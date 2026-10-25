@@ -1,0 +1,125 @@
+import json
+import unittest
+
+from review_broker.admission import AdmissionError, AuthorizationPolicy, authorize
+from review_broker.codespace import CodespaceController, CodespaceError
+from review_broker.publication import GitHubPublisher, PublicationError, result_is_current
+from review_broker.security import (
+    IsolationProbe,
+    SecurityQualification,
+    isolation_probe_passes,
+    require_security_qualification,
+)
+
+
+class FakeCodespaceRunner:
+    def __init__(self, states):
+        self.states = iter(states)
+        self.commands = []
+
+    def __call__(self, command, **kwargs):
+        self.commands.append(command)
+        if command[:3] == ["gh", "codespace", "view"]:
+            state = next(self.states)
+            return type("Result", (), {"returncode": 0, "stdout": json.dumps({"state": state}), "stderr": ""})()
+        return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+
+class SecurityTests(unittest.TestCase):
+    def request(self, repo="fanilosendrison/proto-scope"):
+        return {"subject": {"repository": repo}}
+
+    def test_unauthorized_requester_is_rejected(self):
+        policy = AuthorizationPolicy(frozenset({"trusted"}), frozenset({"fanilosendrison/proto-scope"}))
+        with self.assertRaisesRegex(AdmissionError, "REQUESTER_UNAUTHORIZED"):
+            authorize("attacker", self.request(), policy)
+
+    def test_unauthorized_repository_is_rejected(self):
+        policy = AuthorizationPolicy(frozenset({"trusted"}), frozenset({"fanilosendrison/proto-scope"}))
+        with self.assertRaisesRegex(AdmissionError, "REPOSITORY_UNAUTHORIZED"):
+            authorize("trusted", self.request("other/repo"), policy)
+
+    def test_security_self_qualification_is_rejected(self):
+        qualification = SecurityQualification(
+            status="PASS", reviewer="review-broker", subject="review-broker", evidence_ids=("x",)
+        )
+        with self.assertRaisesRegex(PermissionError, "SELF_QUALIFICATION"):
+            require_security_qualification(qualification)
+
+    def test_missing_security_evidence_fails_closed(self):
+        qualification = SecurityQualification(
+            status="PASS", reviewer="external", subject="review-broker", evidence_ids=()
+        )
+        with self.assertRaisesRegex(PermissionError, "EVIDENCE_REQUIRED"):
+            require_security_qualification(qualification)
+
+    def test_credential_access_attempt_blocks_isolation_qualification(self):
+        probe = IsolationProbe(
+            packet_readable=True,
+            credential_readable=True,
+            github_token_visible=False,
+            api_key_visible=False,
+            unauthorized_network_succeeded=False,
+        )
+        self.assertFalse(isolation_probe_passes(probe))
+
+    def test_stale_result_does_not_apply_to_new_sha(self):
+        result = {"resolved_request": {"subject": {"head_commit": "a" * 40}}}
+        self.assertFalse(result_is_current(result, "b" * 40))
+        self.assertTrue(result_is_current(result, "a" * 40))
+
+    def test_failed_result_upload_preserves_validated_result(self):
+        result = {
+            "schema_version": 1,
+            "request_id": "request:sha256:" + "1" * 64,
+            "subject_id": "subject:sha256:" + "2" * 64,
+            "policy_id": "policy:sha256:" + "3" * 64,
+            "packet_id": "packet:sha256:" + "4" * 64,
+            "attempt_id": "attempt:sha256:" + "5" * 64,
+            "execution_status": "COMPLETED",
+            "evidence_status": "VALID",
+            "review_verdict": "GO",
+            "resolved_request": {"subject": {"head_commit": "a" * 40}},
+            "reviewer": {
+                "backend": "codex-cli",
+                "model_requested": "gpt-5.6-sol",
+                "reasoning_effort_requested": "xhigh",
+                "effective_model_identity_verified": False,
+                "effective_reasoning_effort_verified": False,
+            },
+            "sources_examined": [],
+            "findings": [],
+            "remaining_uncertainties": [],
+            "validation": {"semantic_correctness_validated": False},
+            "applicability": {"status": "CURRENT", "checked_head_commit": "a" * 40},
+        }
+        def runner(*args, **kwargs):
+            return type(
+                "Result", (), {"returncode": 1, "stdout": "", "stderr": "denied"}
+            )()
+
+        with self.assertRaisesRegex(PublicationError, "RESULT_PUBLICATION_FAILED"):
+            GitHubPublisher("sample/repo", runner=runner).publish(1, result)
+
+    def test_codespace_commands_do_not_shell_interpolate_untrusted_values(self):
+        runner = FakeCodespaceRunner(["Available"])
+        controller = CodespaceController("safe-name", runner=runner, sleep=lambda _: None)
+        controller.wait_for("Available", attempts=1, interval_seconds=0)
+        self.assertIsInstance(runner.commands[0], list)
+        self.assertNotIn("shell=True", runner.commands[0])
+
+    def test_cleanup_requires_observed_shutdown(self):
+        runner = FakeCodespaceRunner(["ShuttingDown", "Shutdown"])
+        controller = CodespaceController("safe-name", runner=runner, sleep=lambda _: None)
+        controller.stop(attempts=2, interval_seconds=0)
+        self.assertEqual(runner.commands[-1][-1], "state")
+
+    def test_cleanup_failure_is_explicit(self):
+        runner = FakeCodespaceRunner(["ShuttingDown", "ShuttingDown"])
+        controller = CodespaceController("safe-name", runner=runner, sleep=lambda _: None)
+        with self.assertRaisesRegex(CodespaceError, "SHUTDOWN_NOT_CONFIRMED"):
+            controller.stop(attempts=2, interval_seconds=0)
+
+
+if __name__ == "__main__":
+    unittest.main()

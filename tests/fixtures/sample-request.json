@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "subject": {
+    "kind": "github_pr",
+    "repository": "fanilosendrison/proto-scope",
+    "pull_request": 57
+  },
+  "mission": {
+    "id": "publication",
+    "objective": "Independently review documentary publication",
+    "instructions": "Challenge the documentary candidate under the specified criteria.",
+    "criteria": [
+      "Preserve exact source identity",
+      "Challenge unsupported publication claims",
+      "Identify material uncertainty"
+    ]
+  },
+  "policy": {
+    "profile": "publication",
+    "version": 1
+  },
+  "reviewer": {
+    "backend": "codex-cli",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "xhigh"
+  }
+}
