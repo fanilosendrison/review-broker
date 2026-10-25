@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "code",
+  "version": 1,
+  "mandatory_behavior": [
+    "Challenge correctness, security, error handling, concurrency, and maintainability claims.",
+    "Inspect changed code and directly affected contracts without executing untrusted source.",
+    "Actively seek concrete counterexamples and incomplete failure handling."
+  ],
+  "minimum_evidence": {
+    "whole_changed_file_scope": true,
+    "exact_source_identity": true,
+    "line_anchored_findings": true,
+    "remaining_uncertainties": true
+  },
+  "custom_mission_may_strengthen": true,
+  "custom_mission_may_disable": false
+}

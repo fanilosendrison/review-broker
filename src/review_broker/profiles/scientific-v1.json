@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "scientific",
+  "version": 1,
+  "mandatory_behavior": [
+    "Challenge unsupported scientific claims, provenance gaps, and undisclosed uncertainty.",
+    "Distinguish documentary correspondence from scientific validity.",
+    "Do not invent missing premises, datasets, methods, or acceptance criteria."
+  ],
+  "minimum_evidence": {
+    "whole_changed_file_scope": true,
+    "exact_source_identity": true,
+    "line_anchored_findings": true,
+    "remaining_uncertainties": true
+  },
+  "custom_mission_may_strengthen": true,
+  "custom_mission_may_disable": false
+}

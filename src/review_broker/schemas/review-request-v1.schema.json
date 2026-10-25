@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fanilosendrison/review-broker/schemas/review-request-v1.schema.json",
+  "title": "ReviewRequest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "subject", "mission", "policy", "reviewer"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "repository", "pull_request"],
+      "properties": {
+        "kind": {"const": "github_pr"},
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+        "pull_request": {"type": "integer", "minimum": 1}
+      }
+    },
+    "mission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "objective", "instructions", "criteria"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+        "objective": {"type": "string", "minLength": 1, "maxLength": 2000},
+        "instructions": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {"type": "string", "minLength": 1, "maxLength": 2000}
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "version"],
+      "properties": {
+        "profile": {"enum": ["publication", "architecture", "code", "scientific", "custom"]},
+        "version": {"const": 1}
+      }
+    },
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend", "model", "reasoning_effort"],
+      "properties": {
+        "backend": {"const": "codex-cli"},
+        "model": {"const": "gpt-5.6-sol"},
+        "reasoning_effort": {"const": "xhigh"}
+      }
+    }
+  }
+}

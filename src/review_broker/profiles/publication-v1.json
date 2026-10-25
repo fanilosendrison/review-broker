@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "publication",
+  "version": 1,
+  "mandatory_behavior": [
+    "Challenge unsupported publication claims and accidental normative promotion.",
+    "Identify conflicting identities, missing prerequisites, and material uncertainty.",
+    "Actively seek falsifiers and distinguish source evidence from producer assertions."
+  ],
+  "minimum_evidence": {
+    "whole_changed_file_scope": true,
+    "exact_source_identity": true,
+    "line_anchored_findings": true,
+    "remaining_uncertainties": true
+  },
+  "custom_mission_may_strengthen": true,
+  "custom_mission_may_disable": false
+}
