@@ -1,0 +1,63 @@
+---
+okf_version: "1.0"
+kind: "KnowledgeAsset"
+asset_type: "architecture"
+domain: "independent-review"
+severity: "strict"
+name: "Review Broker Component Boundaries"
+version: "0.1.0"
+---
+
+# Review Broker Component Boundaries
+
+## Domain contracts
+
+`request.py` validates ReviewRequest v1 and owns the GitHub Issue envelope.
+`identity.py` owns RFC 8785 canonical bytes and domain-separated SHA-256
+identities. `admission.py` owns requester/repository authorization and immutable
+pull-request resolution.
+
+## Material acquisition
+
+`packets.py` reads Git blobs without checkout or execution. It preserves original
+bytes, Git object identity, SHA-256, encoding, physical line offsets, and a
+separate normalized line-addressed rendering. It rejects partial-scope claims,
+mutation, unsafe paths, and transport-size overflow.
+
+## Durable execution control
+
+`queue.py` owns legal state transitions, atomic request claims, invocation count,
+and reviewer serialization. Git refs provide atomic create and fast-forward-only
+compare-and-swap behavior. GitHub Actions concurrency is supplemental only.
+
+`recovery.py` maps durable state plus observed Codespace state to bounded recovery
+actions. It never infers whether provider inference happened after an
+inconclusive `ARMED` transition.
+
+## Runtime infrastructure
+
+`codespace.py` owns bounded start, state polling, transfer, SSH, recovery, stop,
+and observed `Shutdown`. `codex.py` owns the pinned one-shot command, child
+environment reduction, prompt before/after hashes, exit capture, and explicit
+failure classification.
+
+Neither module owns request semantics, evidence validity, or publication.
+
+## Evidence and publication
+
+`evidence.py` inventories exact artifacts and detects credential-shaped material.
+`validation.py` checks packet integrity, JSONL terminal sequence, final-message
+binding, response schema, identities, source coverage, and citation anchors. It
+sets semantic correctness validation to false.
+
+`publication.py` constructs ReviewResult v1, checks current applicability, and
+publishes through a trusted GitHub process. Reviewer output cannot call it.
+
+## Interfaces and orchestration
+
+`cli.py` exposes the requester commands and narrow trusted workflow entry points.
+`orchestration.py` composes admission, source acquisition, packet preparation,
+publication, and reconciliation without absorbing their invariants.
+
+The requester installation has no Codex dependency. The authenticated reviewer
+runs only in the dedicated Codespace.
