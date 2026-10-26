@@ -62,7 +62,7 @@ class EvidenceValidationTests(unittest.TestCase):
             "credential_paths_denied": True,
             "trusted_workspace_denied": True,
             "network_access": False,
-        }))
+        }) + b"\n")
         security_observations = {
             "packet_canary_readable": True,
             "auth_parent_canary_readable": False,
@@ -117,7 +117,9 @@ class EvidenceValidationTests(unittest.TestCase):
                 context=context,
                 observed_at="2026-10-26T00:00:01+00:00",
             )
-            (root / "terminal-capture.json").write_bytes(canonical_bytes(receipt))
+            (root / "terminal-capture.json").write_bytes(
+                canonical_bytes(receipt) + b"\n"
+            )
         return manifest
 
     def test_valid_citations_do_not_validate_conclusions(self):
