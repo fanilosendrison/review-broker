@@ -29,17 +29,21 @@ _REQUIRED_OBSERVATIONS = {
     "unauthorized_network_connect": False,
     "sensitive_environment_visible": False,
     "process_canary_visible": False,
+    "outside_packet_canary_readable": False,
+    "symlink_to_auth_parent_canary_readable": False,
+    "hardlink_to_auth_parent_canary_readable": False,
 }
 
 
 def run_reviewer_isolation_probe(
     reviewer_home: Path,
     trusted_workspace: Path,
+    packet_directory: Path,
     *,
     runner: Runner = subprocess.run,
     environment: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
-    profile = verify_reviewer_profile(reviewer_home, trusted_workspace)
+    profile = verify_reviewer_profile(reviewer_home, trusted_workspace, packet_directory)
     codex_home = profile.parent
     auth_path = codex_home / "auth.json"
     if auth_path.is_symlink() or not auth_path.is_file():
@@ -53,8 +57,18 @@ def run_reviewer_isolation_probe(
             stream.write(b"non-secret-auth-parent-canary\n")
             stream.flush()
             os.fsync(stream.fileno())
-        with tempfile.TemporaryDirectory(prefix="review-broker-security-probe-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="review-broker-security-probe-", dir=packet_directory) as temporary, \
+             tempfile.TemporaryDirectory(prefix="review-broker-outside-canary-") as outside:
             probe_root = Path(temporary)
+            outside_canary = Path(outside) / "outside-canary.txt"
+            outside_canary.write_text("non-secret-outside-canary\n", encoding="utf-8")
+            symlink_canary = probe_root / "auth-parent-alias.txt"
+            symlink_canary.symlink_to(adjacent_canary)
+            hardlink_canary = probe_root / "auth-parent-hardlink.txt"
+            try:
+                os.link(adjacent_canary, hardlink_canary)
+            except OSError:
+                pass  # Filesystem may not support cross-mount hard links.
             packet_canary = probe_root / "packet-canary.txt"
             packet_canary.write_text("non-secret-packet-canary\n", encoding="utf-8")
             script = probe_root / "probe.py"
@@ -65,6 +79,9 @@ def run_reviewer_isolation_probe(
                     auth_path,
                     trusted_workspace / "README.md",
                     probe_root,
+                    outside_canary,
+                    symlink_canary,
+                    hardlink_canary,
                 ),
                 encoding="utf-8",
             )
@@ -107,6 +124,8 @@ def run_reviewer_isolation_probe(
         "mismatches": mismatches,
         "limitations": [
             "This probe uses non-secret canaries and does not read credential contents.",
+            "Hard-link denial is untested when the controlled link could not be created.",
+            "Direct sandbox behavior is not an authenticated model-tool observation.",
             "Independent review is still required before authenticated model execution.",
         ],
     }
@@ -152,6 +171,9 @@ def _probe_script(
     auth_path: Path,
     trusted_marker: Path,
     probe_root: Path,
+    outside_canary: Path,
+    symlink_canary: Path,
+    hardlink_canary: Path,
 ) -> str:
     paths = {
         "packet": str(packet_canary),
@@ -159,6 +181,9 @@ def _probe_script(
         "auth": str(auth_path),
         "trusted": str(trusted_marker),
         "write": str(probe_root / "write-canary.txt"),
+        "outside": str(outside_canary),
+        "alias": str(symlink_canary),
+        "hardlink": str(hardlink_canary),
     }
     return f'''from pathlib import Path
 import json
@@ -201,6 +226,14 @@ observation = {{
     "unauthorized_network_connect": connects(),
     "sensitive_environment_visible": any(bool(os.environ.get(name)) for name in sensitive),
     "process_canary_visible": bool(os.environ.get("REVIEW_BROKER_PROCESS_CANARY")),
+    "outside_packet_canary_readable": reads_exact(paths["outside"], "non-secret-outside-canary"),
+    "symlink_to_auth_parent_canary_readable": reads_exact(
+        paths["alias"], "non-secret-auth-parent-canary"
+    ),
+    "hardlink_created": paths["hardlink"].is_file(),
+    "hardlink_to_auth_parent_canary_readable": reads_exact(
+        paths["hardlink"], "non-secret-auth-parent-canary"
+    ),
     "visible_proc_pid_count": sum(name.isdigit() for name in os.listdir("/proc")),
     "parent_process_environment_os_access_readable": os.access(
         f"/proc/{{os.getppid()}}/environ", os.R_OK

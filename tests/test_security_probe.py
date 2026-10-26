@@ -17,26 +17,31 @@ PASSING_OBSERVATION = {
     "unauthorized_network_connect": False,
     "sensitive_environment_visible": False,
     "process_canary_visible": False,
+    "outside_packet_canary_readable": False,
+    "symlink_to_auth_parent_canary_readable": False,
+    "hardlink_to_auth_parent_canary_readable": False,
     "visible_proc_pid_count": 2,
     "parent_process_environment_os_access_readable": True,
 }
 
 
 class SecurityProbeTests(unittest.TestCase):
-    def fixture(self, root: Path) -> tuple[Path, Path]:
+    def fixture(self, root: Path) -> tuple[Path, Path, Path]:
         root = root.resolve()
         home = root / "home"
         workspace = root / "workspace"
+        packet = root / "packet"
         (home / ".codex").mkdir(parents=True)
         workspace.mkdir()
+        packet.mkdir()
         (workspace / "README.md").write_text("trusted")
         (home / ".codex" / "auth.json").write_text("non-secret-fixture")
-        install_reviewer_profile(home, workspace)
-        return home, workspace
+        install_reviewer_profile(home, workspace, packet)
+        return home, workspace, packet
 
     def test_passing_observation_produces_bounded_receipt(self):
         with tempfile.TemporaryDirectory() as temporary:
-            home, workspace = self.fixture(Path(temporary))
+            home, workspace, packet = self.fixture(Path(temporary))
 
             def runner(command, **kwargs):
                 self.assertIn("review-broker", command)
@@ -49,8 +54,7 @@ class SecurityProbeTests(unittest.TestCase):
                 )
 
             receipt = run_reviewer_isolation_probe(
-                home,
-                workspace,
+                home, workspace, packet,
                 runner=runner,
                 environment={"HOME": str(home), "PATH": "/usr/bin"},
             )
@@ -62,7 +66,7 @@ class SecurityProbeTests(unittest.TestCase):
 
     def test_readable_auth_canary_fails_closed(self):
         with tempfile.TemporaryDirectory() as temporary:
-            home, workspace = self.fixture(Path(temporary))
+            home, workspace, packet = self.fixture(Path(temporary))
             observation = dict(PASSING_OBSERVATION, auth_parent_canary_readable=True)
 
             def runner(command, **kwargs):
@@ -74,15 +78,24 @@ class SecurityProbeTests(unittest.TestCase):
                 SecurityProbeError, "auth_parent_canary_readable"
             ):
                 run_reviewer_isolation_probe(
-                    home,
-                    workspace,
+                    home, workspace, packet,
                     runner=runner,
                     environment={"HOME": str(home), "PATH": "/usr/bin"},
                 )
 
+    def test_outside_packet_access_blocks_qualification(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home, workspace, packet = self.fixture(Path(temporary))
+            observed = dict(PASSING_OBSERVATION, outside_packet_canary_readable=True)
+            def runner(command, **kwargs):
+                return subprocess.CompletedProcess(command, 0, stdout=json.dumps(observed), stderr="")
+            with self.assertRaisesRegex(SecurityProbeError, "outside_packet_canary_readable"):
+                run_reviewer_isolation_probe(home, workspace, packet, runner=runner,
+                    environment={"HOME": str(home), "PATH": "/usr/bin"})
+
     def test_probe_transport_failure_is_not_qualification(self):
         with tempfile.TemporaryDirectory() as temporary:
-            home, workspace = self.fixture(Path(temporary))
+            home, workspace, packet = self.fixture(Path(temporary))
 
             def runner(command, **kwargs):
                 return subprocess.CompletedProcess(command, 1, stdout="", stderr="failed")
@@ -91,8 +104,7 @@ class SecurityProbeTests(unittest.TestCase):
                 SecurityProbeError, "SANDBOX_PROBE_EXECUTION_FAILED"
             ):
                 run_reviewer_isolation_probe(
-                    home,
-                    workspace,
+                    home, workspace, packet,
                     runner=runner,
                     environment={"HOME": str(home), "PATH": "/usr/bin"},
                 )

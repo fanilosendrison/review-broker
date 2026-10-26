@@ -13,9 +13,13 @@ class ReviewerProfileError(RuntimeError):
     """The installed reviewer permission profile is absent or untrusted."""
 
 
-def profile_bytes(reviewer_home: Path, trusted_workspace: Path) -> bytes:
+def profile_bytes(reviewer_home: Path, trusted_workspace: Path, packet_directory: Path) -> bytes:
     home = _validated_root(reviewer_home, "REVIEWER_HOME")
     workspace = _validated_root(trusted_workspace, "TRUSTED_WORKSPACE")
+    packet = _validated_root(packet_directory, "PACKET_DIRECTORY")
+    if any(packet == root or packet.is_relative_to(root) or root.is_relative_to(packet)
+           for root in (home, workspace)):
+        raise ReviewerProfileError("PACKET_PRIVILEGED_ROOT_OVERLAP")
     def quote(value: Path) -> str:
         return json.dumps(str(value), ensure_ascii=False)
 
@@ -33,7 +37,8 @@ def profile_bytes(reviewer_home: Path, trusted_workspace: Path) -> bytes:
         'LANG = "C.UTF-8"\n'
         'TZ = "UTC"\n\n'
         f"[permissions.{PROFILE_NAME}.filesystem]\n"
-        '"/" = "read"\n'
+        '":minimal" = "read"\n'
+        f"{quote(packet)} = \"read\"\n"
         f"{quote(home)} = \"deny\"\n"
         f"{quote(workspace)} = \"deny\"\n\n"
         f"[permissions.{PROFILE_NAME}.network]\n"
@@ -41,8 +46,10 @@ def profile_bytes(reviewer_home: Path, trusted_workspace: Path) -> bytes:
     ).encode("utf-8")
 
 
-def install_reviewer_profile(reviewer_home: Path, trusted_workspace: Path) -> Path:
-    expected = profile_bytes(reviewer_home, trusted_workspace)
+def install_reviewer_profile(
+    reviewer_home: Path, trusted_workspace: Path, packet_directory: Path,
+) -> Path:
+    expected = profile_bytes(reviewer_home, trusted_workspace, packet_directory)
     codex_home = _codex_home(reviewer_home)
     _reject_base_user_config(codex_home)
     profile = codex_home / f"{PROFILE_NAME}.config.toml"
@@ -61,12 +68,14 @@ def install_reviewer_profile(reviewer_home: Path, trusted_workspace: Path) -> Pa
         except BaseException:
             profile.unlink(missing_ok=True)
             raise
-    verify_reviewer_profile(reviewer_home, trusted_workspace)
+    verify_reviewer_profile(reviewer_home, trusted_workspace, packet_directory)
     return profile
 
 
-def verify_reviewer_profile(reviewer_home: Path, trusted_workspace: Path) -> Path:
-    expected = profile_bytes(reviewer_home, trusted_workspace)
+def verify_reviewer_profile(
+    reviewer_home: Path, trusted_workspace: Path, packet_directory: Path,
+) -> Path:
+    expected = profile_bytes(reviewer_home, trusted_workspace, packet_directory)
     codex_home = _codex_home(reviewer_home)
     _reject_base_user_config(codex_home)
     profile = codex_home / f"{PROFILE_NAME}.config.toml"
