@@ -66,7 +66,8 @@ jobs:
           set -euo pipefail
           set +x
           touch "$RUNNER_TEMP/codespace-control-may-have-started"
-          gh codespace start -c "$CODESPACE_NAME"
+          gh api --method POST \
+            "user/codespaces/${CODESPACE_NAME}/start" >/dev/null
 
           observed=""
           for _ in $(seq 1 60); do
