@@ -94,9 +94,9 @@ class ReviewerProfileTests(unittest.TestCase):
             with self.assertRaisesRegex(ReviewerProfileError, "PROFILE_MODE_INVALID"):
                 verify_reviewer_profile(home, workspace, packet)
             profile.chmod(0o600)
-            with mock.patch("review_broker.reviewer_profile.os.getuid", return_value=-1):
-                with self.assertRaisesRegex(ReviewerProfileError, "CODEX_HOME_UNTRUSTED|PROFILE_OWNER_INVALID"):
-                    verify_reviewer_profile(home, workspace, packet)
+            with (mock.patch("review_broker.reviewer_profile.os.getuid", return_value=-1),
+                  self.assertRaisesRegex(ReviewerProfileError, "CODEX_HOME_UNTRUSTED|PROFILE_OWNER_INVALID")):
+                verify_reviewer_profile(home, workspace, packet)
             alias = Path(temporary) / "alias"
             os.link(profile, alias)
             with self.assertRaisesRegex(ReviewerProfileError, "PROFILE_TYPE_INVALID"):
