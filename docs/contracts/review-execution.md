@@ -32,9 +32,17 @@ transition requires an evidence identity.
 `REQUESTED` means an atomic deterministic claim exists. `ADMITTED` requires a
 validated, authorized, immutable resolution. `PREPARED` requires a verified
 packet. `ARMED` is durable before a model-capable call. `TERMINAL_CAPTURED`
-requires recovered terminal artifacts. `VALIDATED` requires independent
-validation. `REPORTED` requires observed publication. `STOPPED` requires
-observed Codespace `Shutdown` after reporting or indeterminate cleanup.
+requires a receipt binding the request, attempt, packet, complete terminal
+artifact inventory, and one non-contradictory terminal event sequence.
+`VALIDATED` requires independent validation. `REPORTED` requires observed
+publication. `STOPPED` requires a receipt binding the request, attempt,
+Codespace, workflow context, observation time, and actual `Shutdown` after
+reporting or indeterminate cleanup.
+
+Generic journal transitions cannot create `TERMINAL_CAPTURED` or `STOPPED`.
+Those states require their specialized evidence-validating operations. A failed
+or ambiguous shutdown observation records an infrastructure incident and does
+not create `STOPPED`.
 
 ## Atomic claim and idempotence
 
@@ -62,5 +70,8 @@ Pre-model states can resume the same attempt. Captured evidence can be validated
 without inference. Validated evidence can be published without inference.
 `ARMED` without terminal evidence is marked indeterminate and stopped.
 
-The reconciler reads durable claim refs rather than Actions job history. It
-reports unsupported states and failed cleanup as infrastructure incidents.
+The reconciler reads authenticated open request Issues as well as durable claim
+refs. A lost Issue event creates or reuses the deterministic claim before a
+pre-model dispatch. It reports unsupported states, incomplete scans, missing
+artifact locators, and failed cleanup explicitly; it never converts them into a
+later durable state.

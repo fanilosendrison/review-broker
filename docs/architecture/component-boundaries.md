@@ -15,7 +15,8 @@ version: "0.1.0"
 `request.py` validates ReviewRequest v1 and owns the GitHub Issue envelope.
 `identity.py` owns RFC 8785 canonical bytes and domain-separated SHA-256
 identities. `admission.py` owns requester/repository authorization and immutable
-pull-request resolution.
+pull-request resolution. Packet preparation rechecks the PR head after complete
+file enumeration and rejects a subject change before source acquisition.
 
 ## Material acquisition
 
@@ -26,13 +27,17 @@ mutation, unsafe paths, and transport-size overflow.
 
 ## Durable execution control
 
-`queue.py` owns legal state transitions, atomic request claims, invocation count,
-and reviewer serialization. Git refs provide atomic create and fast-forward-only
+`queue.py` owns legal state transitions, specialized evidence-gated terminal
+transitions, invocation count, and in-memory reviewer serialization.
+`github_journal.py` owns atomic Git-ref claims and fast-forward-only
 compare-and-swap behavior. GitHub Actions concurrency is supplemental only.
 
-`recovery.py` maps durable state plus observed Codespace state to bounded recovery
-actions. It never infers whether provider inference happened after an
-inconclusive `ARMED` transition.
+`recovery.py` maps durable state plus observed Codespace state to bounded
+recovery actions. `execution_recovery.py` owns partial artifact recovery,
+terminal-capture receipts, shutdown observations, incidents, and their durable
+transitions. `reconciliation.py` owns complete bounded Issue and claim scans,
+lost-event dispatch, and executable recovery actions. None infers whether
+provider inference happened after an inconclusive `ARMED` transition.
 
 ## Runtime infrastructure
 
@@ -58,9 +63,12 @@ publishes through a trusted GitHub process. Reviewer output cannot call it.
 
 ## Interfaces and orchestration
 
-`cli.py` exposes the requester commands and narrow trusted workflow entry points.
-`orchestration.py` composes admission, source acquisition, packet preparation,
-publication, and reconciliation without absorbing their invariants.
+`cli.py` exposes the requester commands and narrow trusted workflow entry
+points. `orchestration.py` composes admission, source acquisition, packet
+preparation, and publication without absorbing their invariants. Privileged
+workflows run only from the exact default-branch event SHA. Remote broker code
+is an exact transferred wheel, verified before installation and invoked with
+unsafe Python import paths disabled.
 
 The requester installation has no Codex dependency. The authenticated reviewer
 runs only in the dedicated Codespace.

@@ -29,6 +29,13 @@ Codespace visibility, start, SSH, upload, download, stop, and cleanup transport
 checks in run `40304872558`. Neither result replaces independent security
 review.
 
+Technical finding regressions now prevent false `TERMINAL_CAPTURED` and
+`STOPPED` transitions, preserve partial recovery, execute lost-Issue and safe
+pre-model reconciliation, block unsupported post-capture recovery explicitly,
+recheck source identity during preparation, and bind the exact remote broker
+wheel. These are producer tests and implementation corrections, not independent
+acceptance.
+
 ## Not established
 
 The following gates remain open and must not be represented as passed:
@@ -38,6 +45,9 @@ The following gates remain open and must not be represented as passed:
 - bounded live model, effort, schema, JSONL, quota, and unavailable-model probe;
 - default-branch workflow event delivery from CLI and GitHub connector;
 - live cancellation and stranded-runtime recovery;
+- a durable artifact locator enabling reconciler validation and publication of
+  existing evidence;
+- the re-review identity and attempt-allocation decision tracked by Issue #20;
 - independent external review of contracts, security, retry, and evidence claims;
 - Proto-Scope PR #57 review at the pinned SHA;
 - a materially different second repository review;

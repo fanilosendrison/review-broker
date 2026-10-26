@@ -80,16 +80,21 @@ probe evidence.
 ### Persistent Codespace compromise
 
 Exactly one dedicated private-repository Codespace is used. It does not reuse
-the historical Review Lab Codespace. Packet transfer is bounded, reviewer code
-is pinned, untrusted repository code is not checked out for execution, and each
-workflow verifies `Shutdown`. The scheduled reconciler independently detects
-nonterminal attempts and stranded runtime state.
+the historical Review Lab Codespace. Packet transfer is bounded. The workflow
+builds a broker wheel from its exact default-branch event SHA, transfers and
+verifies its SHA-256, force-installs that wheel, disables unsafe Python import
+paths, and records the wheel identity in attempt evidence. Untrusted repository
+code is not checked out for execution, and each workflow binds actual
+`Shutdown` or records an incident. The scheduled reconciler independently
+detects nonterminal attempts and stranded runtime state.
 
 ### Policy and workflow modification
 
-Only default-branch broker code executes. Pull-request code is not selected by a
-review event. Schemas, profiles, workflows, and reviewer distribution versions
-are versioned and reviewed. Profiles cannot be weakened by mission text.
+Only the exact default-branch event SHA executes. Privileged manual dispatches
+from any other ref are rejected before secrets are exposed. Pull-request code is
+not selected by a review event. Schemas, profiles, workflows, trusted broker
+wheels, and reviewer distribution versions are versioned and reviewed. Profiles
+cannot be weakened by mission text.
 
 ### Incomplete evidence or false success
 
@@ -100,9 +105,9 @@ Failures and missing artifacts produce invalid or indeterminate states.
 
 ## Residual blocker
 
-ChatGPT authentication is verified. A corrected profile has demonstrated the
-required producer-side non-secret canary outcomes, but independent security
-review and a dedicated Codespaces-control credential are still missing. The
-repository variable that enables authenticated execution must remain unset until
-independent qualification accepts the exact filesystem, process, environment,
-and network observations.
+ChatGPT authentication is verified. The dedicated Codespaces-control transport
+passed T1–T6 in Actions run `40304872558`. A corrected profile has demonstrated
+the required producer-side non-secret canary outcomes, but independent security
+review remains missing. The repository variable that enables authenticated
+execution must remain unset until independent qualification accepts the exact
+filesystem, process, environment, and network observations.

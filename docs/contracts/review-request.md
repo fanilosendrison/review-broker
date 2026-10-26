@@ -62,3 +62,12 @@ The canonical JSON appears exactly once between these markers:
 A derived `Request-ID` may appear outside the markers. No other Issue text has
 request semantics. Multiple envelopes, noncanonical JSON, unknown fields, and
 unauthorized authors or repositories fail admission.
+
+## Re-review decision boundary
+
+The accepted v1 fields do not distinguish duplicate delivery, a fresh request
+for a newly resolved PR head, and explicit re-execution of an earlier attempt.
+The implementation therefore preserves one deterministic logical claim and
+does not allocate a new attempt after a subject change. GitHub Issue #20 records
+the required contract decision; no identity or ordinal rule may be inferred
+before that decision is accepted.
