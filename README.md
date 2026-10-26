@@ -18,10 +18,11 @@ of the result.
 ## Qualification status
 
 The implementation is a construction candidate. It is **not production
-qualified**. The dedicated Codespace exists and the Codex CLI is pinned, but its
-independent ChatGPT authentication and the reviewer credential-isolation gate
-remain incomplete. Automatic workflows fail closed until external security
-evidence is registered.
+qualified**. Independent ChatGPT authentication is verified and the corrected
+reviewer profile passes a producer-run non-secret isolation probe. Independent
+security and construction reviews, a dedicated Codespaces-control credential,
+and live execution qualification remain incomplete. Automatic workflows fail
+closed until external security evidence is registered.
 
 ## Install the requester CLI
 

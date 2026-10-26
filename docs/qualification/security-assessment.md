@@ -1,0 +1,92 @@
+---
+okf_version: "1.0"
+kind: "KnowledgeAsset"
+asset_type: "qualification-record"
+domain: "independent-review"
+severity: "strict"
+name: "Reviewer Credential-Isolation Assessment"
+version: "0.1.0"
+---
+
+# Reviewer Credential-Isolation Assessment
+
+## Discovery
+
+### Statement
+
+The Codex CLI `:read-only` permission profile used by the original PR #14
+candidate permitted model-controlled subprocesses to read the runtime user's
+home directory, including the ChatGPT credential path.
+
+### Source and evidence
+
+The subject was candidate
+`114ff4bd25d43c5aeaca1cf3f60deb80fc63f0ba` with Codex CLI `0.164.0` in the
+dedicated Codespace. A direct `codex sandbox -P :read-only` probe read a
+non-secret canary adjacent to the credential file and reported that the
+credential path was readable. It could not write the packet or connect directly
+to the network.
+
+The exact upstream source at OpenAI Codex tag `rust-v0.164.0`, commit
+`6aaac694803004a63c6f393d153c96d22521a6b9`, defines the built-in read-only
+filesystem policy as read access to `/`. File mode `0600` therefore did not
+isolate a same-user sandbox subprocess.
+
+Credential contents were never read, copied, printed, hashed, or transferred.
+
+### Existing authority
+
+`docs/security/reviewer-independence.md` requires model-controlled tools to be
+unable to read ChatGPT credential material. `docs/security/threat-model.md`
+explicitly states that a read-only flag is insufficient. The observed behavior
+contradicted the candidate implementation, not the accepted security contract.
+
+### Semantic disposition
+
+`derived-from-existing-authority`
+
+### Affected layers
+
+- `verification-or-qualification-evidence`
+- `architecture-or-implementation`
+- `integration-or-conformance`
+- `repository-governance-or-documentation`
+
+### Related discoveries or consequences
+
+No live model invocation, construction review, or consumer review is admissible
+until the correction receives independent security review. ChatGPT
+authentication itself remains valid and separate.
+
+### Required authority
+
+No new product decision is required. The existing security contract uniquely
+requires correction. Independent review remains required to accept the
+qualification evidence.
+
+### Next action
+
+Use Codex's maintained named permission profiles to deny the complete runtime
+home and trusted workspace, disable network and writes, prevent login shells,
+and replace inherited model-tool environment variables with a fixed minimal
+set. Verify the exact profile before every invocation and run a controlled
+non-secret probe after installation.
+
+## Corrected producer observation
+
+The corrected `review-broker` profile produced the receipt in
+`receipts/reviewer-isolation-probe-v1.json`:
+
+- packet canary readable;
+- runtime home and adjacent auth canary unreadable;
+- auth path not readable;
+- trusted broker workspace unreadable;
+- packet directory not writable;
+- direct network connection denied;
+- sensitive and process canary environment variables absent;
+- two processes visible in the sandbox namespace.
+
+This producer probe passed. It does not independently qualify the boundary. The
+repository security gate remains closed until a separate reviewer challenges
+the mechanism, evidence scope, alternate credential paths, and process
+isolation.

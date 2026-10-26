@@ -17,10 +17,18 @@ working tree, mutable configuration, local rules, or result. It receives only
 the trusted mission, mandatory profile, immutable packet, output schema, and
 minimum runtime metadata required for examination.
 
-The v1 adapter uses `--ephemeral`, `--ignore-user-config`, `--ignore-rules`, a
-read-only sandbox, exact model selection, and schema-constrained output. These
-flags constrain execution but do not establish credential isolation or semantic
-independence by themselves.
+The v1 adapter uses `--ephemeral`, `--ignore-rules`, `--strict-config`, the
+exact `review-broker` permission profile, exact model selection, and
+schema-constrained output. It rejects any base user config and verifies the
+profile bytes, ownership, mode, runtime home, and trusted workspace before
+creating `attempt.json`.
+
+The profile grants read access at filesystem root only after denying the complete
+runtime home and trusted workspace. It denies network and writes, prevents login
+shells, and replaces inherited model-tool environment variables with a fixed
+minimal set. A controlled non-secret probe verifies the effective boundary.
+These producer checks do not establish semantic independence or replace
+independent security review.
 
 ## Credential ownership
 
@@ -47,7 +55,8 @@ metadata. The broker never infers either from a CLI flag.
 
 ## Qualification gate
 
-Before authenticated content is exposed, controlled probes must demonstrate:
+Before authenticated content is exposed, independently reviewed controlled
+probes must demonstrate:
 
 - the effective user and process tree;
 - packet read access and write restrictions;

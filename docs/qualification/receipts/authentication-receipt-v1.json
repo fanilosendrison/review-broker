@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "codespace": "review-broker-reviewer-4q4v769jr65hjww9",
+  "repository": "fanilosendrison/review-broker",
+  "codex_distribution": "@openai/codex",
+  "codex_version": "0.164.0",
+  "authentication_mode": "ChatGPT",
+  "authentication_status": "VERIFIED",
+  "authentication_usable": true,
+  "observed_utc": "2026-10-26T08:31:37Z",
+  "api_key_overrides_observed": false,
+  "credential_contents_examined": false,
+  "limitations": [
+    "Authentication does not establish model availability.",
+    "Authentication does not establish reviewer credential isolation.",
+    "No account identifier or credential material is included."
+  ]
+}

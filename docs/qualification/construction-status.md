@@ -21,14 +21,17 @@ automated synthetic coverage.
 
 The historical Review Lab implementation was inspected at the pinned commit.
 The new dedicated Codespace and pinned Codex distribution were created and
-inventoried. `Shutdown` was observed after setup and CLI inspection.
+inventoried. Independent ChatGPT authentication is verified. A reproduced
+root-read defect in the built-in read-only profile is corrected by an exact
+named permission profile, and the producer-run non-secret isolation probe
+passes. This does not replace independent security review.
 
 ## Not established
 
 The following gates remain open and must not be represented as passed:
 
-- independent ChatGPT authentication in the new Codespace;
-- effective filesystem, process, environment, and network credential isolation;
+- independent acceptance of the filesystem, process, environment, and network
+  credential-isolation evidence;
 - bounded live model, effort, schema, JSONL, quota, and unavailable-model probe;
 - dedicated Codespaces-control identity and exact permission qualification;
 - default-branch workflow event delivery from CLI and GitHub connector;

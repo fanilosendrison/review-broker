@@ -42,8 +42,14 @@ codex-final.json
 codex-exit-code.txt
 input-before.sha256
 input-after.sha256
+reviewer-security-probe.json
 validation.json
 ```
+
+`reviewer-security-probe.json` binds the exact permission-profile SHA-256 to
+controlled non-secret filesystem, environment, write, and network observations.
+A missing or mismatched receipt invalidates the evidence; a passing producer
+receipt does not replace independent security review.
 
 A missing final response is represented by an empty captured artifact and an
 invalid or indeterminate validation outcome, not a manufactured response.

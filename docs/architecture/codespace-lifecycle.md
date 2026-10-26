@@ -48,7 +48,10 @@ execution success.
 
 ## Current gate
 
-`codex login status` returned `Not logged in`. Authentication requires the
-supported interactive ChatGPT device-login procedure. No API key is permitted.
-No review packet may be transferred until authentication and external security
-qualification both pass.
+`codex login status` returned `Logged in using ChatGPT` at the recorded
+post-authentication observation. No API key is permitted. The corrected
+permission profile passes a producer-run non-secret probe and the Codespace was
+returned to `Shutdown` after qualification work.
+
+No review packet may reach a model until independent security review and the
+dedicated Codespaces-control credential gate both pass.

@@ -20,8 +20,9 @@ terminal execution truth.
 ## Safe recovery by state
 
 - `REQUESTED`, `ADMITTED`, or `PREPARED`: resume the same attempt before the
-  model boundary. Rebuild packets only from the same resolved commits and
-  require the same packet identity.
+  model boundary. Re-admission must reproduce the recorded resolved-request
+  evidence identity. A rebuilt prepared packet must reproduce the recorded
+  packet evidence identity before execution can continue.
 - `ARMED`: if complete terminal evidence is absent, record `INDETERMINATE`, stop
   the Codespace, and do not invoke Codex again.
 - `TERMINAL_CAPTURED`: validate recovered evidence without inference.

@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "codespace": "review-broker-reviewer-4q4v769jr65hjww9",
+  "repository": "fanilosendrison/review-broker",
+  "codex_version": "0.164.0",
+  "official_source_tag": "rust-v0.164.0",
+  "official_source_commit": "6aaac694803004a63c6f393d153c96d22521a6b9",
+  "permission_profile": "review-broker",
+  "observed_utc": "2026-10-26T09:01:35.010015+00:00",
+  "permission_profile_sha256": "2ded00bc59deb4d1ea6bb7b6fde7ca2488d729846c6c888288cad2eb72c21a45",
+  "observations": {
+    "auth_file_os_access_readable": false,
+    "auth_parent_canary_readable": false,
+    "packet_canary_readable": true,
+    "packet_directory_writable": false,
+    "parent_process_environment_os_access_readable": true,
+    "process_canary_visible": false,
+    "sensitive_environment_visible": false,
+    "trusted_workspace_readable": false,
+    "unauthorized_network_connect": false,
+    "visible_proc_pid_count": 2
+  },
+  "required_observations": {
+    "auth_file_os_access_readable": false,
+    "auth_parent_canary_readable": false,
+    "packet_canary_readable": true,
+    "packet_directory_writable": false,
+    "process_canary_visible": false,
+    "sensitive_environment_visible": false,
+    "trusted_workspace_readable": false,
+    "unauthorized_network_connect": false
+  },
+  "producer_probe_result": "PASS",
+  "credential_contents_examined": false,
+  "model_inference_performed": false,
+  "limitations": [
+    "The passing probe validates controlled non-secret canaries, not model reasoning.",
+    "The visible parent-process environment belonged to the two-process sandbox namespace and was filtered by the reviewer profile.",
+    "Independent security review remains required before authenticated model execution."
+  ]
+}

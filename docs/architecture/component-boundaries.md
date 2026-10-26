@@ -37,7 +37,10 @@ inconclusive `ARMED` transition.
 ## Runtime infrastructure
 
 `codespace.py` owns bounded start, state polling, transfer, SSH, recovery, stop,
-and observed `Shutdown`. `codex.py` owns the pinned one-shot command, child
+and observed `Shutdown`. `reviewer_profile.py` owns the exact credential-denying
+Codex permission profile. `security_probe.py` owns controlled non-secret
+verification of its effective filesystem, environment, and network boundary.
+`codex.py` owns the pinned one-shot command, profile verification, parent-process
 environment reduction, prompt before/after hashes, exit capture, and explicit
 failure classification.
 

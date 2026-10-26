@@ -66,10 +66,16 @@ from the Codex child environment. Evidence is scanned for credential-shaped
 material. The ChatGPT credential file is never copied, logged, committed, or
 placed in Actions secrets.
 
-These controls are not sufficient by themselves. A read-only Codex sandbox may
-still permit reads outside the packet. Authenticated review remains disabled
-until controlled tests prove that model-controlled tools cannot read credential
-material or reach unauthorized network targets.
+The built-in Codex `:read-only` profile was proven insufficient because it
+allowed reads from filesystem root. The corrected named profile denies the
+complete runtime home and trusted workspace, denies writes and network access,
+prevents login shells, and supplies a fixed minimal subprocess environment. A
+controlled non-secret probe must pass immediately before invocation.
+
+These producer controls are not sufficient qualification by themselves.
+Authenticated model execution remains disabled until an independent reviewer
+challenges the profile, alternate credential paths, process visibility, and
+probe evidence.
 
 ### Persistent Codespace compromise
 
@@ -94,8 +100,9 @@ Failures and missing artifacts produce invalid or indeterminate states.
 
 ## Residual blocker
 
-The new Codespace currently has no ChatGPT login. More importantly, effective
-credential isolation for model-controlled tools has not yet been demonstrated.
-The repository variable that enables authenticated execution must remain unset
-until independent qualification records exact filesystem, process, environment,
+ChatGPT authentication is verified. A corrected profile has demonstrated the
+required producer-side non-secret canary outcomes, but independent security
+review and a dedicated Codespaces-control credential are still missing. The
+repository variable that enables authenticated execution must remain unset until
+independent qualification accepts the exact filesystem, process, environment,
 and network observations.
