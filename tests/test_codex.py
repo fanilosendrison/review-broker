@@ -32,6 +32,18 @@ class CodexAdapterTests(unittest.TestCase):
         self.assertEqual(command[command.index("--model") + 1], "gpt-5.6-sol")
         self.assertIn('model_reasoning_effort="xhigh"', command)
         self.assertEqual(command[-1], "-")
+        self.assertEqual(command.count("features.shell_tool=false"), 1)
+        self.assertNotIn("features.shell_tool=true", command)
+        self.assertNotIn("--enable", command)
+        self.assertEqual(
+            [command[index + 1] for index, arg in enumerate(command[:-1]) if arg == "-c"],
+            ['features.shell_tool=false', 'model_reasoning_effort="xhigh"'],
+        )
+        self.assertNotIn("--dangerously-bypass-approvals-and-sandbox", command)
+        self.assertNotIn("OPENAI_API_KEY", command)
+        self.assertNotIn("--api-key", command)
+        self.assertEqual(command[command.index("--output-schema") + 1], "/schema.json")
+        self.assertEqual(command[command.index("--output-last-message") + 1], "/final.json")
 
     def test_api_and_github_credentials_are_removed(self):
         source = {
@@ -79,7 +91,12 @@ class CodexAdapterTests(unittest.TestCase):
             schema = packet / "response.schema.json"
             schema.write_text("{}")
 
+            calls = []
+
             def runner(command, **kwargs):
+                calls.append(list(command))
+                self.assertFalse(kwargs["shell"])
+                self.assertNotIn("OPENAI_API_KEY", kwargs["env"])
                 kwargs["stdout"].write(b'{"type":"turn.started"}\n')
                 kwargs["stderr"].write(b"model unavailable")
                 return subprocess.CompletedProcess(command, 1)
@@ -104,6 +121,10 @@ class CodexAdapterTests(unittest.TestCase):
                 )
             attempt = json.loads((packet / "attempt.json").read_text(encoding="utf-8"))
             self.assertEqual(attempt["broker_wheel_sha256"], "b" * 64)
+            self.assertEqual(calls, [attempt["argv"]])
+            self.assertEqual(attempt["argv"].count("features.shell_tool=false"), 1)
+            self.assertEqual(attempt["argv"][attempt["argv"].index("--profile") + 1],
+                             profile_name(packet))
             self.assertEqual(attempt["permission_profile"], profile_name(packet))
             self.assertEqual(attempt["permission_profile_sha256"],
                              hashlib.sha256((home / ".codex" / (profile_name(packet) + ".config.toml")).read_bytes()).hexdigest())
@@ -124,6 +145,7 @@ class CodexAdapterTests(unittest.TestCase):
                     runner=runner,
                     environment=environment,
                 )
+            self.assertEqual(calls, [attempt["argv"]])
 
     def test_model_transport_requires_prepared_packet_identity(self):
         with tempfile.TemporaryDirectory() as temporary:
