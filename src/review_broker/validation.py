@@ -14,6 +14,7 @@ from .evidence import (
     EvidenceCaptureError,
     REQUIRED_EVIDENCE_FILES,
     TERMINAL_CAPTURE_FILES,
+    credential_material_detected,
     evidence_manifest,
     scan_for_credentials,
     validate_terminal_capture_receipt,
@@ -50,7 +51,7 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
         execution_status = "INDETERMINATE"
     contaminated = scan_for_credentials(directory)
     if contaminated:
-        reasons.append("CREDENTIAL_MATERIAL_DETECTED:" + ",".join(contaminated))
+        reasons.append("CREDENTIAL_MATERIAL_DETECTED")
     reasons.extend(_security_profile_errors(directory))
     reasons.extend(_terminal_capture_errors(directory, manifest, inventory))
     exit_value = _read_text(directory / "codex-exit-code.txt").strip()
@@ -123,6 +124,14 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
         review_verdict = response["verdict"]
     else:
         evidence_status = "UNDETERMINED"
+    # Never serialize model-authored data into a publishable validation record
+    # when known credential material was detected anywhere in recovered evidence.
+    if contaminated:
+        response = {}
+        reasons = ["SANITIZED_VALIDATION_REASON" if credential_material_detected(reason)
+                   else reason for reason in reasons]
+        inventory = {name: {"present": entry["present"], "byte_length": None,
+                            "sha256": None} for name, entry in inventory.items()}
     result = {
         "schema_version": 1,
         "execution_status": execution_status,
@@ -139,8 +148,8 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
         "effective_reasoning_effort_verified": False,
         "validation_reasons": reasons,
         "artifact_inventory": inventory,
-        "events_sha256": _file_hash(directory / "codex-events.jsonl"),
-        "final_sha256": _file_hash(directory / "codex-final.json"),
+        "events_sha256": None if contaminated else _file_hash(directory / "codex-events.jsonl"),
+        "final_sha256": None if contaminated else _file_hash(directory / "codex-final.json"),
     }
     _write_exclusive(directory / "validation.json", canonical_bytes(result) + b"\n")
     return result

@@ -11,6 +11,7 @@ from typing import Any, Callable, Mapping
 
 from jsonschema import Draft202012Validator
 
+from .evidence import credential_material_detected
 from .identity import canonical_bytes
 
 RESULT_MARKER = "<!-- review-broker-result:v1 -->"
@@ -39,6 +40,9 @@ def build_review_result(
     *,
     current_head: str | None,
 ) -> dict[str, Any]:
+    if any(str(reason).startswith("CREDENTIAL_MATERIAL_DETECTED")
+           for reason in validation.get("validation_reasons", [])):
+        raise PublicationError("CONTAMINATED_EVIDENCE_NOT_PUBLISHABLE")
     reviewed_head = resolved_request["subject"]["head_commit"]
     if current_head is None:
         applicability = "UNDETERMINED"
@@ -73,7 +77,18 @@ def build_review_result(
     errors = list(Draft202012Validator(_result_schema()).iter_errors(result))
     if errors:
         raise PublicationError("REVIEW_RESULT_SCHEMA_INVALID")
+    _reject_unsafe_result(result)
     return result
+
+
+def _reject_unsafe_result(result: Mapping[str, Any]) -> None:
+    validation = result.get("validation")
+    if (isinstance(validation, dict) and
+        any(str(reason).startswith("CREDENTIAL_MATERIAL_DETECTED")
+            for reason in validation.get("validation_reasons", []))):
+        raise PublicationError("CONTAMINATED_EVIDENCE_NOT_PUBLISHABLE")
+    if credential_material_detected(dict(result)):
+        raise PublicationError("CREDENTIAL_PATTERN_IN_RESULT")
 
 
 def result_identity(result: Mapping[str, Any]) -> str:
@@ -88,6 +103,7 @@ def render_result_comment(
     errors = list(Draft202012Validator(_result_schema()).iter_errors(result))
     if errors:
         raise PublicationError("REVIEW_RESULT_SCHEMA_INVALID")
+    _reject_unsafe_result(result)
     publication_line = ""
     if publication_id is not None:
         if not PUBLICATION_ID.fullmatch(publication_id):
@@ -205,9 +221,7 @@ def validate_publication_intent(
         if hashlib.sha256(body.encode("utf-8")).hexdigest() != intent["comment_body_sha256"]:
             raise PublicationError("PUBLICATION_BODY_IDENTITY_MISMATCH")
     _timestamp(intent.get("reserved_at"), "PUBLICATION_RESERVED_AT_INVALID")
-    return "artifact:sha256:" + hashlib.sha256(
-        canonical_bytes(dict(intent)) + b"\n"
-    ).hexdigest()
+    return "artifact:sha256:" + hashlib.sha256(canonical_bytes(dict(intent)) + b"\n").hexdigest()
 
 
 def validate_publication_receipt(
@@ -259,27 +273,15 @@ class GitHubPublisher:
             dict(result), publication_id=intent["publication_id"]
         )
         matches: list[dict[str, Any]] = []
-        for page in range(1, 101):
-            values = self._json(
-                "GET",
-                f"repos/{self.repository}/issues/{intent['issue_number']}"
-                f"/comments?per_page=100&page={page}",
-            )
-            if not isinstance(values, list):
-                raise PublicationError("PUBLICATION_COMMENT_LIST_INVALID")
-            for comment in values:
-                if not isinstance(comment, dict) or comment.get("body") != body:
-                    continue
-                actor = comment.get("user")
-                if not isinstance(actor, dict) or {
-                    "login": actor.get("login"), "id": actor.get("id")
-                } != intent["publisher"]:
-                    continue
-                matches.append(comment)
-            if len(values) < 100:
-                break
-        else:
-            raise PublicationError("PUBLICATION_COMMENT_SCAN_INCOMPLETE")
+        for comment in self.comments(intent["issue_number"]):
+            if comment.get("body") != body:
+                continue
+            actor = comment.get("user")
+            if not isinstance(actor, dict) or {
+                "login": actor.get("login"), "id": actor.get("id")
+            } != intent["publisher"]:
+                continue
+            matches.append(comment)
         if len(matches) > 1:
             raise PublicationError("DUPLICATE_PUBLICATION_INCIDENT")
         if not matches:
@@ -300,6 +302,27 @@ class GitHubPublisher:
         }
         validate_publication_receipt(receipt, intent=intent)
         return receipt
+
+    def comments(self, issue_number: int) -> list[dict[str, Any]]:
+        comments: list[dict[str, Any]] = []
+        for page in range(1, 101):
+            values = self._json(
+                "GET",
+                f"repos/{self.repository}/issues/{issue_number}"
+                f"/comments?per_page=100&page={page}",
+            )
+            if not isinstance(values, list) or any(not isinstance(item, dict) for item in values):
+                raise PublicationError("PUBLICATION_COMMENT_LIST_INVALID")
+            comments.extend(values)
+            if len(values) < 100:
+                return comments
+        raise PublicationError("PUBLICATION_COMMENT_SCAN_INCOMPLETE")
+
+    def comment(self, comment_id: int) -> dict[str, Any]:
+        value = self._json("GET", f"repos/{self.repository}/issues/comments/{comment_id}")
+        if not isinstance(value, dict):
+            raise PublicationError("PUBLICATION_COMMENT_INVALID")
+        return value
 
     def publish_reserved(
         self,

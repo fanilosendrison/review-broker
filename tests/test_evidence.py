@@ -11,14 +11,18 @@ from review_broker.evidence import (
     build_terminal_capture_receipt,
     evidence_manifest,
     scan_for_credentials,
+    quarantine_contaminated_evidence,
 )
 from review_broker.identity import artifact_identity, canonical_bytes
 from review_broker.packets import SourceRecord, build_packet
+from review_broker.publication import PublicationError, build_review_result
 from review_broker.validation import validate_evidence
 
 
 class EvidenceValidationTests(unittest.TestCase):
-    def fixture(self, root: Path, *, quote="alpha", terminal=True, failure=False):
+    def fixture(self, root: Path, *, quote="alpha", terminal=True, failure=False,
+                claim="A conclusion that the validator cannot semantically adjudicate.",
+                uncertainty="Semantic correctness is not machine-validated."):
         source = b"alpha line\r\nbeta line\r\n"
         oid = hashlib.sha1(b"blob " + str(len(source)).encode() + b"\0" + source).hexdigest()
         record = SourceRecord.from_bytes("sample/repo", "a" * 40, "doc.md", oid, source)
@@ -39,11 +43,11 @@ class EvidenceValidationTests(unittest.TestCase):
             "sources_examined": ["S001"],
             "findings": [{
                 "id": "F001", "category": "evidence-gap",
-                "claim": "A conclusion that the validator cannot semantically adjudicate.",
+                "claim": claim,
                 "consequence": "Consumer review remains required.",
                 "evidence": [{"source_id": "S001", "line": 1, "quote": quote}],
             }],
-            "remaining_uncertainties": ["Semantic correctness is not machine-validated."],
+            "remaining_uncertainties": [uncertainty],
         }
         final_text = json.dumps(final, separators=(",", ":"))
         events = [{"type": "turn.started"}]
@@ -72,6 +76,9 @@ class EvidenceValidationTests(unittest.TestCase):
             "unauthorized_network_connect": False,
             "sensitive_environment_visible": False,
             "process_canary_visible": False,
+            "outside_packet_canary_readable": False,
+            "symlink_to_auth_parent_canary_readable": False,
+            "hardlink_to_auth_parent_canary_readable": False,
         }
         (root / "reviewer-security-probe.json").write_bytes(canonical_bytes({
             "qualified": True,
@@ -269,6 +276,73 @@ class EvidenceValidationTests(unittest.TestCase):
             self.fixture(root)
             manifest = evidence_manifest(root)
             self.assertTrue(set(REQUIRED_EVIDENCE_FILES) <= set(manifest))
+
+    def test_contaminated_reviewer_claim_is_not_retained_in_validation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            canary = "sk-" + "A" * 24  # Synthetic token-shaped data, never a credential.
+            result = validate_evidence(root, setup=self.fixture(root, claim=canary))
+            self.assertEqual(result["evidence_status"], "INVALID")
+            self.assertEqual(result["review_verdict"], "UNDETERMINED")
+            self.assertNotIn(canary, (root / "validation.json").read_text())
+            self.assertEqual(result["findings"], [])
+
+    def test_contaminated_uncertainty_is_not_retained_in_validation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            canary = "sk-" + "B" * 24
+            result = validate_evidence(root, setup=self.fixture(root, uncertainty=canary))
+            self.assertNotIn(canary, (root / "validation.json").read_text())
+            self.assertEqual(result["remaining_uncertainties"], [])
+
+    def test_contaminated_diagnostic_is_not_retained_in_validation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.fixture(root)
+            canary = "sk-" + "F" * 24
+            (root / "codex-exit-code.txt").write_text(canary + "\n")
+            result = validate_evidence(root)
+            self.assertEqual(result["evidence_status"], "INVALID")
+            self.assertEqual(result["review_verdict"], "UNDETERMINED")
+            self.assertNotIn(canary, (root / "validation.json").read_text())
+            self.assertTrue(all(entry["sha256"] is None
+                                for entry in result["artifact_inventory"].values()))
+
+    def test_contaminated_jsonl_is_reduced_to_non_secret_upload_artifacts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "evidence"
+            self.fixture(root)
+            canary = "sk-" + "C" * 24
+            with (root / "codex-events.jsonl").open("a", encoding="utf-8") as events:
+                events.write(json.dumps({"type": "item.completed", "item": {"text": canary}}) + "\n")
+            outcome = quarantine_contaminated_evidence(
+                root, request_id="request:sha256:" + "1" * 64,
+                attempt_id="attempt:sha256:" + "3" * 64,
+            )
+            self.assertEqual(outcome, {"contaminated": True})
+            self.assertEqual({path.name for path in root.iterdir()},
+                             {"credential-incident.json", "recovery-manifest.json"})
+            self.assertNotIn(canary, "".join(path.read_text() for path in root.iterdir()))
+            self.assertFalse(json.loads((root / "credential-incident.json").read_text())[
+                "raw_runner_evidence_retained"])
+
+    def test_contaminated_validation_is_not_publishable(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = self.fixture(root, claim="sk-" + "D" * 24)
+            validation = validate_evidence(root)
+            with self.assertRaisesRegex(PublicationError, "CONTAMINATED"):
+                build_review_result(
+                    {"request_id": manifest["request_id"],
+                     "subject_id": manifest["subject_id"],
+                     "policy_id": "policy:sha256:" + "4" * 64,
+                     "subject": {"head_commit": "a" * 40}},
+                    manifest,
+                    {"attempt_id": "attempt:sha256:" + "3" * 64,
+                     "model_requested": "gpt-5.6-sol",
+                     "reasoning_effort_requested": "xhigh"},
+                    validation, current_head="a" * 40,
+                )
 
     def test_credential_material_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:

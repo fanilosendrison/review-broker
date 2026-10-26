@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shutil
 from typing import Any, Mapping
 
 from .identity import artifact_identity, canonical_bytes
@@ -69,15 +70,75 @@ def missing_evidence(directory: Path) -> list[str]:
     return [name for name, entry in evidence_manifest(directory).items() if not entry["present"]]
 
 
+def credential_material_detected(value: Any) -> bool:
+    """Conservative known-pattern check, not proof that other secrets are absent."""
+    if isinstance(value, str):
+        return any(pattern.search(value.encode("utf-8")) for pattern in _CREDENTIAL_PATTERNS)
+    if isinstance(value, dict):
+        return (
+            any(credential_material_detected(key) or credential_material_detected(item)
+                for key, item in value.items())
+            or any(pattern.search(canonical_bytes(value)) for pattern in _CREDENTIAL_PATTERNS)
+        )
+    if isinstance(value, (list, tuple)):
+        return any(credential_material_detected(item) for item in value)
+    return False
+
+
 def scan_for_credentials(directory: Path) -> list[str]:
     contaminated: list[str] = []
-    for path in sorted(directory.iterdir()):
-        if path.is_symlink() or not path.is_file():
-            continue
-        data = path.read_bytes()
-        if any(pattern.search(data) for pattern in _CREDENTIAL_PATTERNS):
-            contaminated.append(path.name)
+    for path in sorted(directory.rglob("*")):
+        relative = path.relative_to(directory).as_posix()
+        if path.is_symlink():
+            contaminated.append(relative)  # Never follow an untrusted evidence alias.
+        elif path.is_file():
+            try:
+                data = path.read_bytes()
+            except OSError as exc:
+                raise EvidenceCaptureError("CREDENTIAL_SCREENING_UNDETERMINED") from exc
+            if any(pattern.search(data) for pattern in _CREDENTIAL_PATTERNS):
+                contaminated.append(relative)
     return contaminated
+
+
+def quarantine_contaminated_evidence(
+    directory: Path, *, request_id: str, attempt_id: str,
+) -> dict[str, Any]:
+    """Replace detected unsafe evidence with a bounded, non-secret incident.
+
+    This intentionally destroys the runner's raw copy rather than uploading it.
+    An inaccessible remote copy may remain and requires separate incident handling.
+    """
+    if directory.is_symlink() or not directory.is_dir() or directory.name != "evidence":
+        raise EvidenceCaptureError("QUARANTINE_DIRECTORY_INVALID")
+    if not scan_for_credentials(directory):
+        return {"contaminated": False}
+    incident = {
+        "schema_version": 1,
+        "evidence_type": "credential-shaped-material-incident",
+        "request_id": request_id,
+        "attempt_id": attempt_id,
+        "raw_runner_evidence_retained": False,
+        "remote_evidence_retention": "UNVERIFIED",
+        "detection_scope": "known-pattern-and-symlink-scan; absence is not proof of safety",
+    }
+    try:
+        shutil.rmtree(directory)
+        directory.mkdir(mode=0o700)
+    except OSError as exc:
+        raise EvidenceCaptureError("EVIDENCE_QUARANTINE_FAILED") from exc
+    (directory / "credential-incident.json").write_bytes(canonical_bytes(incident) + b"\n")
+    (directory / "recovery-manifest.json").write_bytes(canonical_bytes({
+        "schema_version": 1,
+        "evidence_type": "runtime-evidence-recovery",
+        "request_id": request_id,
+        "attempt_id": attempt_id,
+        "complete": False,
+        "artifacts": {},
+        "raw_runner_evidence_retained": False,
+        "reason": "CREDENTIAL_SHAPED_MATERIAL_QUARANTINED",
+    }) + b"\n")
+    return {"contaminated": True}
 
 
 def build_terminal_capture_receipt(
