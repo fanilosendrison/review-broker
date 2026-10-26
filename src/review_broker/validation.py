@@ -22,6 +22,7 @@ from .evidence import (
 from .identity import artifact_identity, canonical_bytes
 from .packets import PacketError, source_lines, verify_packet
 from .security_probe import validate_probe_receipt
+from .reviewer_profile import PROFILE_NAME
 
 
 def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -50,6 +51,12 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
         reasons.append("MISSING_EVIDENCE:" + ",".join(missing))
         execution_status = "INDETERMINATE"
     contaminated = scan_for_credentials(directory)
+    incident = directory / "credential-incident.json"
+    incident_present = incident.exists() or incident.is_symlink()
+    if incident_present:
+        # A sanitized incident remains a permanent publication veto after raw
+        # evidence has been destroyed, even if the incident is malformed.
+        reasons.append("CREDENTIAL_MATERIAL_DETECTED_QUARANTINED")
     if contaminated:
         reasons.append("CREDENTIAL_MATERIAL_DETECTED")
     reasons.extend(_security_profile_errors(directory))
@@ -126,7 +133,8 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
         evidence_status = "UNDETERMINED"
     # Never serialize model-authored data into a publishable validation record
     # when known credential material was detected anywhere in recovered evidence.
-    if contaminated:
+    unsafe = bool(contaminated) or incident_present
+    if unsafe:
         response = {}
         reasons = ["SANITIZED_VALIDATION_REASON" if credential_material_detected(reason)
                    else reason for reason in reasons]
@@ -148,8 +156,8 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
         "effective_reasoning_effort_verified": False,
         "validation_reasons": reasons,
         "artifact_inventory": inventory,
-        "events_sha256": None if contaminated else _file_hash(directory / "codex-events.jsonl"),
-        "final_sha256": None if contaminated else _file_hash(directory / "codex-final.json"),
+        "events_sha256": None if unsafe else _file_hash(directory / "codex-events.jsonl"),
+        "final_sha256": None if unsafe else _file_hash(directory / "codex-final.json"),
     }
     _write_exclusive(directory / "validation.json", canonical_bytes(result) + b"\n")
     return result
@@ -223,7 +231,12 @@ def _security_profile_errors(directory: Path) -> list[str]:
     if not isinstance(attempt, dict) or not isinstance(receipt, dict):
         return ["SECURITY_PROFILE_EVIDENCE_INVALID"]
     errors: list[str] = []
-    if attempt.get("permission_profile") != "review-broker":
+    expected_profile = attempt.get("permission_profile")
+    if (not isinstance(expected_profile, str) or
+        not expected_profile.startswith(PROFILE_NAME + "-") or
+        len(expected_profile) != len(PROFILE_NAME) + 1 + 64 or
+        any(character not in "0123456789abcdef"
+            for character in expected_profile[len(PROFILE_NAME) + 1:])):
         errors.append("ATTEMPT_PERMISSION_PROFILE_INVALID")
     if attempt.get("credential_paths_denied") is not True:
         errors.append("ATTEMPT_CREDENTIAL_DENIAL_UNVERIFIED")
@@ -246,7 +259,7 @@ def _security_profile_errors(directory: Path) -> list[str]:
     ):
         errors.append("ATTEMPT_PERMISSION_PROFILE_SHA256_INVALID")
         return errors
-    errors.extend(validate_probe_receipt(receipt, profile_sha256))
+    errors.extend(validate_probe_receipt(receipt, profile_sha256, expected_profile))
     return errors
 
 

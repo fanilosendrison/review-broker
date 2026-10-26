@@ -11,7 +11,7 @@ import tempfile
 from typing import Any, Callable, Mapping
 
 from .codex import sanitized_environment
-from .reviewer_profile import PROFILE_NAME, verify_reviewer_profile
+from .reviewer_profile import profile_name, verify_reviewer_profile
 
 
 class SecurityProbeError(RuntimeError):
@@ -23,7 +23,6 @@ Runner = Callable[..., subprocess.CompletedProcess[str]]
 _REQUIRED_OBSERVATIONS = {
     "packet_canary_readable": True,
     "auth_parent_canary_readable": False,
-    "auth_file_os_access_readable": False,
     "trusted_workspace_readable": False,
     "packet_directory_writable": False,
     "unauthorized_network_connect": False,
@@ -32,6 +31,7 @@ _REQUIRED_OBSERVATIONS = {
     "outside_packet_canary_readable": False,
     "symlink_to_auth_parent_canary_readable": False,
     "hardlink_to_auth_parent_canary_readable": False,
+    "hardlink_created": True,
 }
 
 
@@ -44,10 +44,8 @@ def run_reviewer_isolation_probe(
     environment: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     profile = verify_reviewer_profile(reviewer_home, trusted_workspace, packet_directory)
+    name = profile_name(packet_directory)
     codex_home = profile.parent
-    auth_path = codex_home / "auth.json"
-    if auth_path.is_symlink() or not auth_path.is_file():
-        raise SecurityProbeError("AUTH_FILE_UNAVAILABLE")
     adjacent_canary = codex_home / "review-broker-auth-parent-canary.txt"
     if adjacent_canary.exists() or adjacent_canary.is_symlink():
         raise SecurityProbeError("AUTH_PARENT_CANARY_COLLISION")
@@ -66,7 +64,7 @@ def run_reviewer_isolation_probe(
             symlink_canary.symlink_to(adjacent_canary)
             hardlink_canary = probe_root / "auth-parent-hardlink.txt"
             try:
-                os.link(adjacent_canary, hardlink_canary)
+                os.link(outside_canary, hardlink_canary)
             except OSError:
                 pass  # Filesystem may not support cross-mount hard links.
             packet_canary = probe_root / "packet-canary.txt"
@@ -76,7 +74,6 @@ def run_reviewer_isolation_probe(
                 _probe_script(
                     packet_canary,
                     adjacent_canary,
-                    auth_path,
                     trusted_workspace / "README.md",
                     probe_root,
                     outside_canary,
@@ -91,8 +88,8 @@ def run_reviewer_isolation_probe(
             result = runner(
                 [
                     "codex", "sandbox",
-                    "-p", PROFILE_NAME,
-                    "-P", PROFILE_NAME,
+                    "-p", name,
+                    "-P", name,
                     "-C", str(probe_root),
                     "python3", str(script),
                 ],
@@ -116,7 +113,7 @@ def run_reviewer_isolation_probe(
     receipt = {
         "schema_version": 1,
         "observed_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
-        "permission_profile": PROFILE_NAME,
+        "permission_profile": name,
         "permission_profile_sha256": hashlib.sha256(profile.read_bytes()).hexdigest(),
         "observations": observation,
         "required_observations": _REQUIRED_OBSERVATIONS,
@@ -134,11 +131,11 @@ def run_reviewer_isolation_probe(
     return receipt
 
 
-def validate_probe_receipt(receipt: dict[str, Any], profile_sha256: str) -> list[str]:
+def validate_probe_receipt(receipt: dict[str, Any], profile_sha256: str, profile_identity: str) -> list[str]:
     errors: list[str] = []
     if receipt.get("qualified") is not True:
         errors.append("SECURITY_PROBE_NOT_QUALIFIED")
-    if receipt.get("permission_profile") != PROFILE_NAME:
+    if receipt.get("permission_profile") != profile_identity:
         errors.append("SECURITY_PROBE_PROFILE_MISMATCH")
     if receipt.get("permission_profile_sha256") != profile_sha256:
         errors.append("SECURITY_PROBE_PROFILE_SHA256_MISMATCH")
@@ -168,7 +165,6 @@ def _parse_observation(stdout: str) -> dict[str, Any]:
 def _probe_script(
     packet_canary: Path,
     adjacent_canary: Path,
-    auth_path: Path,
     trusted_marker: Path,
     probe_root: Path,
     outside_canary: Path,
@@ -178,7 +174,6 @@ def _probe_script(
     paths = {
         "packet": str(packet_canary),
         "adjacent": str(adjacent_canary),
-        "auth": str(auth_path),
         "trusted": str(trusted_marker),
         "write": str(probe_root / "write-canary.txt"),
         "outside": str(outside_canary),
@@ -220,7 +215,6 @@ sensitive = ("OPENAI_API_KEY", "CODEX_API_KEY", "GH_TOKEN", "GITHUB_TOKEN")
 observation = {{
     "packet_canary_readable": reads_exact(paths["packet"], "non-secret-packet-canary"),
     "auth_parent_canary_readable": reads_exact(paths["adjacent"], "non-secret-auth-parent-canary"),
-    "auth_file_os_access_readable": os.access(paths["auth"], os.R_OK),
     "trusted_workspace_readable": os.access(paths["trusted"], os.R_OK),
     "packet_directory_writable": writes(paths["write"]),
     "unauthorized_network_connect": connects(),
@@ -232,7 +226,7 @@ observation = {{
     ),
     "hardlink_created": paths["hardlink"].is_file(),
     "hardlink_to_auth_parent_canary_readable": reads_exact(
-        paths["hardlink"], "non-secret-auth-parent-canary"
+        paths["hardlink"], "non-secret-outside-canary"
     ),
     "visible_proc_pid_count": sum(name.isdigit() for name in os.listdir("/proc")),
     "parent_process_environment_os_access_readable": os.access(

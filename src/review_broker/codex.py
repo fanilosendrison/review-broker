@@ -14,7 +14,7 @@ from typing import Callable, Mapping
 from .identity import canonical_bytes
 from .packets import PacketError, verify_packet
 from .reviewer_profile import (
-    PROFILE_NAME,
+    profile_name,
     ReviewerProfileError,
     reviewer_home_from_environment,
     verify_reviewer_profile,
@@ -32,7 +32,6 @@ class CodexPolicy:
     model: str = "gpt-5.6-sol"
     reasoning_effort: str = "xhigh"
     sandbox: str = "credential-isolated-read-only"
-    permission_profile: str = PROFILE_NAME
 
 
 REQUIRED_FLAGS = (
@@ -60,14 +59,14 @@ REMOVED_ENVIRONMENT_KEYS = (
 Runner = Callable[..., subprocess.CompletedProcess[bytes]]
 
 
-def build_command(schema_path: Path, output_path: Path, policy: CodexPolicy) -> list[str]:
+def build_command(schema_path: Path, output_path: Path, policy: CodexPolicy, permission_profile: str) -> list[str]:
     return [
         "codex",
         "exec",
         "--json",
         "--ephemeral",
         "--profile",
-        policy.permission_profile,
+        permission_profile,
         "--strict-config",
         "--ignore-rules",
         "--skip-git-repo-check",
@@ -154,7 +153,8 @@ def invoke_once(
         raise InvocationError("ALREADY_ATTEMPTED")
     _assert_packet_tree(packet_directory, schema_path)
     prompt_before = _digest(prompt_path.read_bytes())
-    command = build_command(schema_path, output_path, policy)
+    permission_profile = profile_name(packet_directory)
+    command = build_command(schema_path, output_path, policy, permission_profile)
     child_environment, removed = sanitized_environment(environment or os.environ)
     try:
         reviewer_home = reviewer_home_from_environment(child_environment)
@@ -179,7 +179,7 @@ def invoke_once(
         "effective_model_identity_verified": False,
         "effective_reasoning_effort_verified": False,
         "sandbox": policy.sandbox,
-        "permission_profile": policy.permission_profile,
+        "permission_profile": permission_profile,
         "permission_profile_sha256": _digest(profile_path.read_bytes()),
         "credential_paths_denied": True,
         "trusted_workspace_denied": True,

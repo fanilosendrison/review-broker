@@ -1,6 +1,7 @@
 """Exact Codex permission profile for credential-isolated review execution."""
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,11 @@ class ReviewerProfileError(RuntimeError):
     """The installed reviewer permission profile is absent or untrusted."""
 
 
+def profile_name(packet_directory: Path) -> str:
+    packet = _validated_root(packet_directory, "PACKET_DIRECTORY")
+    return PROFILE_NAME + "-" + hashlib.sha256(os.fsencode(packet)).hexdigest()
+
+
 def profile_bytes(reviewer_home: Path, trusted_workspace: Path, packet_directory: Path) -> bytes:
     home = _validated_root(reviewer_home, "REVIEWER_HOME")
     workspace = _validated_root(trusted_workspace, "TRUSTED_WORKSPACE")
@@ -23,8 +29,9 @@ def profile_bytes(reviewer_home: Path, trusted_workspace: Path, packet_directory
     def quote(value: Path) -> str:
         return json.dumps(str(value), ensure_ascii=False)
 
+    name = profile_name(packet)
     return (
-        f'default_permissions = "{PROFILE_NAME}"\n'
+        f'default_permissions = "{name}"\n'
         'approval_policy = "never"\n'
         "allow_login_shell = false\n"
         "include_environment_context = false\n"
@@ -36,12 +43,12 @@ def profile_bytes(reviewer_home: Path, trusted_workspace: Path, packet_directory
         f"HOME = {quote(home)}\n"
         'LANG = "C.UTF-8"\n'
         'TZ = "UTC"\n\n'
-        f"[permissions.{PROFILE_NAME}.filesystem]\n"
+        f"[permissions.{name}.filesystem]\n"
         '":minimal" = "read"\n'
         f"{quote(packet)} = \"read\"\n"
         f"{quote(home)} = \"deny\"\n"
         f"{quote(workspace)} = \"deny\"\n\n"
-        f"[permissions.{PROFILE_NAME}.network]\n"
+        f"[permissions.{name}.network]\n"
         "enabled = false\n"
     ).encode("utf-8")
 
@@ -52,22 +59,25 @@ def install_reviewer_profile(
     expected = profile_bytes(reviewer_home, trusted_workspace, packet_directory)
     codex_home = _codex_home(reviewer_home)
     _reject_base_user_config(codex_home)
-    profile = codex_home / f"{PROFILE_NAME}.config.toml"
-    if profile.is_symlink():
-        raise ReviewerProfileError("PROFILE_SYMLINK")
-    if profile.exists():
-        if not profile.is_file() or profile.read_bytes() != expected:
-            raise ReviewerProfileError("PROFILE_MISMATCH")
+    profile = codex_home / f"{profile_name(packet_directory)}.config.toml"
+    try:
+        descriptor = os.open(profile, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                             getattr(os, "O_NOFOLLOW", 0), 0o600)
+    except FileExistsError:
+        # Existing profiles are immutable: accept exact bytes only, never migrate.
+        verify_reviewer_profile(reviewer_home, trusted_workspace, packet_directory)
     else:
-        descriptor = os.open(profile, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        # A partial write remains a rejecting conflict; never unlink a file another
+        # installer or an invocation could have started using.
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(expected)
+            stream.flush()
+            os.fsync(stream.fileno())
+        directory_fd = os.open(codex_home, os.O_RDONLY)
         try:
-            with os.fdopen(descriptor, "wb") as stream:
-                stream.write(expected)
-                stream.flush()
-                os.fsync(stream.fileno())
-        except BaseException:
-            profile.unlink(missing_ok=True)
-            raise
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
     verify_reviewer_profile(reviewer_home, trusted_workspace, packet_directory)
     return profile
 
@@ -78,16 +88,31 @@ def verify_reviewer_profile(
     expected = profile_bytes(reviewer_home, trusted_workspace, packet_directory)
     codex_home = _codex_home(reviewer_home)
     _reject_base_user_config(codex_home)
-    profile = codex_home / f"{PROFILE_NAME}.config.toml"
+    profile = codex_home / f"{profile_name(packet_directory)}.config.toml"
     if profile.is_symlink():
         raise ReviewerProfileError("PROFILE_SYMLINK")
-    if not profile.is_file() or profile.read_bytes() != expected:
-        raise ReviewerProfileError("PROFILE_MISMATCH")
-    metadata = profile.stat()
-    if stat.S_IMODE(metadata.st_mode) != 0o600:
-        raise ReviewerProfileError("PROFILE_MODE_INVALID")
-    if hasattr(os, "getuid") and metadata.st_uid != os.getuid():
-        raise ReviewerProfileError("PROFILE_OWNER_INVALID")
+    try:
+        descriptor = os.open(profile, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    except OSError as exc:
+        raise ReviewerProfileError("PROFILE_UNAVAILABLE") from exc
+    with os.fdopen(descriptor, "rb") as stream:
+        metadata = os.fstat(stream.fileno())
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise ReviewerProfileError("PROFILE_TYPE_INVALID")
+        if stat.S_IMODE(metadata.st_mode) != 0o600:
+            raise ReviewerProfileError("PROFILE_MODE_INVALID")
+        if hasattr(os, "getuid") and metadata.st_uid != os.getuid():
+            raise ReviewerProfileError("PROFILE_OWNER_INVALID")
+        if stream.read() != expected:
+            raise ReviewerProfileError("PROFILE_MISMATCH")
+        try:
+            current = profile.lstat()
+        except OSError as exc:
+            raise ReviewerProfileError("PROFILE_CHANGED") from exc
+        if (current.st_dev, current.st_ino, current.st_mtime_ns, current.st_size) != (
+            metadata.st_dev, metadata.st_ino, metadata.st_mtime_ns, metadata.st_size
+        ):
+            raise ReviewerProfileError("PROFILE_CHANGED")
     return profile
 
 
@@ -107,6 +132,9 @@ def _codex_home(reviewer_home: Path) -> Path:
     codex_home = home / ".codex"
     if codex_home.is_symlink() or not codex_home.is_dir():
         raise ReviewerProfileError("CODEX_HOME_INVALID")
+    metadata = codex_home.stat()
+    if (hasattr(os, "getuid") and metadata.st_uid != os.getuid()) or metadata.st_mode & 0o022:
+        raise ReviewerProfileError("CODEX_HOME_UNTRUSTED")
     return codex_home
 
 
