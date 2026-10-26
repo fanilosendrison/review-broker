@@ -88,6 +88,19 @@ class QueueTests(unittest.TestCase):
                 ["artifact:sha256:" + "9" * 64],
             )
 
+    def test_generic_reported_transition_is_rejected(self):
+        record = AttemptRecord(
+            request_id="request:sha256:" + "7" * 64,
+            attempt_id="attempt:sha256:" + "8" * 64,
+            state=AttemptState.VALIDATED,
+        )
+        with self.assertRaisesRegex(StateTransitionError, "SPECIALIZED_EVIDENCE_REQUIRED"):
+            transition_record(
+                record,
+                AttemptState.REPORTED,
+                ["artifact:sha256:" + "9" * 64],
+            )
+
     def test_generic_stopped_transition_is_rejected(self):
         record = AttemptRecord(
             request_id="request:sha256:" + "7" * 64,

@@ -1,3 +1,4 @@
+from dataclasses import replace
 import unittest
 
 from review_broker.queue import AttemptRecord, AttemptState
@@ -66,6 +67,19 @@ class RecoveryTests(unittest.TestCase):
         )
         self.assertEqual(decision.action, RecoveryAction.BLOCKED_EVIDENCE_LOCATION)
         self.assertIn("artifact locator", decision.reason)
+
+    def test_terminal_or_validated_attempt_resumes_only_with_durable_locator(self):
+        for state in (AttemptState.TERMINAL_CAPTURED, AttemptState.VALIDATED):
+            with self.subTest(state=state):
+                base = self.record(state, 1)
+                record = replace(
+                    base,
+                    evidence_locator={
+                        "evidence_type": "github-actions-artifact-locator"
+                    },
+                )
+                decision = decide_recovery(record, codespace_state="Shutdown")
+                self.assertEqual(decision.action, RecoveryAction.RESUME_FROM_ARTIFACT)
 
     def test_validated_publication_is_blocked_without_durable_artifact_locator(self):
         decision = decide_recovery(

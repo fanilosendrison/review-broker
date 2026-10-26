@@ -1,19 +1,26 @@
 """Trusted preparation and publication use cases for GitHub workflows."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from importlib import resources
 import json
 import os
 from pathlib import Path
+import secrets
 import subprocess
 import tempfile
 from typing import Any, Mapping
 
-from .admission import AuthorizationPolicy, authorize_and_resolve
+from .admission import AuthorizationPolicy, authorize, resolve_request
 from .identity import artifact_identity, canonical_bytes
 from .packets import GitSourceReader, SourceSpec, build_packet
 from .github_journal import GitHubRefJournal
-from .publication import GitHubPublisher, build_review_result
+from .publication import (
+    GitHubPublisher,
+    build_publication_intent,
+    build_review_result,
+    validate_publication_intent,
+)
 from .queue import AttemptState
 from .recovery import (
     PreparationRecoveryAction,
@@ -33,6 +40,7 @@ def prepare_issue(
     output_directory: Path,
     *,
     environment: Mapping[str, str] = os.environ,
+    source_token: str | None = None,
 ) -> dict[str, Any]:
     issue = _gh_json(f"repos/{broker_repository}/issues/{issue_number}")
     request = parse_issue_body(issue.get("body") or "")
@@ -40,11 +48,22 @@ def prepare_issue(
         requesters=_csv_set(environment.get("REVIEW_BROKER_AUTHORIZED_REQUESTERS", "")),
         repositories=_csv_set(environment.get("REVIEW_BROKER_AUTHORIZED_REPOSITORIES", "")),
     )
-    resolved = authorize_and_resolve(
-        issue["user"]["login"],
+    authorize(issue["user"]["login"], request, authorization)
+    source_repository_name = request["subject"]["repository"]
+    private_repositories = _csv_set(
+        environment.get("REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES", "")
+    )
+    source_environment = _source_environment_for_repository(
+        source_repository_name,
+        private_repositories,
+        source_token,
+    )
+
+    def source_getter(endpoint: str) -> Any:
+        return _gh_json(endpoint, environment=source_environment)
+    resolved = resolve_request(
         request,
-        authorization,
-        _gh_json,
+        source_getter,
         expected_head=environment.get("REVIEW_BROKER_EXPECTED_HEAD") or None,
     )
     journal = GitHubRefJournal(
@@ -65,6 +84,7 @@ def prepare_issue(
         request["subject"]["repository"],
         request["subject"]["pull_request"],
         expected_head=resolved["subject"]["head_commit"],
+        get_json=source_getter,
     )
     if not changed:
         raise OrchestrationError("PULL_REQUEST_HAS_NO_FILES")
@@ -80,6 +100,7 @@ def prepare_issue(
             check=False,
             timeout=300,
             shell=False,
+            env=source_environment,
         )
         if clone.returncode != 0:
             raise OrchestrationError("SOURCE_ACQUISITION_FAILED")
@@ -92,6 +113,7 @@ def prepare_issue(
                 check=False,
                 timeout=180,
                 shell=False,
+                env=source_environment,
             )
             if fetch.returncode != 0:
                 raise OrchestrationError("SOURCE_COMMIT_FETCH_FAILED")
@@ -145,6 +167,8 @@ def prepare_issue(
 def publish_validated_result(
     broker_repository: str,
     packet_directory: Path,
+    *,
+    source_token: str | None = None,
 ) -> dict[str, Any]:
     resolved = _read_object(packet_directory / "resolved-request.json")
     metadata = _read_object(packet_directory / "broker-metadata.json")
@@ -152,16 +176,51 @@ def publish_validated_result(
     attempt = _read_object(packet_directory / "attempt.json")
     validation = _read_object(packet_directory / "validation.json")
     subject = resolved["subject"]
-    pr = _gh_json(f"repos/{subject['repository']}/pulls/{subject['pull_request']}")
+    private_repositories = _csv_set(
+        os.environ.get("REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES", "")
+    )
+    source_environment = _source_environment_for_repository(
+        subject["repository"],
+        private_repositories,
+        source_token,
+    )
+    pr = _gh_json(
+        f"repos/{subject['repository']}/pulls/{subject['pull_request']}",
+        environment=source_environment,
+    )
     current_head = pr.get("head", {}).get("sha")
     result = build_review_result(
         resolved, manifest, attempt, validation, current_head=current_head
     )
-    GitHubPublisher(broker_repository).publish(metadata["issue_number"], result)
+    publisher = GitHubPublisher(broker_repository)
     journal = GitHubRefJournal(broker_repository)
-    result_evidence = artifact_identity(canonical_bytes(result))
-    journal.transition(resolved["request_id"], AttemptState.REPORTED, [result_evidence])
-    return result
+    current = journal.get(resolved["request_id"])
+    reservation_created = False
+    if current.publication_intent is None:
+        candidate_intent = build_publication_intent(
+            result,
+            issue_number=metadata["issue_number"],
+            publisher=publisher.identity(),
+            nonce=secrets.token_hex(32),
+            reserved_at=datetime.now(timezone.utc).isoformat(),
+        )
+        current, reservation_created = journal.reserve_publication(
+            resolved["request_id"], candidate_intent
+        )
+    intent = current.publication_intent
+    if intent is None:
+        raise OrchestrationError("PUBLICATION_INTENT_NOT_RECORDED")
+    publication_result = intent.get("result")
+    if not isinstance(publication_result, dict):
+        raise OrchestrationError("PUBLICATION_RESULT_NOT_RECORDED")
+    validate_publication_intent(intent, result=publication_result)
+    receipt = publisher.publish_reserved(
+        intent,
+        publication_result,
+        reservation_created=reservation_created,
+    )
+    journal.record_publication(resolved["request_id"], receipt)
+    return publication_result
 
 
 def _review_instruction(request: dict[str, Any], profile: dict[str, Any]) -> str:
@@ -219,7 +278,11 @@ def _pull_request_files(
     return files
 
 
-def _gh_json(endpoint: str) -> Any:
+def _gh_json(
+    endpoint: str,
+    *,
+    environment: Mapping[str, str] | None = None,
+) -> Any:
     result = subprocess.run(
         ["gh", "api", endpoint],
         text=True,
@@ -227,6 +290,7 @@ def _gh_json(endpoint: str) -> Any:
         check=False,
         timeout=120,
         shell=False,
+        env=environment,
     )
     if result.returncode != 0:
         raise OrchestrationError("GITHUB_API_FAILED")
@@ -234,6 +298,30 @@ def _gh_json(endpoint: str) -> Any:
         return json.loads(result.stdout)
     except json.JSONDecodeError as exc:
         raise OrchestrationError("GITHUB_RESPONSE_INVALID") from exc
+
+
+def _source_environment_for_repository(
+    repository: str,
+    private_repositories: frozenset[str],
+    source_token: str | None,
+) -> dict[str, str] | None:
+    if repository not in private_repositories:
+        return None
+    if not source_token:
+        raise OrchestrationError("PRIVATE_SOURCE_CREDENTIAL_REQUIRED")
+    return _source_environment(source_token)
+
+
+def _source_environment(source_token: str | None) -> dict[str, str] | None:
+    if source_token is None:
+        return None
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key in {"HOME", "PATH", "XDG_CONFIG_HOME", "SSL_CERT_FILE", "SSL_CERT_DIR"}
+    }
+    environment["GH_TOKEN"] = source_token
+    return environment
 
 
 def _csv_set(value: str) -> frozenset[str]:

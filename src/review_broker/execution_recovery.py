@@ -7,6 +7,11 @@ import os
 from pathlib import Path
 from typing import Any, Mapping
 
+from .artifact_locator import (
+    GitHubActionsArtifactStore,
+    build_evidence_artifact_plan,
+    validate_evidence_artifact_plan,
+)
 from .codespace import CodespaceController, CodespaceError
 from .evidence import (
     TERMINAL_CAPTURE_FILES,
@@ -20,6 +25,54 @@ from .queue import AttemptState
 
 class ExecutionRecoveryError(RuntimeError):
     """A recovery operation cannot establish its required evidence."""
+
+
+def plan_durable_evidence_artifact(
+    broker_repository: str,
+    evidence_directory: Path,
+    output_path: Path,
+    *,
+    artifact_name: str,
+    workflow_run_id: str,
+    workflow_run_attempt: str,
+) -> dict[str, Any]:
+    if output_path.exists():
+        plan = _read_object(output_path)
+        validate_evidence_artifact_plan(plan)
+    else:
+        plan = build_evidence_artifact_plan(
+            evidence_directory,
+            broker_repository=broker_repository,
+            artifact_name=artifact_name,
+            workflow_run_id=workflow_run_id,
+            workflow_run_attempt=workflow_run_attempt,
+        )
+        _write_object_exclusive(output_path, plan)
+    GitHubRefJournal(broker_repository).record_evidence_locator_plan(
+        plan["request_id"], plan
+    )
+    return plan
+
+
+def finalize_durable_evidence_artifact(
+    broker_repository: str,
+    plan_path: Path,
+    output_path: Path,
+    *,
+    artifact_id: int,
+    artifact_digest: str,
+) -> dict[str, Any]:
+    plan = _read_object(plan_path)
+    locator = GitHubActionsArtifactStore(broker_repository).finalize(
+        plan,
+        artifact_id,
+        artifact_digest,
+    )
+    GitHubRefJournal(broker_repository).record_evidence_locator(
+        locator["request_id"], locator
+    )
+    _write_object_exclusive(output_path, locator)
+    return locator
 
 
 def recover_runtime_evidence(

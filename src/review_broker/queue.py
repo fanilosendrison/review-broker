@@ -28,6 +28,7 @@ class AttemptState(str, Enum):
 
 EVIDENCE_GATED_STATES = {
     AttemptState.TERMINAL_CAPTURED,
+    AttemptState.REPORTED,
     AttemptState.STOPPED,
 }
 
@@ -60,6 +61,10 @@ class AttemptRecord:
     state: AttemptState
     evidence_ids: tuple[str, ...] = ()
     invocation_count: int = 0
+    evidence_locator_plan: dict[str, Any] | None = None
+    evidence_locator: dict[str, Any] | None = None
+    publication_intent: dict[str, Any] | None = None
+    publication_receipt: dict[str, Any] | None = None
     history: tuple[dict[str, Any], ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
@@ -70,6 +75,10 @@ class AttemptRecord:
             "state": self.state.value,
             "evidence_ids": list(self.evidence_ids),
             "invocation_count": self.invocation_count,
+            "evidence_locator_plan": self.evidence_locator_plan,
+            "evidence_locator": self.evidence_locator,
+            "publication_intent": self.publication_intent,
+            "publication_receipt": self.publication_receipt,
             "history": list(self.history),
         }
 
@@ -81,6 +90,10 @@ class AttemptRecord:
             state=AttemptState(value["state"]),
             evidence_ids=tuple(value.get("evidence_ids", [])),
             invocation_count=value.get("invocation_count", 0),
+            evidence_locator_plan=value.get("evidence_locator_plan"),
+            evidence_locator=value.get("evidence_locator"),
+            publication_intent=value.get("publication_intent"),
+            publication_receipt=value.get("publication_receipt"),
             history=tuple(value.get("history", [])),
         )
 
@@ -198,6 +211,27 @@ def record_terminal_capture_transition(
     return _verified_transition_record(
         current,
         AttemptState.TERMINAL_CAPTURED,
+        [evidence_id],
+    )
+
+
+def record_publication_transition(
+    current: AttemptRecord,
+    receipt: Mapping[str, Any],
+    evidence_id: str,
+) -> AttemptRecord:
+    intent = current.publication_intent
+    if current.state is not AttemptState.VALIDATED or intent is None:
+        raise StateTransitionError("PUBLICATION_INTENT_REQUIRED")
+    if (
+        receipt.get("publication_id") != intent.get("publication_id")
+        or receipt.get("result_id") != intent.get("result_id")
+    ):
+        raise StateTransitionError("PUBLICATION_RECEIPT_IDENTITY_MISMATCH")
+    with_receipt = replace(current, publication_receipt=dict(receipt))
+    return _verified_transition_record(
+        with_receipt,
+        AttemptState.REPORTED,
         [evidence_id],
     )
 

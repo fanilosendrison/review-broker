@@ -7,11 +7,17 @@ import json
 import subprocess
 from typing import Any, Callable, Mapping
 
+from .artifact_locator import (
+    validate_evidence_artifact_locator,
+    validate_evidence_artifact_plan,
+)
 from .identity import attempt_identity, canonical_bytes
+from .publication import validate_publication_intent, validate_publication_receipt
 from .queue import (
     AttemptRecord,
     AttemptState,
     StateTransitionError,
+    record_publication_transition,
     record_shutdown_transition,
     record_terminal_capture_transition,
     transition_record,
@@ -108,6 +114,136 @@ class GitHubRefJournal:
         self._compare_and_swap(request_id, current_sha, updated)
         return updated
 
+    def record_evidence_locator_plan(
+        self,
+        request_id: str,
+        plan: Mapping[str, Any],
+    ) -> AttemptRecord:
+        evidence_id = validate_evidence_artifact_plan(
+            plan,
+            request_id=request_id,
+        )
+        if plan.get("broker_repository") != self.repository:
+            raise StateTransitionError("ARTIFACT_PLAN_REPOSITORY_MISMATCH")
+        return self._record_bound_metadata(
+            request_id,
+            field="evidence_locator_plan",
+            value=dict(plan),
+            evidence_id=evidence_id,
+            event="EVIDENCE_LOCATOR_PLANNED",
+            allowed_states={AttemptState.TERMINAL_CAPTURED},
+        )
+
+    def record_evidence_locator(
+        self,
+        request_id: str,
+        locator: Mapping[str, Any],
+    ) -> AttemptRecord:
+        evidence_id = validate_evidence_artifact_locator(
+            locator,
+            request_id=request_id,
+        )
+        if locator.get("broker_repository") != self.repository:
+            raise StateTransitionError("ARTIFACT_LOCATOR_REPOSITORY_MISMATCH")
+        return self._record_bound_metadata(
+            request_id,
+            field="evidence_locator",
+            value=dict(locator),
+            evidence_id=evidence_id,
+            event="EVIDENCE_LOCATOR_RECORDED",
+            allowed_states={AttemptState.TERMINAL_CAPTURED, AttemptState.VALIDATED},
+        )
+
+    def _record_bound_metadata(
+        self,
+        request_id: str,
+        *,
+        field: str,
+        value: dict[str, Any],
+        evidence_id: str,
+        event: str,
+        allowed_states: set[AttemptState],
+    ) -> AttemptRecord:
+        found = self._read(request_id)
+        if found is None:
+            raise KeyError(request_id)
+        current_sha, current = found
+        if current.attempt_id != value.get("attempt_id"):
+            raise StateTransitionError("BOUND_METADATA_ATTEMPT_MISMATCH")
+        existing = getattr(current, field)
+        if existing is not None:
+            if existing != value:
+                raise StateTransitionError("BOUND_METADATA_CONFLICT")
+            return current
+        if current.state not in allowed_states:
+            raise StateTransitionError("BOUND_METADATA_STATE_INVALID")
+        history_entry = {"event": event, "evidence_ids": [evidence_id]}
+        updated = replace(
+            current,
+            **{field: value},
+            evidence_ids=current.evidence_ids + (evidence_id,),
+            history=current.history + (history_entry,),
+        )
+        self._compare_and_swap(request_id, current_sha, updated)
+        return updated
+
+    def reserve_publication(
+        self,
+        request_id: str,
+        intent: Mapping[str, Any],
+    ) -> tuple[AttemptRecord, bool]:
+        evidence_id = validate_publication_intent(intent)
+        found = self._read(request_id)
+        if found is None:
+            raise KeyError(request_id)
+        current_sha, current = found
+        if current.attempt_id != intent.get("attempt_id"):
+            raise StateTransitionError("PUBLICATION_ATTEMPT_MISMATCH")
+        if current.publication_intent is not None:
+            return current, False
+        if current.state is not AttemptState.VALIDATED:
+            raise StateTransitionError("PUBLICATION_STATE_INVALID")
+        updated = replace(
+            current,
+            publication_intent=dict(intent),
+            evidence_ids=current.evidence_ids + (evidence_id,),
+            history=current.history + ({
+                "event": "PUBLICATION_RESERVED",
+                "evidence_ids": [evidence_id],
+            },),
+        )
+        try:
+            self._compare_and_swap(request_id, current_sha, updated)
+        except StateTransitionError:
+            winner = self.get(request_id)
+            if winner.publication_intent is not None:
+                return winner, False
+            raise
+        return updated, True
+
+    def record_publication(
+        self,
+        request_id: str,
+        receipt: Mapping[str, Any],
+    ) -> AttemptRecord:
+        found = self._read(request_id)
+        if found is None:
+            raise KeyError(request_id)
+        current_sha, current = found
+        if current.publication_intent is None:
+            raise StateTransitionError("PUBLICATION_INTENT_REQUIRED")
+        evidence_id = validate_publication_receipt(
+            receipt,
+            intent=current.publication_intent,
+        )
+        if current.state is AttemptState.REPORTED:
+            if current.publication_receipt != receipt:
+                raise StateTransitionError("PUBLICATION_RECEIPT_CONFLICT")
+            return current
+        updated = record_publication_transition(current, receipt, evidence_id)
+        self._compare_and_swap(request_id, current_sha, updated)
+        return updated
+
     def record_invocation(self, request_id: str) -> AttemptRecord:
         found = self._read(request_id)
         if found is None:
@@ -136,18 +272,49 @@ class GitHubRefJournal:
             raise StateTransitionError("STATE_COMPARE_AND_SWAP_FAILED")
 
     def _read(self, request_id: str) -> tuple[str, AttemptRecord] | None:
-        ref = self._api("GET", f"repos/{self.repository}/git/{self._claim_ref(request_id)}", check=False)
+        ref = self._api(
+            "GET",
+            f"repos/{self.repository}/git/{self._claim_ref(request_id)}",
+            check=False,
+        )
         if ref.returncode != 0:
             return None
-        sha = json.loads(ref.stdout)["object"]["sha"]
-        branch = self._claim_ref(request_id).removeprefix("refs/heads/")
+        try:
+            ref_value = json.loads(ref.stdout)
+            sha = ref_value["object"]["sha"]
+            if (
+                not isinstance(sha, str)
+                or len(sha) != 40
+                or any(character not in "0123456789abcdef" for character in sha)
+            ):
+                raise ValueError
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise StateTransitionError("JOURNAL_REF_RESPONSE_INVALID") from exc
         content = self._api(
             "GET",
-            f"repos/{self.repository}/contents/{self.STATE_PATH}?ref={branch}",
+            f"repos/{self.repository}/contents/{self.STATE_PATH}?ref={sha}",
         )
-        encoded = json.loads(content.stdout)["content"]
-        value = json.loads(base64.b64decode(encoded).decode("utf-8"))
-        return sha, AttemptRecord.from_dict(value)
+        try:
+            content_value = json.loads(content.stdout)
+            encoded = content_value["content"]
+            if content_value.get("encoding") != "base64" or not isinstance(encoded, str):
+                raise ValueError
+            raw = base64.b64decode(encoded, validate=True)
+            value = json.loads(raw.decode("utf-8"))
+            if not isinstance(value, dict) or raw != canonical_bytes(value) + b"\n":
+                raise ValueError
+            record = AttemptRecord.from_dict(value)
+            if record.request_id != request_id:
+                raise ValueError
+        except (
+            KeyError,
+            TypeError,
+            ValueError,
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+        ) as exc:
+            raise StateTransitionError("JOURNAL_CONTENT_RESPONSE_INVALID") from exc
+        return sha, record
 
     def _state_commit(self, parent_sha: str, record: AttemptRecord) -> str:
         parent = json.loads(self._api("GET", f"repos/{self.repository}/git/commits/{parent_sha}").stdout)

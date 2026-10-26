@@ -295,6 +295,46 @@ class ReconciliationTests(unittest.TestCase):
         self.assertEqual(len(journal.records), 1)
         self.assertGreaterEqual(len(dispatched), 1)
 
+    def test_private_source_without_dedicated_read_token_is_explicitly_blocked(self):
+        journal = SharedJournal()
+        dispatched = []
+        environment = {
+            **self.environment,
+            "REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES": "fanilosendrison/proto-scope",
+        }
+        decisions = reconcile_repository(
+            "fanilosendrison/review-broker",
+            "review-broker-safe",
+            environment=environment,
+            get_json=self.getter([self.issue()]),
+            journal=journal,
+            controller=FakeController(),
+            dispatch=lambda *args: dispatched.append(args),
+        )
+        self.assertEqual(decisions[0]["action"], "PRIVATE_SOURCE_CREDENTIAL_REQUIRED")
+        self.assertEqual(decisions[0]["outcome"], "BLOCKED")
+        self.assertEqual(journal.claim_count, 0)
+        self.assertEqual(dispatched, [])
+
+    def test_unauthorized_private_request_does_not_disclose_credential_state(self):
+        journal = SharedJournal()
+        dispatched = []
+        environment = {
+            **self.environment,
+            "REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES": "fanilosendrison/proto-scope",
+        }
+        decisions = reconcile_repository(
+            "fanilosendrison/review-broker",
+            "review-broker-safe",
+            environment=environment,
+            get_json=self.getter([self.issue(actor="untrusted")]),
+            journal=journal,
+            controller=FakeController(),
+            dispatch=lambda *args: dispatched.append(args),
+        )
+        self.assertEqual(decisions[0]["action"], "REJECTED_REQUEST")
+        self.assertNotIn("credential", decisions[0].get("reason", "").lower())
+
     def test_unauthorized_discovered_issue_is_not_claimed_or_dispatched(self):
         journal = SharedJournal()
         dispatched = []

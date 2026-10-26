@@ -8,7 +8,7 @@ on:
 permissions:
   actions: write
   contents: write
-  issues: read
+  issues: write
 
 concurrency:
   group: review-broker-single-reviewer
@@ -28,10 +28,20 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m pip install .
+      - name: Mint bounded private-source read token
+        id: source_auth
+        if: vars.REVIEW_BROKER_SOURCE_APP_ID != ''
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ vars.REVIEW_BROKER_SOURCE_APP_ID }}
+          private-key: ${{ secrets.REVIEW_BROKER_SOURCE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
       - name: Discover durable attempts and stranded Codespace
         env:
           GH_TOKEN: ${{ github.token }}
           REVIEW_BROKER_CODESPACE_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
+          REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES: ${{ vars.REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES }}
+          REVIEW_BROKER_SOURCE_TOKEN: ${{ steps.source_auth.outputs.token }}
           CODESPACE_NAME: ${{ vars.REVIEW_BROKER_CODESPACE_NAME }}
         run: |
           test -n "$REVIEW_BROKER_CODESPACE_TOKEN" || { echo "CODESPACE_CREDENTIAL_MISSING"; exit 1; }

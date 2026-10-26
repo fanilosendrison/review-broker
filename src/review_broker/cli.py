@@ -13,7 +13,9 @@ from .codex import invoke_once
 from .codespace import CodespaceController
 from .execution_recovery import (
     capture_terminal_transition,
+    finalize_durable_evidence_artifact,
     mark_ambiguous_execution_indeterminate,
+    plan_durable_evidence_artifact,
     record_stopped_transition,
     recover_runtime_evidence,
     stop_and_observe_shutdown,
@@ -72,55 +74,54 @@ def _parser() -> argparse.ArgumentParser:
 
     install_profile = subcommands.add_parser("internal-install-reviewer-profile")
     install_profile.add_argument("--trusted-workspace", required=True, type=Path)
-
     probe_profile = subcommands.add_parser("internal-probe-reviewer-profile")
     probe_profile.add_argument("--trusted-workspace", required=True, type=Path)
-
     invoke = subcommands.add_parser("internal-invoke")
     invoke.add_argument("--packet-dir", required=True, type=Path)
     invoke.add_argument("--schema", required=True, type=Path)
     invoke.add_argument("--attempt", required=True)
     invoke.add_argument("--broker-wheel-sha256", required=True)
     invoke.add_argument("--trusted-workspace", required=True, type=Path)
-
     recover = subcommands.add_parser("internal-recover")
     recover.add_argument("--codespace", required=True)
     recover.add_argument("--remote-dir", required=True)
     recover.add_argument("--output", required=True, type=Path)
     recover.add_argument("--request", required=True)
     recover.add_argument("--attempt", required=True)
-
     capture = subcommands.add_parser("internal-capture-terminal")
     capture.add_argument("--packet-dir", required=True, type=Path)
     capture.add_argument("--request", required=True)
     capture.add_argument("--attempt", required=True)
     capture.add_argument("--packet-id", required=True)
-
+    plan_artifact = subcommands.add_parser("internal-plan-evidence-artifact")
+    plan_artifact.add_argument("--evidence-dir", required=True, type=Path)
+    plan_artifact.add_argument("--output", required=True, type=Path)
+    plan_artifact.add_argument("--artifact-name", required=True)
+    finalize_artifact = subcommands.add_parser("internal-finalize-evidence-artifact")
+    finalize_artifact.add_argument("--plan", required=True, type=Path)
+    finalize_artifact.add_argument("--output", required=True, type=Path)
+    finalize_artifact.add_argument("--artifact-id", required=True, type=int)
+    finalize_artifact.add_argument("--artifact-digest", required=True)
     indeterminate = subcommands.add_parser("internal-mark-indeterminate")
     indeterminate.add_argument("--recovery-manifest", required=True, type=Path)
     indeterminate.add_argument("--request", required=True)
     indeterminate.add_argument("--attempt", required=True)
-
     validate = subcommands.add_parser("internal-validate")
     validate.add_argument("--packet-dir", required=True, type=Path)
-
     stop = subcommands.add_parser("internal-stop-codespace")
     stop.add_argument("--codespace", required=True)
     stop.add_argument("--output", required=True, type=Path)
     stop.add_argument("--request", required=True)
     stop.add_argument("--attempt", required=True)
-
     stopped = subcommands.add_parser("internal-record-stopped")
     stopped.add_argument("--observation", required=True, type=Path)
     stopped.add_argument("--codespace", required=True)
     stopped.add_argument("--request", required=True)
     stopped.add_argument("--attempt", required=True)
-
     transition = subcommands.add_parser("internal-transition")
     transition.add_argument("--request", required=True)
     transition.add_argument("--state", required=True, choices=[state.value for state in AttemptState])
     transition.add_argument("--evidence", required=True)
-
     publish = subcommands.add_parser("internal-publish")
     publish.add_argument("--packet-dir", required=True, type=Path)
 
@@ -131,6 +132,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    source_token = os.environ.pop("REVIEW_BROKER_SOURCE_TOKEN", None)
     try:
         if args.command == "request":
             return _request(args)
@@ -139,7 +141,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "result":
             return _result(args)
         if args.command == "internal-prepare":
-            value = prepare_issue(args.broker_repo, args.issue, args.output)
+            value = prepare_issue(
+                args.broker_repo,
+                args.issue,
+                args.output,
+                source_token=source_token,
+            )
             print(canonical_bytes(value).decode("utf-8"))
             return 0
         if args.command == "internal-verify-packet":
@@ -190,6 +197,27 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(canonical_bytes(value).decode("utf-8"))
             return 0
+        if args.command == "internal-plan-evidence-artifact":
+            value = plan_durable_evidence_artifact(
+                args.broker_repo,
+                args.evidence_dir,
+                args.output,
+                artifact_name=args.artifact_name,
+                workflow_run_id=os.environ.get("GITHUB_RUN_ID", ""),
+                workflow_run_attempt=os.environ.get("GITHUB_RUN_ATTEMPT", ""),
+            )
+            print(canonical_bytes(value).decode("utf-8"))
+            return 0
+        if args.command == "internal-finalize-evidence-artifact":
+            value = finalize_durable_evidence_artifact(
+                args.broker_repo,
+                args.plan,
+                args.output,
+                artifact_id=args.artifact_id,
+                artifact_digest=args.artifact_digest,
+            )
+            print(canonical_bytes(value).decode("utf-8"))
+            return 0
         if args.command == "internal-mark-indeterminate":
             value = mark_ambiguous_execution_indeterminate(
                 args.broker_repo,
@@ -228,7 +256,11 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
         if args.command == "internal-publish":
-            print(canonical_bytes(publish_validated_result(args.broker_repo, args.packet_dir)).decode("utf-8"))
+            print(canonical_bytes(publish_validated_result(
+                args.broker_repo,
+                args.packet_dir,
+                source_token=source_token,
+            )).decode("utf-8"))
             return 0
         if args.command == "internal-reconcile":
             codespace_token = os.environ.get("REVIEW_BROKER_CODESPACE_TOKEN")
@@ -241,6 +273,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.broker_repo,
                 args.codespace,
                 codespace_environment=codespace_environment,
+                source_token=source_token,
             )
             print(canonical_bytes(result).decode("utf-8"))
             if any(

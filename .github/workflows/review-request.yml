@@ -11,6 +11,7 @@ on:
         type: number
 
 permissions:
+  actions: read
   contents: write
   issues: write
 
@@ -32,6 +33,7 @@ jobs:
       CODESPACE_NAME: ${{ vars.REVIEW_BROKER_CODESPACE_NAME }}
       REVIEW_BROKER_AUTHORIZED_REQUESTERS: ${{ vars.REVIEW_BROKER_AUTHORIZED_REQUESTERS }}
       REVIEW_BROKER_AUTHORIZED_REPOSITORIES: ${{ vars.REVIEW_BROKER_AUTHORIZED_REPOSITORIES }}
+      REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES: ${{ vars.REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES }}
       REVIEW_BROKER_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       REMOTE_ROOT: /tmp/review-broker-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
@@ -60,10 +62,20 @@ jobs:
           echo "BROKER_WHEEL_NAME=$wheel_name" >> "$GITHUB_ENV"
           echo "BROKER_WHEEL_SHA256=$wheel_sha256" >> "$GITHUB_ENV"
           echo "REVIEWER_SCHEMA_SHA256=$schema_sha256" >> "$GITHUB_ENV"
+      - name: Mint bounded private-source read token
+        id: source_auth
+        if: vars.REVIEW_BROKER_SOURCE_APP_ID != ''
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ vars.REVIEW_BROKER_SOURCE_APP_ID }}
+          private-key: ${{ secrets.REVIEW_BROKER_SOURCE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
       - name: Admit and prepare immutable packet
         id: prepare
         env:
           GH_TOKEN: ${{ github.token }}
+          REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES: ${{ vars.REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES }}
+          REVIEW_BROKER_SOURCE_TOKEN: ${{ steps.source_auth.outputs.token }}
         run: |
           reviewctl --broker-repo "$BROKER_REPOSITORY" internal-prepare \
             --issue "$ISSUE_NUMBER" --output evidence > prepare-output.json
@@ -181,6 +193,34 @@ jobs:
             --request '${{ steps.prepare.outputs.request_id }}' \
             --attempt '${{ steps.prepare.outputs.attempt_id }}' \
             --packet-id '${{ steps.prepare.outputs.packet_id }}'
+      - name: Plan durable terminal evidence artifact
+        if: steps.prepare.outputs.duplicate == 'false' && steps.capture.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          reviewctl --broker-repo "$BROKER_REPOSITORY" internal-plan-evidence-artifact \
+            --evidence-dir evidence \
+            --output evidence-artifact-plan.json \
+            --artifact-name "terminal-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - name: Upload durable terminal evidence artifact
+        id: terminal_artifact
+        if: steps.prepare.outputs.duplicate == 'false' && steps.capture.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: terminal-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence
+          if-no-files-found: error
+          retention-days: 90
+      - name: Bind durable terminal evidence locator
+        if: steps.prepare.outputs.duplicate == 'false' && steps.capture.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          reviewctl --broker-repo "$BROKER_REPOSITORY" internal-finalize-evidence-artifact \
+            --plan evidence-artifact-plan.json \
+            --output evidence-artifact-locator.json \
+            --artifact-id '${{ steps.terminal_artifact.outputs.artifact-id }}' \
+            --artifact-digest '${{ steps.terminal_artifact.outputs.artifact-digest }}'
       - name: Preserve ambiguous execution as indeterminate
         if: steps.prepare.outputs.duplicate == 'false' && always() && steps.capture.outcome == 'failure'
         env:
@@ -205,6 +245,7 @@ jobs:
         if: steps.prepare.outputs.duplicate == 'false' && steps.validation.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
+          REVIEW_BROKER_SOURCE_TOKEN: ${{ steps.source_auth.outputs.token }}
         run: reviewctl --broker-repo "$BROKER_REPOSITORY" internal-publish --packet-dir evidence
       - name: Stop and independently observe Shutdown
         id: stop
@@ -232,6 +273,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: evidence-${{ github.run_id }}-${{ github.run_attempt }}
-          path: evidence
+          path: |
+            evidence
+            evidence-artifact-plan.json
+            evidence-artifact-locator.json
           if-no-files-found: error
           retention-days: 90

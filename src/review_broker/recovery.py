@@ -18,6 +18,7 @@ class RecoveryAction(str, Enum):
     NONE = "NONE"
     RESUME_PRE_MODEL = "RESUME_PRE_MODEL"
     MARK_INDETERMINATE_AND_STOP = "MARK_INDETERMINATE_AND_STOP"
+    RESUME_FROM_ARTIFACT = "RESUME_FROM_ARTIFACT"
     BLOCKED_EVIDENCE_LOCATION = "BLOCKED_EVIDENCE_LOCATION"
     STOP_CODESPACE = "STOP_CODESPACE"
     RECORD_STOPPED = "RECORD_STOPPED"
@@ -65,15 +66,16 @@ def decide_recovery(record: AttemptRecord, *, codespace_state: str) -> RecoveryD
             RecoveryAction.MARK_INDETERMINATE_AND_STOP,
             "ARMED exists without terminal evidence; actual provider inference is unknown and must not be retried.",
         )
-    if state is AttemptState.TERMINAL_CAPTURED:
+    if state in {AttemptState.TERMINAL_CAPTURED, AttemptState.VALIDATED}:
+        if record.evidence_locator is not None or record.evidence_locator_plan is not None:
+            return RecoveryDecision(
+                RecoveryAction.RESUME_FROM_ARTIFACT,
+                "Exact durable evidence is locatable without another model invocation.",
+            )
+        operation = "Validation" if state is AttemptState.TERMINAL_CAPTURED else "Publication"
         return RecoveryDecision(
             RecoveryAction.BLOCKED_EVIDENCE_LOCATION,
-            "Validation is authorized, but no durable artifact locator is recorded in the journal.",
-        )
-    if state is AttemptState.VALIDATED:
-        return RecoveryDecision(
-            RecoveryAction.BLOCKED_EVIDENCE_LOCATION,
-            "Publication is authorized, but no durable artifact locator is recorded in the journal.",
+            f"{operation} is authorized, but no durable artifact locator is recorded in the journal.",
         )
     if state in {AttemptState.REPORTED, AttemptState.INDETERMINATE}:
         if codespace_state in {"Available", "ShuttingDown"}:

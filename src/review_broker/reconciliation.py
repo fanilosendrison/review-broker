@@ -7,7 +7,13 @@ import os
 import subprocess
 from typing import Any, Mapping
 
-from .admission import AdmissionError, AuthorizationPolicy, authorize_and_resolve
+from .admission import (
+    AdmissionError,
+    AuthorizationPolicy,
+    authorize,
+    resolve_request,
+)
+from .artifact_resume import ArtifactResumeError, resume_from_durable_artifact
 from .codespace import CodespaceController, CodespaceError
 from .evidence import build_shutdown_observation
 from .github_journal import GitHubRefJournal
@@ -19,6 +25,10 @@ from .request import RequestContractError, parse_issue_body
 
 class ReconciliationError(RuntimeError):
     """Reconciliation cannot safely complete the advertised operation."""
+
+
+class PrivateSourceCredentialRequired(ReconciliationError):
+    """An authorized private consumer has no bounded source-read credential."""
 
 
 def reconcile_repository(
@@ -33,6 +43,7 @@ def reconcile_repository(
     dispatch: Any | None = None,
     max_issue_pages: int = 100,
     max_ref_pages: int = 100,
+    source_token: str | None = None,
 ) -> list[dict[str, Any]]:
     getter = get_json or _gh_json
     dispatcher = dispatch or _dispatch_review_workflow
@@ -40,6 +51,9 @@ def reconcile_repository(
     authorization = AuthorizationPolicy(
         requesters=_csv_set(environment.get("REVIEW_BROKER_AUTHORIZED_REQUESTERS", "")),
         repositories=_csv_set(environment.get("REVIEW_BROKER_AUTHORIZED_REPOSITORIES", "")),
+    )
+    private_repositories = _csv_set(
+        environment.get("REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES", "")
     )
     issues = _paginated_list(
         getter,
@@ -71,12 +85,28 @@ def reconcile_repository(
             continue
         try:
             request = parse_issue_body(issue.get("body") or "")
-            resolved = authorize_and_resolve(
-                issue["user"]["login"],
-                request,
-                authorization,
-                getter,
-            )
+            authorize(issue["user"]["login"], request, authorization)
+            repository = request["subject"]["repository"]
+            private_source = repository in private_repositories
+            if private_source and not source_token:
+                raise PrivateSourceCredentialRequired
+            if get_json is not None:
+                source_getter = getter
+            else:
+                selected_token = source_token if private_source else None
+
+                def source_getter(endpoint: str) -> Any:
+                    return _gh_json(endpoint, token=selected_token)
+
+            resolved = resolve_request(request, source_getter)
+        except PrivateSourceCredentialRequired:
+            decisions.append({
+                "issue_number": issue.get("number"),
+                "action": "PRIVATE_SOURCE_CREDENTIAL_REQUIRED",
+                "reason": "Dedicated read-only private-source authority is unavailable.",
+                "outcome": "BLOCKED",
+            })
+            continue
         except (AdmissionError, RequestContractError, KeyError, TypeError) as exc:
             decisions.append({
                 "issue_number": issue.get("number"),
@@ -116,6 +146,8 @@ def reconcile_repository(
             decision,
             codespace_state=codespace_state,
             context=context,
+            broker_repository=broker_repository,
+            source_token=source_token,
         )
         entry["issue_number"] = issue["number"]
         decisions.append(entry)
@@ -147,6 +179,8 @@ def reconcile_repository(
             decision,
             codespace_state=codespace_state,
             context=context,
+            broker_repository=broker_repository,
+            source_token=source_token,
         )
         decisions.append(entry)
     return decisions
@@ -160,6 +194,8 @@ def _execute_recovery_decision(
     *,
     codespace_state: str,
     context: Mapping[str, str],
+    broker_repository: str,
+    source_token: str | None,
 ) -> tuple[dict[str, Any], str]:
     entry: dict[str, Any] = {
         "request_id": record.request_id,
@@ -169,7 +205,22 @@ def _execute_recovery_decision(
         "reason": decision.reason,
         "outcome": "NO_ACTION",
     }
-    if decision.action is RecoveryAction.MARK_INDETERMINATE_AND_STOP:
+    if decision.action is RecoveryAction.RESUME_FROM_ARTIFACT:
+        try:
+            resumed = resume_from_durable_artifact(
+                broker_repository,
+                record,
+                source_token=source_token,
+                journal=journal,
+            )
+        except ArtifactResumeError as exc:
+            entry["outcome"] = "BLOCKED_ARTIFACT_RECOVERY"
+            entry["artifact_recovery_error"] = str(exc)
+        else:
+            entry["outcome"] = "VALIDATED_AND_REPORTED"
+            entry["final_state"] = resumed["state"]
+            entry["validation_id"] = resumed["validation_id"]
+    elif decision.action is RecoveryAction.MARK_INDETERMINATE_AND_STOP:
         indeterminate = {
             "schema_version": 1,
             "evidence_type": "indeterminate-recovery",
@@ -284,7 +335,15 @@ def _dispatch_review_workflow(
 
 
 
-def _gh_json(endpoint: str) -> Any:
+def _gh_json(endpoint: str, *, token: str | None = None) -> Any:
+    child_environment = None
+    if token is not None:
+        child_environment = {
+            key: value
+            for key, value in os.environ.items()
+            if key in {"HOME", "PATH", "XDG_CONFIG_HOME", "SSL_CERT_FILE", "SSL_CERT_DIR"}
+        }
+        child_environment["GH_TOKEN"] = token
     result = subprocess.run(
         ["gh", "api", endpoint],
         text=True,
@@ -292,6 +351,7 @@ def _gh_json(endpoint: str) -> Any:
         check=False,
         timeout=120,
         shell=False,
+        env=child_environment,
     )
     if result.returncode != 0:
         raise ReconciliationError("GITHUB_API_FAILED")
