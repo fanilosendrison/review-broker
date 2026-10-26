@@ -61,7 +61,7 @@ class EvidenceValidationTests(unittest.TestCase):
         (root / "attempt.json").write_bytes(canonical_bytes({
             "attempt_id": "attempt:sha256:" + "3" * 64,
             "broker_wheel_sha256": "6" * 64,
-            "permission_profile": "review-broker",
+            "permission_profile": "review-broker-" + "0" * 64,
             "permission_profile_sha256": profile_sha256,
             "credential_paths_denied": True,
             "trusted_workspace_denied": True,
@@ -70,7 +70,6 @@ class EvidenceValidationTests(unittest.TestCase):
         security_observations = {
             "packet_canary_readable": True,
             "auth_parent_canary_readable": False,
-            "auth_file_os_access_readable": False,
             "trusted_workspace_readable": False,
             "packet_directory_writable": False,
             "unauthorized_network_connect": False,
@@ -79,10 +78,11 @@ class EvidenceValidationTests(unittest.TestCase):
             "outside_packet_canary_readable": False,
             "symlink_to_auth_parent_canary_readable": False,
             "hardlink_to_auth_parent_canary_readable": False,
+            "hardlink_created": True,
         }
         (root / "reviewer-security-probe.json").write_bytes(canonical_bytes({
             "qualified": True,
-            "permission_profile": "review-broker",
+            "permission_profile": "review-broker-" + "0" * 64,
             "permission_profile_sha256": profile_sha256,
             "mismatches": [],
             "observations": security_observations,
@@ -325,6 +325,12 @@ class EvidenceValidationTests(unittest.TestCase):
             self.assertNotIn(canary, "".join(path.read_text() for path in root.iterdir()))
             self.assertFalse(json.loads((root / "credential-incident.json").read_text())[
                 "raw_runner_evidence_retained"])
+            validation = validate_evidence(root)
+            self.assertIn("CREDENTIAL_MATERIAL_DETECTED_QUARANTINED",
+                          validation["validation_reasons"])
+            self.assertEqual(validation["review_verdict"], "UNDETERMINED")
+            with self.assertRaisesRegex(PublicationError, "CONTAMINATED"):
+                build_review_result({}, {}, {}, validation, current_head=None)
 
     def test_contaminated_validation_is_not_publishable(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -343,6 +349,21 @@ class EvidenceValidationTests(unittest.TestCase):
                      "reasoning_effort_requested": "xhigh"},
                     validation, current_head="a" * 40,
                 )
+
+    def test_actions_qualification_workflow_has_no_write_or_codespace_credential(self):
+        workflow = (Path(__file__).resolve().parents[1] / ".github" / "workflows" /
+                    "qualify-quarantine.yml").read_text(encoding="utf-8")
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn("contents: read", workflow)
+        self.assertIn("issues: read", workflow)
+        self.assertIn("actions: read", workflow)
+        self.assertNotIn("contents: write", workflow)
+        self.assertNotIn("issues: write", workflow)
+        self.assertNotIn("secrets.", workflow)
+        self.assertNotIn("codespace", workflow.lower())
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("synthetic-negative-", workflow)
+        self.assertIn("synthetic-clean-", workflow)
 
     def test_credential_material_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:

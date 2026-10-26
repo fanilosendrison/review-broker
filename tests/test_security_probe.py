@@ -4,14 +4,13 @@ import subprocess
 import tempfile
 import unittest
 
-from review_broker.reviewer_profile import install_reviewer_profile
+from review_broker.reviewer_profile import install_reviewer_profile, profile_name
 from review_broker.security_probe import SecurityProbeError, run_reviewer_isolation_probe
 
 
 PASSING_OBSERVATION = {
     "packet_canary_readable": True,
     "auth_parent_canary_readable": False,
-    "auth_file_os_access_readable": False,
     "trusted_workspace_readable": False,
     "packet_directory_writable": False,
     "unauthorized_network_connect": False,
@@ -20,6 +19,7 @@ PASSING_OBSERVATION = {
     "outside_packet_canary_readable": False,
     "symlink_to_auth_parent_canary_readable": False,
     "hardlink_to_auth_parent_canary_readable": False,
+    "hardlink_created": True,
     "visible_proc_pid_count": 2,
     "parent_process_environment_os_access_readable": True,
 }
@@ -44,7 +44,7 @@ class SecurityProbeTests(unittest.TestCase):
             home, workspace, packet = self.fixture(Path(temporary))
 
             def runner(command, **kwargs):
-                self.assertIn("review-broker", command)
+                self.assertIn(profile_name(packet), command)
                 self.assertEqual(
                     kwargs["env"]["REVIEW_BROKER_PROCESS_CANARY"],
                     "non-secret-process-canary",
@@ -90,6 +90,16 @@ class SecurityProbeTests(unittest.TestCase):
             def runner(command, **kwargs):
                 return subprocess.CompletedProcess(command, 0, stdout=json.dumps(observed), stderr="")
             with self.assertRaisesRegex(SecurityProbeError, "outside_packet_canary_readable"):
+                run_reviewer_isolation_probe(home, workspace, packet, runner=runner,
+                    environment={"HOME": str(home), "PATH": "/usr/bin"})
+
+    def test_unconstructed_hardlink_is_not_a_pass(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home, workspace, packet = self.fixture(Path(temporary))
+            observed = dict(PASSING_OBSERVATION, hardlink_created=False)
+            def runner(command, **kwargs):
+                return subprocess.CompletedProcess(command, 0, stdout=json.dumps(observed), stderr="")
+            with self.assertRaisesRegex(SecurityProbeError, "hardlink_created"):
                 run_reviewer_isolation_probe(home, workspace, packet, runner=runner,
                     environment={"HOME": str(home), "PATH": "/usr/bin"})
 

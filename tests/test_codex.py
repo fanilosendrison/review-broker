@@ -15,20 +15,20 @@ from review_broker.codex import (
     invoke_once,
     sanitized_environment,
 )
-from review_broker.reviewer_profile import install_reviewer_profile
+from review_broker.reviewer_profile import install_reviewer_profile, profile_name
 from review_broker.packets import SourceRecord, build_packet
 
 
 class CodexAdapterTests(unittest.TestCase):
     def test_command_is_pinned_and_read_only(self):
-        command = build_command(Path("/schema.json"), Path("/final.json"), CodexPolicy())
+        command = build_command(Path("/schema.json"), Path("/final.json"), CodexPolicy(), "review-broker-test")
         self.assertEqual(command[:2], ["codex", "exec"])
         self.assertIn("--ephemeral", command)
         self.assertNotIn("--ignore-user-config", command)
         self.assertIn("--ignore-rules", command)
         self.assertNotIn("--sandbox", command)
         self.assertIn("--strict-config", command)
-        self.assertEqual(command[command.index("--profile") + 1], "review-broker")
+        self.assertEqual(command[command.index("--profile") + 1], "review-broker-test")
         self.assertEqual(command[command.index("--model") + 1], "gpt-5.6-sol")
         self.assertIn('model_reasoning_effort="xhigh"', command)
         self.assertEqual(command[-1], "-")
@@ -49,7 +49,7 @@ class CodexAdapterTests(unittest.TestCase):
         self.assertNotIn("OPENAI_API_KEY", cleaned)
 
     def test_installed_help_must_support_every_qualified_flag(self):
-        command = build_command(Path("schema"), Path("final"), CodexPolicy())
+        command = build_command(Path("schema"), Path("final"), CodexPolicy(), "review-broker-test")
         help_text = " ".join(x for x in command if x.startswith("--"))
         ensure_cli_compatibility(help_text)
         with self.assertRaisesRegex(InvocationError, "UNSUPPORTED_FLAG"):
@@ -104,6 +104,9 @@ class CodexAdapterTests(unittest.TestCase):
                 )
             attempt = json.loads((packet / "attempt.json").read_text(encoding="utf-8"))
             self.assertEqual(attempt["broker_wheel_sha256"], "b" * 64)
+            self.assertEqual(attempt["permission_profile"], profile_name(packet))
+            self.assertEqual(attempt["permission_profile_sha256"],
+                             hashlib.sha256((home / ".codex" / (profile_name(packet) + ".config.toml")).read_bytes()).hexdigest())
             for name in (
                 "attempt.json", "input-manifest.json", "prompt.sha256",
                 "codex-events.jsonl", "codex-stderr.txt", "codex-exit-code.txt",
