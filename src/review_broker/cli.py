@@ -2,14 +2,12 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 from pathlib import Path
-import subprocess
 import sys
-from typing import Any
 
 from .codex import invoke_once
+from .evidence import quarantine_contaminated_evidence
 from .codespace import CodespaceController
 from .execution_recovery import (
     capture_terminal_transition,
@@ -22,22 +20,17 @@ from .execution_recovery import (
     workflow_context,
 )
 from .github_journal import GitHubRefJournal
-from .identity import canonical_bytes, request_identity
+from .identity import canonical_bytes
 from .orchestration import prepare_issue, publish_validated_result
 from .reconciliation import reconcile_repository
 from .packets import verify_packet
-from .publication import extract_result_comment
 from .queue import AttemptState
-from .request import RequestContractError, build_issue_body, create_request, parse_issue_body
+from .requester import CliError, request as _request, result as _result, status as _status
 from .reviewer_profile import install_reviewer_profile, reviewer_home_from_environment
 from .security_probe import run_reviewer_isolation_probe
 from .validation import validate_evidence
 
 DEFAULT_BROKER_REPOSITORY = "fanilosendrison/review-broker"
-
-
-class CliError(RuntimeError):
-    pass
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -67,6 +60,7 @@ def _parser() -> argparse.ArgumentParser:
 
     verify = subcommands.add_parser("internal-verify-packet")
     verify.add_argument("--packet-dir", required=True, type=Path)
+    verify.add_argument("--expected-packet-id", required=True)
 
     arm = subcommands.add_parser("internal-arm")
     arm.add_argument("--request", required=True)
@@ -74,12 +68,15 @@ def _parser() -> argparse.ArgumentParser:
 
     install_profile = subcommands.add_parser("internal-install-reviewer-profile")
     install_profile.add_argument("--trusted-workspace", required=True, type=Path)
+    install_profile.add_argument("--packet-dir", required=True, type=Path)
     probe_profile = subcommands.add_parser("internal-probe-reviewer-profile")
     probe_profile.add_argument("--trusted-workspace", required=True, type=Path)
+    probe_profile.add_argument("--packet-dir", required=True, type=Path)
     invoke = subcommands.add_parser("internal-invoke")
     invoke.add_argument("--packet-dir", required=True, type=Path)
     invoke.add_argument("--schema", required=True, type=Path)
     invoke.add_argument("--attempt", required=True)
+    invoke.add_argument("--packet-id", required=True)
     invoke.add_argument("--broker-wheel-sha256", required=True)
     invoke.add_argument("--trusted-workspace", required=True, type=Path)
     recover = subcommands.add_parser("internal-recover")
@@ -88,6 +85,10 @@ def _parser() -> argparse.ArgumentParser:
     recover.add_argument("--output", required=True, type=Path)
     recover.add_argument("--request", required=True)
     recover.add_argument("--attempt", required=True)
+    quarantine = subcommands.add_parser("internal-quarantine-evidence")
+    quarantine.add_argument("--evidence-dir", required=True, type=Path)
+    quarantine.add_argument("--request", required=True)
+    quarantine.add_argument("--attempt", required=True)
     capture = subcommands.add_parser("internal-capture-terminal")
     capture.add_argument("--packet-dir", required=True, type=Path)
     capture.add_argument("--request", required=True)
@@ -150,7 +151,9 @@ def main(argv: list[str] | None = None) -> int:
             print(canonical_bytes(value).decode("utf-8"))
             return 0
         if args.command == "internal-verify-packet":
-            print(canonical_bytes(verify_packet(args.packet_dir)).decode("utf-8"))
+            observed = verify_packet(args.packet_dir)
+            if observed["packet_id"] != args.expected_packet_id:
+                raise CliError("PACKET_ID_MISMATCH")
             return 0
         if args.command == "internal-arm":
             journal = GitHubRefJournal(args.broker_repo)
@@ -159,11 +162,11 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "internal-install-reviewer-profile":
             home = reviewer_home_from_environment(dict(os.environ))
-            install_reviewer_profile(home, args.trusted_workspace)
+            install_reviewer_profile(home, args.trusted_workspace, args.packet_dir)
             return 0
         if args.command == "internal-probe-reviewer-profile":
             home = reviewer_home_from_environment(dict(os.environ))
-            receipt = run_reviewer_isolation_probe(home, args.trusted_workspace)
+            receipt = run_reviewer_isolation_probe(home, args.trusted_workspace, args.packet_dir)
             print(canonical_bytes(receipt).decode("utf-8"))
             return 0
         if args.command == "internal-invoke":
@@ -171,6 +174,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.packet_dir,
                 args.schema,
                 args.attempt,
+                expected_packet_id=args.packet_id,
                 broker_wheel_sha256=args.broker_wheel_sha256,
                 trusted_workspace=args.trusted_workspace,
             )
@@ -185,6 +189,11 @@ def main(argv: list[str] | None = None) -> int:
                 context=workflow_context(os.environ, source="review-workflow-recovery"),
             )
             print(canonical_bytes(value).decode("utf-8"))
+            return 0
+        if args.command == "internal-quarantine-evidence":
+            print(canonical_bytes(quarantine_contaminated_evidence(
+                args.evidence_dir, request_id=args.request, attempt_id=args.attempt,
+            )).decode("utf-8"))
             return 0
         if args.command == "internal-capture-terminal":
             value = capture_terminal_transition(
@@ -286,110 +295,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"REVIEWCTL_ERROR={type(exc).__name__}:{exc}", file=sys.stderr)
         return 1
     raise AssertionError("unreachable")
-
-
-def _request(args: argparse.Namespace) -> int:
-    mission = _read_json_object(args.mission_file, maximum_bytes=100_000)
-    request = create_request(args.repo, args.pr, args.profile, mission)
-    body = build_issue_body(request)
-    title = f"Review request — {args.repo}#{args.pr} — {mission['id']}"
-    result = _run([
-        "gh", "issue", "create", "--repo", args.broker_repo,
-        "--title", title, "--body", body,
-    ])
-    print(f"REQUEST_ID={request_identity(request)}")
-    print(f"ISSUE_URL={result.stdout.strip()}")
-    return 0
-
-
-def _status(args: argparse.Namespace) -> int:
-    issue = _find_issue(args.broker_repo, args.request)
-    try:
-        attempt = GitHubRefJournal(args.broker_repo).get(args.request)
-        state = attempt.state.value
-        attempt_id = attempt.attempt_id
-    except KeyError:
-        state = "REQUESTED"
-        attempt_id = "UNDETERMINED"
-    print(f"REQUEST_ID={args.request}")
-    print(f"ISSUE={issue['url']}")
-    print(f"STATE={state}")
-    print(f"ATTEMPT_ID={attempt_id}")
-    return 0
-
-
-def _result(args: argparse.Namespace) -> int:
-    issue = _find_issue(args.broker_repo, args.request)
-    comments = _gh_json(f"repos/{args.broker_repo}/issues/{issue['number']}/comments?per_page=100")
-    results = [
-        value for value in (extract_result_comment(comment.get("body", "")) for comment in comments)
-        if value is not None and value.get("request_id") == args.request
-    ]
-    if not results:
-        raise CliError("RESULT_UNAVAILABLE")
-    value = results[-1]
-    if args.json:
-        print(canonical_bytes(value).decode("utf-8"))
-    else:
-        print(f"EXECUTION_STATUS={value['execution_status']}")
-        print(f"EVIDENCE_STATUS={value['evidence_status']}")
-        print(f"REVIEW_VERDICT={value['review_verdict']}")
-        print(f"APPLICABILITY={value['applicability']['status']}")
-    return 0
-
-
-def _find_issue(repository: str, wanted_request_id: str) -> dict[str, Any]:
-    result = _run([
-        "gh", "issue", "list", "--repo", repository, "--state", "all",
-        "--limit", "1000", "--json", "number,url,body,state",
-    ])
-    issues = json.loads(result.stdout)
-    matches = []
-    for issue in issues:
-        try:
-            request = parse_issue_body(issue.get("body") or "")
-        except RequestContractError:
-            continue
-        if request_identity(request) == wanted_request_id:
-            matches.append(issue)
-    if not matches:
-        raise CliError("REQUEST_NOT_FOUND")
-    matches.sort(key=lambda item: item["number"])
-    return matches[0]
-
-
-def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
-    result = subprocess.run(
-        command,
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=120,
-        shell=False,
-    )
-    if result.returncode != 0:
-        raise CliError(f"COMMAND_FAILED:{command[1]}")
-    return result
-
-
-def _gh_json(endpoint: str) -> Any:
-    result = _run(["gh", "api", endpoint])
-    try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError as exc:
-        raise CliError("GITHUB_RESPONSE_INVALID") from exc
-
-
-def _read_json_object(path: Path, *, maximum_bytes: int) -> dict[str, Any]:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > maximum_bytes:
-        raise CliError("MISSION_FILE_INVALID")
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise CliError("MISSION_FILE_JSON_INVALID") from exc
-    if not isinstance(value, dict):
-        raise CliError("MISSION_FILE_NOT_OBJECT")
-    return value
 
 
 if __name__ == "__main__":
