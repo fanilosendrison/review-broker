@@ -73,6 +73,8 @@ def build_command(schema_path: Path, output_path: Path, policy: CodexPolicy, per
         "--model",
         policy.model,
         "-c",
+        "features.shell_tool=false",
+        "-c",
         f'model_reasoning_effort="{policy.reasoning_effort}"',
         "--output-schema",
         str(schema_path.resolve()),
