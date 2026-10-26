@@ -16,9 +16,11 @@ class FakeCodespaceRunner:
     def __init__(self, states):
         self.states = iter(states)
         self.commands = []
+        self.environments = []
 
     def __call__(self, command, **kwargs):
         self.commands.append(command)
+        self.environments.append(kwargs.get("env"))
         if command[:3] == ["gh", "codespace", "view"]:
             state = next(self.states)
             return type("Result", (), {"returncode": 0, "stdout": json.dumps({"state": state}), "stderr": ""})()
@@ -107,6 +109,18 @@ class SecurityTests(unittest.TestCase):
         controller.wait_for("Available", attempts=1, interval_seconds=0)
         self.assertIsInstance(runner.commands[0], list)
         self.assertNotIn("shell=True", runner.commands[0])
+
+    def test_codespace_controller_uses_only_supplied_control_environment(self):
+        runner = FakeCodespaceRunner(["Available"])
+        environment = {"GH_TOKEN": "placeholder-control-token"}
+        controller = CodespaceController(
+            "safe-name",
+            runner=runner,
+            sleep=lambda _: None,
+            environment=environment,
+        )
+        controller.wait_for("Available", attempts=1, interval_seconds=0)
+        self.assertEqual(runner.environments, [environment])
 
     def test_cleanup_requires_observed_shutdown(self):
         runner = FakeCodespaceRunner(["ShuttingDown", "Shutdown"])

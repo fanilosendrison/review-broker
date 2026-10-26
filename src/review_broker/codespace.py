@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 import subprocess
 import time
-from typing import Callable
+from typing import Callable, Mapping
 
 
 class CodespaceError(RuntimeError):
@@ -23,12 +23,14 @@ class CodespaceController:
         *,
         runner: Runner = subprocess.run,
         sleep: Callable[[float], None] = time.sleep,
+        environment: Mapping[str, str] | None = None,
     ):
         if not re.fullmatch(r"[A-Za-z0-9-]+", name):
             raise ValueError("CODESPACE_NAME_INVALID")
         self.name = name
         self.runner = runner
         self.sleep = sleep
+        self.environment = dict(environment) if environment is not None else None
 
     def start(self, *, attempts: int = 30, interval_seconds: float = 5) -> None:
         self._run(["gh", "api", "--method", "POST", f"user/codespaces/{self.name}/start", "--silent"])
@@ -94,6 +96,7 @@ class CodespaceController:
             check=False,
             timeout=120,
             shell=False,
+            env=self.environment,
         )
         if result.returncode != 0:
             raise CodespaceError(f"COMMAND_FAILED:{command[1]}:{command[2]}")

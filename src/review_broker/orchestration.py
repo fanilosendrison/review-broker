@@ -15,7 +15,13 @@ from .identity import artifact_identity, canonical_bytes
 from .packets import GitSourceReader, SourceSpec, build_packet
 from .publication import GitHubPublisher, build_review_result
 from .queue import AttemptState, GitHubRefJournal
-from .recovery import RecoveryAction, decide_recovery
+from .recovery import (
+    PreparationRecoveryAction,
+    RecoveryAction,
+    decide_preparation_recovery,
+    decide_recovery,
+    verify_rebuilt_packet,
+)
 from .request import parse_issue_body
 
 
@@ -48,12 +54,14 @@ def prepare_issue(
         base_branch=environment.get("REVIEW_BROKER_DEFAULT_BRANCH", "dev"),
     )
     attempt = journal.claim(resolved["request_id"])
-    if attempt.state is not AttemptState.REQUESTED:
-        return {"duplicate": True, "attempt": attempt.as_dict(), "resolved_request": resolved}
     admission_evidence = artifact_identity(canonical_bytes(resolved))
-    attempt = journal.transition(
-        resolved["request_id"], AttemptState.ADMITTED, [admission_evidence]
-    )
+    preparation_action = decide_preparation_recovery(attempt, admission_evidence)
+    if preparation_action is PreparationRecoveryAction.DUPLICATE_TERMINAL_OR_MODEL_CAPABLE:
+        return {"duplicate": True, "attempt": attempt.as_dict(), "resolved_request": resolved}
+    if preparation_action is PreparationRecoveryAction.ADMIT_AND_BUILD:
+        attempt = journal.transition(
+            resolved["request_id"], AttemptState.ADMITTED, [admission_evidence]
+        )
     profile = _load_profile(request["policy"]["profile"], request["policy"]["version"])
     changed = _pull_request_files(
         request["subject"]["repository"], request["subject"]["pull_request"]
@@ -120,9 +128,12 @@ def prepare_issue(
     (output_directory / "resolved-request.json").write_bytes(canonical_bytes(resolved) + b"\n")
     (output_directory / "broker-metadata.json").write_bytes(canonical_bytes(metadata) + b"\n")
     prepared_evidence = artifact_identity(canonical_bytes(manifest))
-    attempt = journal.transition(
-        resolved["request_id"], AttemptState.PREPARED, [prepared_evidence]
-    )
+    if preparation_action is PreparationRecoveryAction.REBUILD_PREPARED:
+        verify_rebuilt_packet(attempt, prepared_evidence)
+    else:
+        attempt = journal.transition(
+            resolved["request_id"], AttemptState.PREPARED, [prepared_evidence]
+        )
     return {
         "duplicate": False,
         "attempt": attempt.as_dict(),
@@ -156,13 +167,18 @@ def publish_validated_result(
 def reconcile_repository(
     broker_repository: str,
     codespace_name: str,
+    *,
+    codespace_environment: Mapping[str, str] | None = None,
 ) -> list[dict[str, str]]:
     refs = _gh_json(
         f"repos/{broker_repository}/git/matching-refs/heads/review-claims/"
     )
     if not isinstance(refs, list):
         raise OrchestrationError("CLAIM_REF_RESPONSE_INVALID")
-    controller = CodespaceController(codespace_name)
+    controller = CodespaceController(
+        codespace_name,
+        environment=codespace_environment,
+    )
     codespace_state = controller.state()
     journal = GitHubRefJournal(broker_repository)
     decisions: list[dict[str, str]] = []

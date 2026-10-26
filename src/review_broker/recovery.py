@@ -7,6 +7,13 @@ from enum import Enum
 from .queue import AttemptRecord, AttemptState
 
 
+class PreparationRecoveryAction(str, Enum):
+    ADMIT_AND_BUILD = "ADMIT_AND_BUILD"
+    BUILD_FROM_ADMITTED = "BUILD_FROM_ADMITTED"
+    REBUILD_PREPARED = "REBUILD_PREPARED"
+    DUPLICATE_TERMINAL_OR_MODEL_CAPABLE = "DUPLICATE_TERMINAL_OR_MODEL_CAPABLE"
+
+
 class RecoveryAction(str, Enum):
     NONE = "NONE"
     RESUME_PRE_MODEL = "RESUME_PRE_MODEL"
@@ -21,6 +28,29 @@ class RecoveryAction(str, Enum):
 class RecoveryDecision:
     action: RecoveryAction
     reason: str
+
+
+def decide_preparation_recovery(
+    record: AttemptRecord,
+    admission_evidence_id: str,
+) -> PreparationRecoveryAction:
+    if record.state is AttemptState.REQUESTED:
+        return PreparationRecoveryAction.ADMIT_AND_BUILD
+    if record.state in {AttemptState.ADMITTED, AttemptState.PREPARED}:
+        if admission_evidence_id not in record.evidence_ids:
+            raise ValueError("RESOLVED_REQUEST_EVIDENCE_MISMATCH")
+        if record.state is AttemptState.ADMITTED:
+            return PreparationRecoveryAction.BUILD_FROM_ADMITTED
+        return PreparationRecoveryAction.REBUILD_PREPARED
+    return PreparationRecoveryAction.DUPLICATE_TERMINAL_OR_MODEL_CAPABLE
+
+
+def verify_rebuilt_packet(record: AttemptRecord, packet_evidence_id: str) -> None:
+    if (
+        record.state is AttemptState.PREPARED
+        and packet_evidence_id not in record.evidence_ids
+    ):
+        raise ValueError("PREPARED_PACKET_EVIDENCE_MISMATCH")
 
 
 def decide_recovery(record: AttemptRecord, *, codespace_state: str) -> RecoveryDecision:
