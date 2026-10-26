@@ -8,12 +8,15 @@ import os
 from pathlib import Path
 import re
 import subprocess
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
+from .changes import ChangeScopeError, build_change_basis, verify_change_basis
 from .identity import canonical_bytes, packet_identity
+from .physical import PhysicalLineError, decode_physical_lines
 
 MAX_SOURCE_BYTES = 2_000_000
 MAX_PACKET_BYTES = 8_000_000
+MAX_SOURCE_COUNT = 999  # ReviewerFindings v1 source IDs are S001 through S999.
 PATH_PATTERN = re.compile(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\Z")
 SHA_PATTERN = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})\Z")
 
@@ -56,9 +59,11 @@ class SourceRecord:
 class GitSourceReader:
     """Read blobs without checking out or executing reviewed repository code."""
 
-    def __init__(self, repository_root: Path, timeout_seconds: int = 30):
+    def __init__(self, repository_root: Path, timeout_seconds: int = 30,
+                 environment: Mapping[str, str] | None = None):
         self.repository_root = repository_root
         self.timeout_seconds = timeout_seconds
+        self.environment = dict(environment) if environment is not None else None
 
     def _git(self, *arguments: str, input_data: bytes | None = None) -> bytes:
         try:
@@ -70,12 +75,39 @@ class GitSourceReader:
                 check=False,
                 timeout=self.timeout_seconds,
                 shell=False,
+                env=self.environment,
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise PacketError("GIT_COMMAND_FAILED") from exc
         if result.returncode != 0:
             raise PacketError("GIT_COMMAND_FAILED")
         return result.stdout
+
+    def diff(self, merge_base: str, head: str) -> bytes:
+        self._validate_change_commits(merge_base, head)
+        data = self._git("diff", "--binary", "--full-index", "--no-ext-diff",
+                         "--no-textconv", "--find-renames", "--find-copies-harder",
+                         merge_base, head, "--")
+        if not data or len(data) > MAX_PACKET_BYTES:
+            raise PacketError("CHANGE_DIFF_UNAVAILABLE_OR_TOO_LARGE")
+        return data
+
+    def changed_paths(self, merge_base: str, head: str) -> set[str]:
+        self._validate_change_commits(merge_base, head)
+        raw = self._git("diff", "--name-only", "-z", "--find-renames",
+                        "--find-copies-harder", merge_base, head, "--")
+        try:
+            paths = [part.decode("ascii") for part in raw.split(b"\0")[:-1]]
+        except UnicodeDecodeError as exc:
+            raise PacketError("CHANGE_PATH_UNSUPPORTED") from exc
+        if not raw.endswith(b"\0") or not paths or len(set(paths)) != len(paths):
+            raise PacketError("CHANGE_PATH_SET_INVALID")
+        return set(paths)
+
+    @staticmethod
+    def _validate_change_commits(merge_base: str, head: str) -> None:
+        if not SHA_PATTERN.fullmatch(merge_base) or not SHA_PATTERN.fullmatch(head):
+            raise PacketError("CHANGE_COMMIT_INVALID")
 
     def read(self, source: SourceSpec) -> SourceRecord:
         _validate_source_spec(source)
@@ -108,10 +140,16 @@ def build_packet(
     mission_instruction: str,
     profile: dict[str, Any],
     output_directory: Path,
+    changes: list[dict[str, Any]] | None = None,
+    change_diff: bytes | None = None,
+    merge_base: str | None = None,
+    head: str | None = None,
 ) -> dict[str, Any]:
     records = list(records)
     if not records:
         raise PacketError("PACKET_HAS_NO_SOURCES")
+    if len(records) > MAX_SOURCE_COUNT:
+        raise PacketError("PACKET_SOURCE_ID_LIMIT")
     if output_directory.exists() and any(output_directory.iterdir()):
         raise PacketError("PACKET_OUTPUT_NOT_EMPTY")
     output_directory.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -151,6 +189,19 @@ def build_packet(
         "source_manifest_id": source_manifest_id,
         "sources": source_entries,
     }
+    change_text = ""
+    if changes is not None:
+        if change_diff is None or merge_base is None or head is None:
+            raise PacketError("CHANGE_SCOPE_INCOMPLETE")
+        try:
+            change_basis, change_text = build_change_basis(
+                changes, source_entries, merge_base=merge_base, head=head, diff=change_diff,
+            )
+        except ChangeScopeError as exc:
+            raise PacketError(str(exc)) from exc
+        basis.update(change_basis)
+    elif change_diff is not None or merge_base is not None or head is not None:
+        raise PacketError("CHANGE_SCOPE_INCOMPLETE")
     packet_id = packet_identity(basis)
     prompt = _render_prompt(
         program,
@@ -158,6 +209,7 @@ def build_packet(
         request_id=request_id,
         subject_id=subject_id,
         rendered_sources=rendered,
+        change_text=change_text,
     )
     if len(prompt) > MAX_PACKET_BYTES:
         raise PacketError("PACKET_EXCEEDS_TRANSPORT_LIMIT")
@@ -168,6 +220,8 @@ def build_packet(
         "prompt_sha256": hashlib.sha256(prompt).hexdigest(),
         "prompt_byte_length": len(prompt),
     }
+    if change_diff is not None:
+        _write_exclusive(output_directory / "changes.patch", change_diff)
     _write_exclusive(output_directory / "input.txt", prompt)
     _write_exclusive(output_directory / "input-manifest.json", canonical_bytes(manifest) + b"\n")
     return manifest
@@ -216,6 +270,13 @@ def verify_packet(output_directory: Path) -> dict[str, Any]:
     basis = {key: manifest[key] for key in (
         "schema_version", "request_id", "subject_id", "program_id", "source_manifest_id", "sources"
     )}
+    change_text = ""
+    if "changes" in manifest:
+        try:
+            change_basis, change_text = verify_change_basis(manifest, entries, output_directory)
+        except ChangeScopeError as exc:
+            raise PacketError(str(exc)) from exc
+        basis.update(change_basis)
     if packet_identity(basis) != manifest.get("packet_id"):
         raise PacketError("PACKET_ID_MISMATCH")
     prompt = (output_directory / "input.txt").read_bytes()
@@ -225,6 +286,7 @@ def verify_packet(output_directory: Path) -> dict[str, Any]:
         request_id=manifest["request_id"],
         subject_id=manifest["subject_id"],
         rendered_sources=rendered,
+        change_text=change_text,
     )
     if prompt != expected_prompt:
         raise PacketError("PROMPT_CONTENT_MISMATCH")
@@ -235,7 +297,9 @@ def verify_packet(output_directory: Path) -> dict[str, Any]:
 
 def assert_complete_scope(expected_paths: Iterable[str], manifest: dict[str, Any]) -> None:
     expected = list(expected_paths)
-    actual = [entry.get("path") for entry in manifest.get("sources", [])]
+    actual = ([change.get("path") for change in manifest["changes"]]
+              if "changes" in manifest else
+              [entry.get("path") for entry in manifest.get("sources", [])])
     if expected != actual:
         raise PacketError("INCOMPLETE_SCOPE")
 
@@ -273,6 +337,7 @@ def _render_prompt(
     request_id: str,
     subject_id: str,
     rendered_sources: Iterable[str],
+    change_text: str = "",
 ) -> bytes:
     mission_instruction = program.get("mission_instruction")
     if not isinstance(mission_instruction, str) or not isinstance(program.get("profile"), dict):
@@ -285,47 +350,15 @@ def _render_prompt(
         "An empty findings list is not automatically GO. Report remaining uncertainty.\n\n"
         f"MISSION_INSTRUCTIONS:\n{mission_instruction}\n\n"
         f"PACKET_ID={packet_id}\nREQUEST_ID={request_id}\nSUBJECT_ID={subject_id}\n"
-        + "".join(rendered_sources)
+        + change_text + "".join(rendered_sources)
     ).encode("utf-8")
 
 
 def _decode_physical_lines(data: bytes) -> tuple[str, tuple[str, ...], tuple[dict[str, Any], ...]]:
-    has_bom = data.startswith(b"\xef\xbb\xbf")
-    encoding = "utf-8-sig" if has_bom else "utf-8"
-    lines: list[str] = []
-    mapping: list[dict[str, Any]] = []
-    start = 0
-    number = 1
-    while start < len(data):
-        cursor = start
-        while cursor < len(data) and data[cursor] not in (10, 13):
-            cursor += 1
-        content_end = cursor
-        if cursor == len(data):
-            line_end, ending = cursor, "NONE"
-        elif data[cursor:cursor + 2] == b"\r\n":
-            line_end, ending = cursor + 2, "CRLF"
-        elif data[cursor] == 10:
-            line_end, ending = cursor + 1, "LF"
-        else:
-            line_end, ending = cursor + 1, "CR"
-        content_start = start + (3 if number == 1 and has_bom else 0)
-        try:
-            text = data[content_start:content_end].decode("utf-8")
-        except UnicodeDecodeError as exc:
-            raise PacketError("SOURCE_ENCODING_INVALID") from exc
-        lines.append(text)
-        mapping.append({
-            "line": number,
-            "byte_start": start,
-            "content_start": content_start,
-            "content_end": content_end,
-            "line_end": line_end,
-            "ending": ending,
-        })
-        start = line_end
-        number += 1
-    return encoding, tuple(lines), tuple(mapping)
+    try:
+        return decode_physical_lines(data)
+    except PhysicalLineError as exc:
+        raise PacketError(str(exc)) from exc
 
 
 def _validate_source_spec(source: SourceSpec) -> None:

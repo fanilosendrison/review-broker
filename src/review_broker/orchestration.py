@@ -104,7 +104,7 @@ def prepare_issue(
         )
         if clone.returncode != 0:
             raise OrchestrationError("SOURCE_ACQUISITION_FAILED")
-        commits = {resolved["subject"]["head_commit"], resolved["subject"]["base_commit"]}
+        commits = {resolved["subject"][key] for key in ("head_commit", "base_commit", "merge_base")}
         for commit in commits:
             fetch = subprocess.run(
                 ["git", "-C", str(source_repository), "fetch", "origin", commit, "--depth=1"],
@@ -117,19 +117,32 @@ def prepare_issue(
             )
             if fetch.returncode != 0:
                 raise OrchestrationError("SOURCE_COMMIT_FETCH_FAILED")
-        reader = GitSourceReader(source_repository)
+        reader = GitSourceReader(source_repository, environment=source_environment)
+        merge_base = resolved["subject"]["merge_base"]
+        head = resolved["subject"]["head_commit"]
+        paths = [item.get("filename") for item in changed]
+        if (any(not isinstance(path, str) for path in paths) or
+            len(set(paths)) != len(paths) or reader.changed_paths(merge_base, head) != set(paths)):
+            raise OrchestrationError("PULL_REQUEST_CHANGE_SCOPE_MISMATCH")
         records = []
+        changes = []
         for changed_file in changed:
             status = changed_file.get("status")
-            path = changed_file.get("filename")
-            if not isinstance(path, str):
-                raise OrchestrationError("PULL_REQUEST_FILE_INVALID")
-            commit = (
-                resolved["subject"]["base_commit"]
-                if status == "removed"
-                else resolved["subject"]["head_commit"]
-            )
-            records.append(reader.read(SourceSpec(request["subject"]["repository"], commit, path)))
+            path = changed_file["filename"]
+            previous = changed_file.get("previous_filename") if status in {"renamed", "copied"} else None
+            if (status not in {"added", "removed", "modified", "renamed", "copied", "changed"}
+                or (status in {"renamed", "copied"} and not isinstance(previous, str))):
+                raise OrchestrationError("PULL_REQUEST_CHANGE_STATUS_UNSUPPORTED")
+            before_id = after_id = None
+            if status != "added":
+                before_id = f"S{len(records) + 1:03d}"
+                records.append(reader.read(SourceSpec(request["subject"]["repository"],
+                                                      merge_base, previous or path)))
+            if status != "removed":
+                after_id = f"S{len(records) + 1:03d}"
+                records.append(reader.read(SourceSpec(request["subject"]["repository"], head, path)))
+            changes.append({"status": status, "path": path, "previous_path": previous,
+                            "before_source_id": before_id, "after_source_id": after_id})
         instruction = _review_instruction(request, profile)
         manifest = build_packet(
             records,
@@ -138,6 +151,10 @@ def prepare_issue(
             mission_instruction=instruction,
             profile=profile,
             output_directory=output_directory,
+            changes=changes,
+            change_diff=reader.diff(merge_base, head),
+            merge_base=merge_base,
+            head=head,
         )
     resolved["source_manifest_id"] = manifest["source_manifest_id"]
     metadata = {

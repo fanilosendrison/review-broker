@@ -2,6 +2,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+from unittest import mock
 import tempfile
 import unittest
 
@@ -138,6 +139,124 @@ class PacketTests(unittest.TestCase):
             _, _, _, manifest = self.packet(Path(temporary), ("lf.md",))
             with self.assertRaisesRegex(PacketError, "INCOMPLETE_SCOPE"):
                 assert_complete_scope(["lf.md", "crlf.md"], manifest)
+
+    def test_pr_modified_guard_removal_exposes_preimage_and_head(self):
+        from review_broker.orchestration import prepare_issue
+        from review_broker.queue import AttemptRecord, AttemptState, transition_record
+        from review_broker.request import create_request, build_issue_body
+        from review_broker.identity import attempt_identity
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo, base = self.repository(root)
+            (repo / "guard.md").write_bytes(b"guard_check()\r\nrun()\r\n")
+            subprocess.run(["git", "-C", str(repo), "add", "guard.md"], check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "with guard"], check=True)
+            base = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+            (repo / "guard.md").write_bytes(b"run()\r\n")
+            subprocess.run(["git", "-C", str(repo), "add", "guard.md"], check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "remove guard"], check=True)
+            head = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+            request = create_request("sample/repo", 7, "code", {
+                "id": "guard-review", "objective": "Review PR changes",
+                "instructions": "Find removed security guards.", "criteria": ["Compare old and new."],
+            })
+            def getter(endpoint, **kwargs):
+                if endpoint.endswith("/issues/42"):
+                    return {"body": build_issue_body(request), "user": {"login": "trusted"}}
+                if "/files?" in endpoint:
+                    return [{"filename": "guard.md", "status": "modified"}]
+                if "/pulls/7" in endpoint:
+                    return {"head": {"sha": head}, "base": {"sha": base, "repo": {"id": 7}}}
+                if "/compare/" in endpoint:
+                    return {"merge_base_commit": {"sha": base}}
+                raise AssertionError(endpoint)
+
+            class Journal:
+                def __init__(self, *args, **kwargs):
+                    self.record = None
+                def claim(self, request_id):
+                    self.record = AttemptRecord(request_id, attempt_identity(request_id, 1),
+                                                AttemptState.REQUESTED)
+                    return self.record
+                def transition(self, request_id, state, evidence_ids):
+                    self.record = transition_record(self.record, state, evidence_ids)
+                    return self.record
+            original_run = subprocess.run
+            def transport(command, **kwargs):
+                if command[:3] == ["gh", "repo", "clone"]:
+                    return original_run(["git", "clone", "--bare", str(repo), command[4]],
+                                        **kwargs)
+                return original_run(command, **kwargs)
+            with mock.patch("review_broker.orchestration._gh_json", side_effect=getter), \
+                 mock.patch("review_broker.orchestration.GitHubRefJournal", Journal), \
+                 mock.patch("review_broker.orchestration.subprocess.run", side_effect=transport):
+                result = prepare_issue("sample/broker", 42, root / "packet", environment={
+                    "REVIEW_BROKER_AUTHORIZED_REQUESTERS": "trusted",
+                    "REVIEW_BROKER_AUTHORIZED_REPOSITORIES": "sample/repo",
+                })
+            packet = root / "packet"
+            self.assertIn("guard_check()", (packet / "input.txt").read_text())
+            self.assertIn("run()", (packet / "input.txt").read_text())
+            self.assertEqual(result["resolved_request"]["subject"]["merge_base"], base)
+            self.assertEqual(verify_packet(packet)["packet_id"], result["packet"]["packet_id"])
+
+    def test_added_deleted_renamed_and_copied_scope_is_byte_bound(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo, base = self.repository(root)
+            (repo / "lf.md").write_bytes(b"alpha\r\nreplacement\r\n")
+            (repo / "crlf.md").unlink()
+            (repo / "bom.md").rename(repo / "renamed.md")
+            (repo / "added.md").write_bytes(b"added\n")
+            (repo / "copied.md").write_bytes((repo / "injection.md").read_bytes())
+            subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+            subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "mixed"], check=True)
+            head = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+            reader = GitSourceReader(repo)
+            records = []
+            changes = []
+            for status, path, previous in (
+                ("modified", "lf.md", None),
+                ("removed", "crlf.md", None),
+                ("renamed", "renamed.md", "bom.md"),
+                ("added", "added.md", None),
+                ("copied", "copied.md", "injection.md"),
+            ):
+                before_id = after_id = None
+                if status != "added":
+                    before_id = f"S{len(records) + 1:03d}"
+                    records.append(reader.read(SourceSpec("sample/repo", base, previous or path)))
+                if status != "removed":
+                    after_id = f"S{len(records) + 1:03d}"
+                    records.append(reader.read(SourceSpec("sample/repo", head, path)))
+                changes.append({"status": status, "path": path, "previous_path": previous,
+                                "before_source_id": before_id, "after_source_id": after_id})
+            self.assertEqual(reader.changed_paths(base, head),
+                {"lf.md", "crlf.md", "renamed.md", "added.md", "copied.md"})
+            output = root / "packet"
+            manifest = build_packet(records, request_id="request:sha256:" + "a" * 64,
+                subject_id="subject:sha256:" + "b" * 64,
+                mission_instruction="Review PR changes.", profile={"id": "code", "version": 1},
+                output_directory=output, changes=changes, change_diff=reader.diff(base, head),
+                merge_base=base, head=head)
+            self.assertEqual(verify_packet(output)["packet_id"], manifest["packet_id"])
+            self.assertEqual((output / manifest["sources"][0]["snapshot"]).read_bytes(), b"alpha\nbeta\n")
+            self.assertIn("replacement", (output / "input.txt").read_text())
+            assert_complete_scope([item["path"] for item in changes], manifest)
+            with (output / "changes.patch").open("ab") as stream:
+                stream.write(b"tamper")
+            with self.assertRaisesRegex(PacketError, "CHANGE_SCOPE_INVALID"):
+                verify_packet(output)
+
+    def test_git_blob_reads_keep_bounded_private_source_environment(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            bounded = {"GH_TOKEN": "synthetic-read-only-canary", "PATH": "/usr/bin"}
+            with mock.patch("review_broker.packets.subprocess.run",
+                            return_value=subprocess.CompletedProcess([], 0, b"ok", b"")) as runner:
+                self.assertEqual(GitSourceReader(repo, environment=bounded)._git("rev-parse"), b"ok")
+                self.assertEqual(runner.call_args.kwargs["env"], bounded)
 
     def test_candidate_commit_mismatch_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
