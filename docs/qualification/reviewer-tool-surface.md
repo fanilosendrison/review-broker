@@ -5,7 +5,7 @@ asset_type: "qualification-record"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker v1 Reviewer Tool-Surface Inventory"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # Review Broker v1 Reviewer Tool-Surface Inventory
@@ -288,3 +288,42 @@ The sanitized local receipt is
   Independent shell, remaining-tool and credential-isolation verdicts must
   be requested separately. Do not set the security variable, merge PR #14,
   or close Issues #22/#11 from these producer findings.
+
+## 2026-10-26 — Runtime identity and managed-requirement delta
+
+Official npm metadata identifies the Linux x64 installation as root package
+`@openai/codex@0.164.0` plus alias `@openai/codex-linux-x64`, whose published
+artifact is `@openai/codex@0.164.0-linux-x64`. Both downloaded archives matched
+their registry `dist.integrity`; independently extracted launcher and native
+hashes matched the dedicated Codespace. The versioned trust record and receipt
+are `src/review_broker/trust/codex-release-v1.json` and
+[`codex-npm-release-provenance-0164.json`](receipts/codex-npm-release-provenance-0164.json).
+This is **OBSERVED_NON_INFERENCE** official-artifact identity, not reproducible
+source equivalence or independent acceptance. The bundled `unified_exec` versus
+pinned-source `shell_command` discrepancy remains unresolved.
+
+The mutable npm installation is no longer the model-transport executable. A
+pre-arm check binds its official launcher/package mapping to a root-owned,
+non-writable package-layout copy, and invocation repeats that verification
+before executing the protected absolute native path. Node and mutable launcher
+lookup are excluded from model transport; loader and Node injection variables
+are removed. Missing, ambiguous, changed, unsupported or unprotected runtimes
+fail before model-capable execution evidence is created.
+
+The separate receipt
+[`managed-requirements-attestation-0164.json`](receipts/managed-requirements-attestation-0164.json)
+records isolated synthetic managed requirements. They changed effective
+`shell_tool=false` to true, replaced the requested profile with `:read-only`,
+replaced approval `never` with `on-request`, and selected a managed profile with
+network enabled. These were **OBSERVED_NON_INFERENCE** diagnostics and agree
+with pinned source resolution.
+
+`app-server --print-startup-config` emits requirements, `doctor` and `features`
+are separate processes, and `codex exec --json` emits only a thread identifier
+from its effective session configuration before continuing to the turn. No
+supported interface provides shell state, exact active profile, complete
+filesystem/network policy and approval policy from the same `codex exec`
+process with a broker-controlled pause before model transport. Therefore
+`OBL02_ATTESTATION_INTERFACE=UNAVAILABLE` and `OBL02_STATUS=BLOCKED`. Attempt
+evidence records this absence explicitly; it does not convert requested argv or
+profile bytes into effective-policy attestation.

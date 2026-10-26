@@ -5,7 +5,7 @@ asset_type: "security-model"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Threat Model"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # Review Broker Threat Model
@@ -106,8 +106,11 @@ detects nonterminal attempts and stranded runtime state.
 Only the exact default-branch event SHA executes. Privileged manual dispatches
 from any other ref are rejected before secrets are exposed. Pull-request code is
 not selected by a review event. Schemas, profiles, workflows, trusted broker
-wheels, and reviewer distribution versions are versioned and reviewed. Profiles
-cannot be weakened by mission text.
+wheels, and reviewer distribution versions are versioned and reviewed. The
+Codex launcher/package mapping and native executable must match the versioned
+npm release trust record, and model transport uses a root-owned non-writable
+package-layout copy rather than a second PATH lookup. Profiles cannot be weakened
+by mission text.
 
 ### Incomplete evidence or false success
 
@@ -133,3 +136,11 @@ upgraded: the revised installer fails closed on mismatch. The repository
 variable that enables authenticated execution must remain unset until
 independent qualification accepts the exact filesystem, process, environment,
 network, and output-channel observations and the profile migration is verified.
+
+Official npm artifact provenance now binds the requested Codex release, but does
+not establish upstream-source reproducibility. Synthetic managed-requirement
+probes also demonstrated that Codex can replace `shell_tool=false`, the named
+profile, `approval_policy=never`, and network denial. No supported interface was
+found that exposes all final values from the same `codex exec` process before
+model transport. Effective-policy attestation is therefore blocked, and the
+gate must remain closed.

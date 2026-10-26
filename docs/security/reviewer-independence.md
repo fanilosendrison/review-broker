@@ -5,7 +5,7 @@ asset_type: "security-contract"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Independence Contract"
-version: "0.1.3"
+version: "0.1.4"
 ---
 
 # Reviewer Independence Contract
@@ -25,13 +25,28 @@ qualified by this shell setting. See
 [`reviewer-tool-surface.md`](../qualification/reviewer-tool-surface.md).
 
 The v1 adapter uses `--ephemeral`, `--ignore-rules`, `--strict-config`, the
-exact attempt-bound `review-broker-<packet-path-sha256>` permission profile,
-exact model selection, and schema-constrained output. It rejects any base user
-config and verifies profile bytes, owner, mode, runtime home, and trusted
-workspace before creating `attempt.json`. Installation uses exclusive creation
-and never replaces another attempt's profile; a partial or conflicting file
-blocks execution. The CLI selects the same immutable name for configuration
-and filesystem permissions. The authenticated reviewer path is still disabled.
+attempt-bound `review-broker-<packet-path-sha256>` permission profile, exact
+model selection, and schema-constrained output. It rejects any base user config
+and verifies profile bytes, owner, mode, runtime home, and trusted workspace
+before creating `attempt.json`. Installation uses exclusive creation and never
+replaces another attempt's profile; a partial or conflicting file blocks
+execution.
+
+The adapter now binds the PATH-selected npm launcher, root package, Linux x64
+alias package and native executable to a versioned official-registry trust
+record. It re-verifies a root-owned, non-writable package-layout copy at the
+invocation boundary and executes that absolute native path directly, excluding
+Node and mutable launcher lookup from model transport. The trust record is
+producer-authored evidence pending independent review; npm artifact integrity
+does not establish reproducible equivalence to the pinned upstream source.
+
+Codex `0.164.0` exposes managed requirements that can override the requested
+shell feature, permission profile, approval policy and network policy. Supported
+non-inference diagnostics are separate processes or expose only requirements;
+`codex exec --json` does not emit the required effective values before turn
+transport. The broker therefore records effective policy attestation as
+`UNAVAILABLE` rather than claiming that the requested profile became effective.
+The authenticated reviewer path remains disabled.
 
 The revised profile grants only Codex's minimal system read set and the exact
 prepared packet directory. It explicitly denies the runtime home and trusted

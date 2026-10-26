@@ -5,7 +5,7 @@ asset_type: "qualification-record"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Credential-Isolation Assessment"
-version: "0.1.3"
+version: "0.1.4"
 ---
 
 # Reviewer Credential-Isolation Assessment
@@ -157,3 +157,48 @@ hard-link counterexample remains valid for direct sandbox path permissions;
 disabling shell does not establish global credential isolation. Independent
 security and construction review of the exact published delta are still
 required.
+
+## Trusted-runtime attestation delta
+
+### Official release identity
+
+Registry metadata establishes root package `@openai/codex@0.164.0` and Linux
+x64 alias `@openai/codex-linux-x64`, mapped to published artifact
+`@openai/codex@0.164.0-linux-x64`. Both archives matched their npm
+`dist.integrity`; extracted launcher and native identities matched the installed
+Codespace bytes. The broker now rejects alternate PATH identities, changed
+package metadata, launcher or native bytes, unsupported platforms and missing
+or ambiguous installations. It repeats verification at invocation and executes
+a root-owned non-writable package-layout copy by absolute path. This establishes
+bounded `OFFICIAL_NPM_ARTIFACT_IDENTITY`; it does not establish
+`UPSTREAM_SOURCE_EQUIVALENCE` or independent acceptance.
+
+### Managed configuration counterexamples
+
+Isolated non-authenticated diagnostics with synthetic managed requirements
+produced four counterexamples under pinned `0.164.0`:
+
+- managed `features.shell_tool=true` replaced the requested false value;
+- a disallowed attempt profile fell back to managed `:read-only` after warning;
+- approval `never` fell back to managed `on-request` after warning;
+- a managed fallback profile enabled network despite the requested prohibition.
+
+These findings are `derived-from-existing-authority`: the accepted independence
+contract already requires the exact effective policy. They affect
+`verification-or-qualification-evidence`, `architecture-or-implementation` and
+`integration-or-conformance`; no new product decision is introduced.
+
+### Attestation blocker
+
+Supported startup configuration prints requirements rather than final selected
+policy. Feature and doctor diagnostics run in separate processes. The exec JSONL
+adapter reduces `SessionConfigured` to `thread_id`, while human summary is
+emitted only after thread start and omits shell state, active profile identity
+and complete policy. There is no supported same-process broker pause before the
+turn. Modifying upstream Codex or adopting another execution backend is outside
+this task.
+
+Therefore `OBL01_STATUS=IMPLEMENTED_PENDING_INDEPENDENT_REVIEW`,
+`OBL02_ATTESTATION_INTERFACE=UNAVAILABLE`, and `OBL02_STATUS=BLOCKED`. The
+security gate remains closed, and no authenticated model invocation is
+permitted.
