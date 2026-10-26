@@ -37,11 +37,12 @@ state boundary and is preserved as indeterminate.
 
 The reconciler now executes authorized pre-model dispatch, armed-to-indeterminate
 handling, observed shutdown, and stopped-state recording. It never repeats a
-model-capable operation. `TERMINAL_CAPTURED` validation and `VALIDATED`
-publication are explicitly `BLOCKED_EVIDENCE_LOCATION`: the current journal
-does not record the durable Actions artifact locator required to recover exact
-bytes. That conformance obligation is recorded under RB-08 rather than
-fabricated.
+model-capable operation. The remaining integrity correction adds a journaled
+Actions artifact plan and finalized exact locator before validation. The
+reconciler can retrieve those bytes, reproduce validation, and enter the
+publication protocol without model inference. Historical attempts with no plan
+or locator remain explicitly `BLOCKED_EVIDENCE_LOCATION`; unavailable, expired,
+incomplete, or mismatched artifacts remain non-passing rather than fabricated.
 
 ## F4 — Lost Issue delivery
 
@@ -66,6 +67,23 @@ exact event SHA. The remote broker is built from that SHA, transferred as an
 exact wheel, SHA-256 verified, force-installed, invoked with unsafe Python import
 paths disabled, and bound into attempt evidence. Packet preparation rechecks the
 PR head after complete file enumeration and rejects source identity movement.
+
+## F6 — Packet-to-prompt binding
+
+The counterexample was reproduced at baseline
+`6d9af04fcf6c85c813909cf77c5780ee0f92555c`: altered prompt bytes were accepted
+when their mutable hash and length were updated while packet identity stayed
+unchanged. Verification now recomputes program and source-manifest identities
+and reconstructs the complete expected prompt from packet-bound mission, policy,
+and exact source snapshots. Positive and negative CRLF coverage is retained.
+
+## F7 — Coherent journal reads
+
+The baseline reader was proven to return commit A together with branch content
+from commit B. It now retrieves content using the one observed immutable commit
+SHA and rejects incomplete ref, content, encoding, canonicalization, and request
+identity responses. Deterministic tests cover ref movement, stale coherent
+reads, competing compare-and-swap updates, and incomplete responses.
 
 ## Remaining gates
 

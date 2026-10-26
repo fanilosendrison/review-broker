@@ -29,11 +29,13 @@ Codespace visibility, start, SSH, upload, download, stop, and cleanup transport
 checks in run `40304872558`. Neither result replaces independent security
 review.
 
-Technical finding regressions now prevent false `TERMINAL_CAPTURED` and
-`STOPPED` transitions, preserve partial recovery, execute lost-Issue and safe
-pre-model reconciliation, block unsupported post-capture recovery explicitly,
-recheck source identity during preparation, and bind the exact remote broker
-wheel. These are producer tests and implementation corrections, not independent
+Technical finding regressions now prevent false `TERMINAL_CAPTURED`,
+`REPORTED`, and `STOPPED` transitions; reconstruct prompts from packet-bound
+program and CRLF source bytes; read journals from exact observed commits;
+preserve partial recovery; bind durable Actions artifacts; qualify
+lost-response publication behavior; execute lost-Issue and safe pre-model
+reconciliation; recheck source identity; and bind the exact remote broker wheel.
+These are producer tests and implementation corrections, not independent
 acceptance.
 
 ## Not established
@@ -45,10 +47,15 @@ The following gates remain open and must not be represented as passed:
 - bounded live model, effort, schema, JSONL, quota, and unavailable-model probe;
 - default-branch workflow event delivery from CLI and GitHub connector;
 - live cancellation and stranded-runtime recovery;
-- a durable artifact locator enabling reconciler validation and publication of
-  existing evidence;
-- the re-review identity and attempt-allocation decision tracked by Issue #20;
+- live qualification of durable artifact upload, expiry, download, validation,
+  and publication recovery;
+- owner provisioning and qualification of the dedicated read-only private-source
+  GitHub App described in the operations runbook;
+- owner acceptance of the re-review identity and attempt-allocation proposal
+  tracked by Issue #20;
 - independent external review of contracts, security, retry, and evidence claims;
+  the historical Review Lab Codespace remains inadmissible because its accepted
+  mechanism uses the credential-readable built-in Codex read-only sandbox;
 - Proto-Scope PR #57 review at the pinned SHA;
 - a materially different second repository review;
 - non-provisional shared agent adoption.

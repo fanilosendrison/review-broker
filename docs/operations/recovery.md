@@ -25,12 +25,13 @@ terminal execution truth.
   packet evidence identity before execution can continue.
 - `ARMED`: if complete terminal evidence is absent, record `INDETERMINATE`, stop
   the Codespace, and do not invoke Codex again.
-- `TERMINAL_CAPTURED`: validation is authorized without inference, but the
-  reconciler must report `BLOCKED_EVIDENCE_LOCATION` until the journal records a
-  durable artifact locator.
-- `VALIDATED`: publication is authorized without inference, but the reconciler
-  must report `BLOCKED_EVIDENCE_LOCATION` under the same missing-locator
-  condition.
+- `TERMINAL_CAPTURED`: resolve or read the journal-bound Actions artifact
+  locator, reject unavailable or mismatched evidence, download exact bytes, and
+  validate without inference. Missing locators remain
+  `BLOCKED_EVIDENCE_LOCATION`.
+- `VALIDATED`: reconstruct the same validation from the exact terminal artifact
+  and require its recorded evidence identity before publication. Missing or
+  expired evidence remains blocked.
 - `REPORTED`: stop and verify `Shutdown`.
 - `INDETERMINATE`: preserve uncertainty and complete cleanup only.
 - `STOPPED`: require actual Codespace `Shutdown`; a mismatch is an incident.
@@ -49,8 +50,11 @@ missing, truncated, malformed, or contradictory terminal streams cannot create
 `TERMINAL_CAPTURED`.
 
 Validation and publication failures retain captured artifacts and resume only
-the failed downstream operation. A failed stop remains an infrastructure
-incident until `Shutdown` is observed.
+the failed downstream operation. Publication recovery first records a unique
+intent. Only the reservation creator may post; all later executions observe the
+exact nonce-bearing result comment and actor. No comment after an attempted post
+is ambiguous and is never retried automatically. A failed stop remains an
+infrastructure incident until `Shutdown` is observed.
 
 ## Reconciler
 
@@ -63,6 +67,7 @@ claim and cannot create a second attempt.
 
 The reconciler marks an inconclusive armed attempt indeterminate, obtains a
 bound shutdown observation, and records `STOPPED` only from that receipt. It
-emits a reconciliation artifact, reports missing artifact-location support
-instead of advertising an unexecuted action, and never launches a second model
-attempt.
+emits a reconciliation artifact, resolves planned artifacts when possible, and
+never launches a second model attempt. Expired, unavailable, incomplete, or
+identity-mismatched artifacts and ambiguous publication remain explicit blocked
+outcomes.

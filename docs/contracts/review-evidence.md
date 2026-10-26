@@ -25,8 +25,11 @@ declared `utf-8-sig` encoding.
 The review prompt renders decoded line content with stable `L000001|` prefixes.
 CRLF and other physical endings are not inserted into rendered line text.
 Citation validation checks the rendered physical line while packet validation
-checks the untouched original bytes and mapping. This distinction permits CRLF
-review without source normalization.
+checks the untouched original bytes and mapping. Verification recomputes the
+program identity from the bound mission and policy, the source-manifest identity
+from exact source entries, and every prompt byte from those bound inputs. A
+mutable prompt hash and length cannot bless altered prompt text. This
+distinction permits CRLF review without source normalization.
 
 ## Attempt artifacts
 
@@ -57,6 +60,13 @@ failure record for every required runtime artifact. Partial recovery is
 preserved but is not terminal evidence. `terminal-capture.json` binds exact
 artifact hashes only after required files, attempt and packet identities, and a
 single started-plus-terminal event sequence are established.
+
+After terminal capture, the journal records an Actions artifact plan before
+upload and a finalized locator after independent GitHub metadata observation.
+The locator binds repository, run, run attempt, artifact ID, artifact name,
+archive digest, expiry, request, attempt, subject, packet, and every exact file
+identity. Recovery rejects unavailable, ambiguous, expired, incomplete, changed,
+or unsafe archives and never invokes Codex.
 
 Cleanup writes either `shutdown-observation.json` or
 `shutdown-incident.json`. Only the observation receipt can support `STOPPED`;

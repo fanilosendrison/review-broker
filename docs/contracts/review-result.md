@@ -51,6 +51,21 @@ The original verdict is immutable. Publication re-resolves the pull-request head
 and records `CURRENT`, `SUPERSEDED`, or `UNDETERMINED` separately. A historical
 `GO` cannot authorize a new SHA.
 
+## Publication evidence
+
+Before a result comment can be posted, the journal atomically reserves one
+publication intent containing a fresh nonce, exact canonical result and its
+identity, Issue, and expected GitHub actor. The comment carries that publication
+identity. A
+successful or lost-response history reaches `REPORTED` only after complete
+comment pagination independently observes exactly one matching body from the
+bound actor and records immutable comment metadata.
+
+A concurrent caller that did not create the reservation may observe but never
+post. Zero observed comments after a reserved post attempt is
+`PUBLICATION_OUTCOME_INDETERMINATE`; multiple matches are a duplicate-publication
+incident. Desired comment text alone is not historical publication proof.
+
 ## Authority
 
 A result is bounded evidence. The consuming repository decides whether its own

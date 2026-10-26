@@ -29,13 +29,17 @@ mutation, unsafe paths, and transport-size overflow.
 
 `queue.py` owns legal state transitions, specialized evidence-gated terminal
 transitions, invocation count, and in-memory reviewer serialization.
-`github_journal.py` owns atomic Git-ref claims and fast-forward-only
-compare-and-swap behavior. GitHub Actions concurrency is supplemental only.
+`github_journal.py` owns atomic Git-ref claims, exact-commit reads, and
+fast-forward-only compare-and-swap behavior. GitHub Actions concurrency is
+supplemental only.
 
 `recovery.py` maps durable state plus observed Codespace state to bounded
-recovery actions. `execution_recovery.py` owns partial artifact recovery,
-terminal-capture receipts, shutdown observations, incidents, and their durable
-transitions. `reconciliation.py` owns complete bounded Issue and claim scans,
+recovery actions. `execution_recovery.py` owns partial runtime recovery,
+terminal-capture receipts, artifact-plan recording, shutdown observations,
+incidents, and their durable transitions. `artifact_locator.py` owns exact
+Actions artifact identity, metadata observation, safe extraction, and byte
+verification. `artifact_resume.py` owns post-model reconstruction from those
+bytes. `reconciliation.py` owns complete bounded Issue and claim scans,
 lost-event dispatch, and executable recovery actions. None infers whether
 provider inference happened after an inconclusive `ARMED` transition.
 
@@ -58,8 +62,9 @@ Neither module owns request semantics, evidence validity, or publication.
 binding, response schema, identities, source coverage, and citation anchors. It
 sets semantic correctness validation to false.
 
-`publication.py` constructs ReviewResult v1, checks current applicability, and
-publishes through a trusted GitHub process. Reviewer output cannot call it.
+`publication.py` constructs ReviewResult v1, precommits unique publication
+intent, completely observes exact actor-bound comments, and produces publication
+receipts. Reviewer output cannot call it.
 
 ## Interfaces and orchestration
 

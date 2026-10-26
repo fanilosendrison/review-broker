@@ -25,18 +25,24 @@ on the default branch, versioned schemas and profiles, admission policy, the
 atomic journal, and independent validators are trusted only within their
 qualified responsibilities.
 
-The GitHub Actions publication token and dedicated Codespaces lifecycle token
-are separate. The Codex ChatGPT session exists only in the dedicated Codespace.
-No reviewer process receives repository-write or publication credentials.
+The GitHub Actions publication token, dedicated Codespaces lifecycle token, and
+short-lived private-source read token are separate. The source token is minted
+from a read-only GitHub App and is passed only to source-resolution and Git
+acquisition subprocesses. The Codex ChatGPT session exists only in the dedicated
+Codespace. No reviewer process receives source, repository-write, lifecycle, or
+publication credentials.
 
 ## Threats and controls
 
 ### Malicious reviewed content and prompt injection
 
 Source bytes are acquired with Git object commands and never executed. Packet
-boundaries label source text as untrusted data. Shell commands use argument
-vectors, fixed remote paths, and validated identities. Source instructions
-cannot alter the profile, request, command, schema, or evidence destination.
+boundaries label source text as untrusted data. Verification reconstructs every
+prompt byte from packet-bound mission, policy, and exact source snapshots; a
+mutable prompt hash cannot bless changed instructions. Shell commands use
+argument vectors, fixed remote paths, and validated identities. Source
+instructions cannot alter the profile, request, command, schema, or evidence
+destination.
 
 ### Malicious Issue content and unauthorized requests
 
@@ -55,9 +61,10 @@ checked again before publication.
 ### Duplicate or concurrent execution
 
 A deterministic Git ref is created atomically for each request identity. The
-winning ref contains the attempt journal. Fast-forward-only journal updates and
-one global Actions concurrency group supplement the durable claim. Duplicate
-Issue delivery cannot authorize a second attempt.
+winning ref contains the attempt journal. Readers retrieve state from the exact
+observed commit, while fast-forward-only updates and one global Actions
+concurrency group supplement the durable claim. Duplicate Issue delivery cannot
+authorize a second attempt.
 
 ### Credential exposure and network exfiltration
 
@@ -102,6 +109,11 @@ Execution, evidence, verdict, applicability, and semantic correctness remain
 separate. Terminal JSONL events, final-message equality, prompt hashes, response
 schema, source IDs, physical lines, and exact quote anchors are checked.
 Failures and missing artifacts produce invalid or indeterminate states.
+Terminal evidence is uploaded under a journaled plan and finalized with exact
+Actions run, artifact, archive, and file identities. Publication requires one
+nonce-bearing journal intent and exactly one independently observed comment from
+the expected GitHub actor. Artifact expiry, response loss, or duplicate comments
+cannot create false terminal state.
 
 ## Residual blocker
 
