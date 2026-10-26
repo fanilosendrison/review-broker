@@ -24,7 +24,10 @@ The new dedicated Codespace and pinned Codex distribution were created and
 inventoried. Independent ChatGPT authentication is verified. A reproduced
 root-read defect in the built-in read-only profile is corrected by an exact
 named permission profile, and the producer-run non-secret isolation probe
-passes. This does not replace independent security review.
+passes. The dedicated GitHub Actions control credential independently passed
+Codespace visibility, start, SSH, upload, download, stop, and cleanup transport
+checks in run `40304872558`. Neither result replaces independent security
+review.
 
 ## Not established
 
@@ -33,7 +36,6 @@ The following gates remain open and must not be represented as passed:
 - independent acceptance of the filesystem, process, environment, and network
   credential-isolation evidence;
 - bounded live model, effort, schema, JSONL, quota, and unavailable-model probe;
-- dedicated Codespaces-control identity and exact permission qualification;
 - default-branch workflow event delivery from CLI and GitHub connector;
 - live cancellation and stranded-runtime recovery;
 - independent external review of contracts, security, retry, and evidence claims;
@@ -43,7 +45,7 @@ The following gates remain open and must not be represented as passed:
 
 ## Qualification rule
 
-The candidate may be published as a draft pull request for independent review.
+The candidate may be published as a pull request for independent review.
 It must not be promoted as production infrastructure or set
 `REVIEW_BROKER_SECURITY_QUALIFIED=true` until every applicable gate has durable
 external evidence.

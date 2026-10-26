@@ -46,6 +46,21 @@ durable claim refs and observed Codespace state, marks an inconclusive armed
 attempt `INDETERMINATE`, and stops a stranded runtime. Cleanup does not infer
 execution success.
 
+## Qualified control transport
+
+A dispatch-only trusted workflow at default-branch SHA
+`21a944ac65404dfe2f1d17d51787d3a245ebb0f7` qualified the dedicated credential
+in Actions run `40304872558`. Identity `fanilosendrison` demonstrated exact
+Codespace visibility, REST start through `Available`, fixed-command SSH, upload,
+remote byte and SHA-256 verification, download with exact byte equality, and
+stop through `Shutdown`. Cleanup independently observed `Shutdown`.
+
+The GitHub CLI's Codespace copy wrapper requires legacy SCP mode (`scp -O`) to
+interpret its quoted remote path correctly. A fixed trusted download path also
+requires `gh codespace cp --expand` so OpenSSH strict filename checking can
+remain enabled. No broader credential permission is required by this transport
+constraint.
+
 ## Current gate
 
 `codex login status` returned `Logged in using ChatGPT` at the recorded
@@ -53,5 +68,5 @@ post-authentication observation. No API key is permitted. The corrected
 permission profile passes a producer-run non-secret probe and the Codespace was
 returned to `Shutdown` after qualification work.
 
-No review packet may reach a model until independent security review and the
-dedicated Codespaces-control credential gate both pass.
+The Codespaces-control transport gate passes. No review packet may reach a model
+until independent security review accepts the exact candidate and evidence.

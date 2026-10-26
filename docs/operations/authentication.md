@@ -57,5 +57,5 @@ network evidence in `docs/qualification/security-assessment.md`.
 
 Only then may the repository variables `REVIEW_BROKER_SECURITY_QUALIFIED` and
 `REVIEW_BROKER_SECURITY_EVIDENCE_ID` be set from independently preserved
-evidence. The dedicated Codespaces-control credential is a separate unresolved
-gate.
+evidence. The separate Codespaces-control transport gate passed T1–T6 in
+Actions run `40304872558`; that result grants no security qualification.
