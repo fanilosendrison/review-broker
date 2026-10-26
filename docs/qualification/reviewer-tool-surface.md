@@ -5,7 +5,7 @@ asset_type: "qualification-record"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker v1 Reviewer Tool-Surface Inventory"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Review Broker v1 Reviewer Tool-Surface Inventory
@@ -95,3 +95,196 @@ inventory has been observed.
 model metadata and end-to-end privilege effects are not qualified. A passing B
 is not a passing C. Independent security acceptance is still required before
 any authenticated reviewer inference.
+
+## 2026-10-26 — Exact-SHA bundled metadata and router investigation
+
+**Subject:** PR #14 at `6f1495ac073d9121655fab2146cfe78d8359e536`,
+upstream tag `rust-v0.164.0` at
+`6aaac694803004a63c6f393d153c96d22521a6b9`. This section supplements,
+not replaces, the historical hard-link, `/proc` and feature-resolution results
+above. Evidence classes below describe only the cited subject and inputs.
+The sanitized local receipt is
+[`bundled-model-tool-metadata-0164.json`](receipts/bundled-model-tool-metadata-0164.json).
+
+### Installed CLI and exact bundled entry — OBSERVED_NON_INFERENCE
+
+- The dedicated Codespace ran installed `codex-cli 0.164.0`. Its native Linux
+  executable had SHA-256
+  `b93f6811d3f653f0fb83be4050d857fb9abbb111dfa2ce160563327daff7f306`;
+  its JavaScript launcher had SHA-256
+  `61b0194f3bb6534439c8d26a3ed57d0805f84b884588b761795323eeb92fcf70`.
+  The original `env -i` version check failed because minimal `PATH` omitted
+  Node; a fresh empty temporary `HOME` and `CODEX_HOME`, `env -i`, and a PATH
+  containing only the installed Node location and system binaries fixed it.
+  A temporary-home PATH-alias warning did not prevent the successful local
+  commands. The Codespace returned to independently observed `Shutdown` after
+  **each** inspection. No service credentials were forwarded to these CLI
+  children; no real authentication files or credential contents were read.
+- `codex debug models --bundled`, **not** online `codex debug models`, emitted
+  JSON with root field `models`, 11 entries, 658607 stdout bytes and SHA-256
+  `69af12f94a39dabd1a1ded8f5257b4884d2118902ea2b5b9cffbf4a1925dfa65`.
+  Exactly one entry had `slug: "gpt-5.6-sol"`. The selected entry's actual
+  fields were `shell_type: "unified_exec"`,
+  `apply_patch_tool_type: "freeform"`, `tool_mode: "code_mode_only"`,
+  `multi_agent_version: "v2"`, `experimental_supported_tools: []`,
+  `supports_search_tool: true`, `web_search_tool_type: "text_and_image"`,
+  `node_repl_disabled: false`, `supported_in_api: true`, and
+  `use_responses_lite: true`. None is an observed effective model-visible tool
+  specification or evidence that a provider accepted this model. Other catalog
+  entries and model instruction text were not published.
+- With the broker's two `-c` settings and an empty temporary home, the installed
+  `features list` reported `shell_tool=false`, `code_mode=false`,
+  `code_mode_only=false`, `code_mode_host=true`, `multi_agent=true`,
+  `multi_agent_v2=false`, `standalone_web_search=false`, `view_image=true`.
+  These are **feature-resolution observations for that clean configuration**,
+  not an installed attempt-profile or live turn-state inspection.
+
+### Metadata selection and model-visible inventory — SOURCE_DERIVED / UNDETERMINED
+
+- [`cli/src/main.rs:2192–2222`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/cli/src/main.rs#L2192-L2222)
+  selects the bundled catalog directly under `--bundled`, skipping the normal
+  config, auth and catalog refresh branch. The ordinary manager seeds bundled
+  entries but can use identity-bound cache and a provider `/models` refresh;
+  [`models-manager/src/manager.rs:288–365`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/models-manager/src/manager.rs#L288-L365),
+  [`488–500`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/models-manager/src/manager.rs#L488-L500),
+  [`545–614`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/models-manager/src/manager.rs#L545-L614).
+  Thus the exact bundled match is a **local fallback candidate**, not an
+  attestation of the authenticated reviewer's selected catalog, authorization,
+  tool metadata, or effective model identity.
+- The CLI help and pinned `prompt_debug.rs:24–109` show `debug prompt-input`
+  builds the **prompt input list**, starts a debug thread and an auth manager;
+  it does not emit `ToolRouter.model_visible_specs`. It was **not executed**.
+  `debug models --bundled` exports a catalog, while `app-server --help` exposes
+  startup-config printing and server transport, not a final tool-spec dump.
+  [`tools/spec_plan.rs:371–551`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/tools/spec_plan.rs#L371-L551)
+  builds the final registry and model-visible specifications from live turn,
+  selected model, environment, MCP binding, extension/dynamic registrations,
+  provider-hosted specs and tool policy. No supported **non-inference final
+  tool-inventory interface** was established for this exact invocation.
+  **EFFECTIVE_TOOL_INVENTORY=UNAVAILABLE_WITH_SUPPORTED_NON_INFERENCE_INTERFACE**.
+- The source-derived inputs actually known are the broker's `codex exec` argv,
+  requested model and effort, source-generated immutable profile bytes, the
+  initial offline packet guard, this empty-home CLI feature snapshot and the
+  bundled descriptor. **UNDETERMINED:** installed attempt-bound and managed
+  feature layers, effective model metadata and tool mode, provider-hosted tool
+  capabilities, MCP servers and resources, plugins and application extensions,
+  dynamic definitions, agent-role configs, tool policy, environment availability
+  and final model-visible tool router. The profile source does not declare MCP,
+  extensions or agent roles; their absence from every effective layer was not
+  proved. Neither the actual OAuth session nor an authenticated model request
+  was used to fill these gaps.
+
+### Conditional host-I/O paths — SOURCE_DERIVED, not an effective list
+
+- **Shell:** `shell_type: "unified_exec"` specifies a preferred shell **type**, not
+  compulsory exposure. `add_shell_tools` at
+  [`spec_plan.rs:1235–1265`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/tools/spec_plan.rs#L1235-L1265)
+  exits before adding `exec_command`/`write_stdin` if effective
+  `Feature::ShellTool=false`. This remains valid even if the bundled descriptor
+  selects `code_mode_only`, because the code-mode wrapper draws its nested tools
+  from the registered tool set at
+  [`spec_plan.rs:951–995`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/tools/spec_plan.rs#L951-L995).
+  The actual managed/profile feature stack and final registry were not observed.
+- **Patch and image filesystem:** The exact bundled descriptor supplies
+  `apply_patch_tool_type: "freeform"`. If selected at runtime, it triggers
+  independent patch registration at
+  [`spec_plan.rs:1409–1412`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/tools/spec_plan.rs#L1409-L1412).
+  The patch handler verifies against an environment filesystem sandbox before
+  parsing and executing; it derives and requests write permissions at
+  [`apply_patch.rs:328–357`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/tools/handlers/apply_patch.rs#L328-L357)
+  and [`476–563`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/tools/handlers/apply_patch.rs#L476-L563).
+  It is **not** a read-only inert tool, nor is successful write escalation
+  demonstrated. Default-on `view_image` registers independently and obtains
+  metadata and bytes through the environment filesystem **with sandbox
+  context**, [`view_image.rs:147–180`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/tools/handlers/view_image.rs#L147-L180).
+  Path aliases and credential material were not tested through either model
+  tool. A hard-link alias passed the **direct sandbox**, while the broker's
+  pre-invocation packet-tree check rejects multi-linked files; no integrated
+  model-tool result eliminates race, alternate-path or `/proc` concerns.
+- **Code mode:** The bundled entry specifies `tool_mode: "code_mode_only"`.
+  [`tools/mod.rs:64–91`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/tools/mod.rs#L64-L91)
+  prefers model mode over default-off `code_mode` feature flags; if that entry
+  is effective, `spec_plan.rs:1013–1102` registers code-mode execute/wait and
+  exposes eligible nested tools. The code-mode runtime's V8 globals export
+  broker-provided `tools` and `ALL_TOOLS`, and its module loader rejects
+  imports, at
+  [`runtime/globals.rs:16–63`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/code-mode-runtime/src/runtime/globals.rs#L16-L63)
+  and [`runtime/module_loader.rs:143–206`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/code-mode-runtime/src/runtime/module_loader.rs#L143-L206).
+  This is **not Node's unrestricted filesystem/process API**, and the JavaScript
+  wrapper does not by itself restore the disabled shell. It dispatches nested
+  registered tools through `tools/code_mode/delegate.rs:441–464`; those tools'
+  distinct permissions and any V8-to-host escape remain unqualified.
+- **MCP:** Even without a bound server, `code_mode_only` causes independent
+  MCP-resource registration at `spec_plan.rs:1269–1285`; an actual server's
+  tools depend on the live MCP binding and per-server policy at
+  [`spec_plan.rs:151–166`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/tools/spec_plan.rs#L151-L166)
+  and `198–293`. Servers can carry their own filesystem, service or network
+  authority; an empty broker profile alone is not an effective server census.
+- **Subagents:** The bundled entry selects `multi_agent_version: "v2"` if the
+  model entry is chosen and config does not override it;
+  [`config/mod.rs:1658–1684`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/config/mod.rs#L1658-L1684).
+  Spawning still depends on enabled agents, depth, policy and available tools
+  (`spec_plan.rs:729–765`, `1439–1582`). V2 spawn routes through
+  [`multi_agents_v2/spawn.rs:94–138`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs#L94-L138).
+  Children start from their parent's effective config and carry current
+  approval/profile/cwd state, then may layer role and model choices;
+  [`agent/child_config.rs:52–100`](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/agent/child_config.rs#L52-L100)
+  and [`132–201`](https://github.com/openai/codex/blob/6aaac694803004a63c96d22521a6b9/codex-rs/core/src/agent/child_config.rs#L132-L201).
+  In the inspected role code, feature overrides can **disable** `ShellTool`,
+  not turn a false parent feature on (`agent/role.rs:90–106`, `200–221`).
+  Other role/provider/environment privilege effects remain unobserved.
+- **Web, extension, dynamic and other tools:** The bundled
+  `web_search_tool_type: "text_and_image"` and `supports_search_tool: true`
+  affect conditional hosted web, deferred search and third-party exposure,
+  **not** proof that web is off or that external calls are sandboxed.
+  `spec_plan.rs:687–715` requires provider capability and selected web mode;
+  `1624–1652` registers eligible extensions independently of shell;
+  `1585–1614` registers dynamic tools. Broker code did not establish the
+  effective server, provider, plugin, extension or dynamic inventories.
+  Provider-hosted calls and tool plugins may have different network and local
+  service privileges from the Linux shell sandbox.
+
+### Discovery classification
+
+- **Bundled mode:** Statement: the exact bundled `gpt-5.6-sol` entry specifies
+  `code_mode_only`, even though clean-home feature defaults for code mode are
+  false. Source and evidence: installed CLI receipt and pinned `tools/mod.rs`.
+  Existing authority: the reviewer-independence contract requires isolation,
+  not a specific tool mode. Semantic disposition: `no-normative-impact`;
+  affected layers: `verification-or-qualification-evidence`,
+  `architecture-or-implementation`, `integration-or-conformance`. Related
+  consequence: possible nested tool paths below. Required authority:
+  independent security acceptance, not a new product choice. Next action:
+  validate actual catalog selection and model-visible specs.
+- **Incomplete host-I/O guarantee:** Statement: shell registration can be
+  suppressed without demonstrating that all other tool I/O is credential
+  isolated. Source and evidence: this conditional registration analysis plus
+  the retained hard-link and `/proc` direct-sandbox observations. Existing
+  authority: `docs/security/reviewer-independence.md` requires model-tool
+  credential isolation and an independent qualification gate. Semantic
+  disposition: `no-normative-impact` (qualification gap under an already
+  accepted rule); affected layers: `verification-or-qualification-evidence`,
+  `integration-or-conformance`. Related consequence: Issue #22 remains open.
+  Required authority: independent security adjudication. Next action:
+  request separate exact-SHA security verdicts via Issue #11; do not silently
+  weaken the accepted requirement.
+
+### Security dispositions and handoff
+
+- **SHELL_REGISTRATION_BOUNDARY — SOURCE_DERIVED conditional denial:** With the
+  broker's exact `-c features.shell_tool=false` effective, normal shell-tool
+  registration is rejected; the installed clean-home CLI resolved that flag as
+  false. This does not attest the final model-visible list or all child tools.
+- **OTHER_MODEL_HOST_IO_BOUNDARY — UNDETERMINED:** A selected bundled model
+  would have code-mode nested tools, independent patch/image filesystem routes,
+  MCP resource entry points and conditional V2 agents, web and extensions.
+  Which of these are exposed in the actual authenticated turn and what
+  privileged host resources each can reach are not established.
+- **CREDENTIAL_ISOLATION_BOUNDARY — UNQUALIFIED:** The existing contract
+  forbids all model-controlled paths to OAuth and privileged material. Neither
+  shell suppression nor source-derived V8 constraints qualify the remaining
+  paths, `/proc`, descriptors, hard-link aliases or packet-tree time-of-check.
+  No authenticated reviewer inference or real credential access occurred.
+  Independent shell, remaining-tool and credential-isolation verdicts must
+  be requested separately. Do not set the security variable, merge PR #14,
+  or close Issues #22/#11 from these producer findings.
