@@ -5,7 +5,7 @@ asset_type: "contract"
 domain: "independent-review"
 severity: "strict"
 name: "ReviewResult v1 Contract"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # ReviewResult v1 Contract
@@ -56,7 +56,10 @@ and records `CURRENT`, `SUPERSEDED`, or `UNDETERMINED` separately. A historical
 Before a result comment can be posted, the journal atomically reserves one
 publication intent containing a fresh nonce, exact canonical result and its
 identity, Issue, and expected GitHub actor. The comment carries that publication
-identity. A
+identity. `reviewctl result` retrieves only the exact journaled receipt's
+comment ID and rechecks its issue, actor, canonical body, publication marker,
+result identity, and complete comment pagination; a result-shaped comment
+without that attribution is not an authoritative CLI result. A
 successful or lost-response history reaches `REPORTED` only after complete
 comment pagination independently observes exactly one matching body from the
 bound actor and records immutable comment metadata.

@@ -5,7 +5,7 @@ asset_type: "security-model"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Threat Model"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Review Broker Threat Model
@@ -69,15 +69,21 @@ authorize a second attempt.
 ### Credential exposure and network exfiltration
 
 API-key, GitHub token, base URL, organization, and project overrides are removed
-from the Codex child environment. Evidence is scanned for credential-shaped
-material. The ChatGPT credential file is never copied, logged, committed, or
-placed in Actions secrets.
+from the Codex child environment. Known credential-shaped patterns are screened before each ordinary artifact
+upload and result publication. Detected raw runner evidence is replaced with a
+sanitized incident; contaminated results and findings cannot be published.
+This bounded detection is not proof that all secrets are absent. The ChatGPT
+credential file is never intentionally copied, logged, committed, or placed in
+Actions secrets.
 
 The built-in Codex `:read-only` profile was proven insufficient because it
-allowed reads from filesystem root. The corrected named profile denies the
-complete runtime home and trusted workspace, denies writes and network access,
-prevents login shells, and supplies a fixed minimal subprocess environment. A
-controlled non-secret probe must pass immediately before invocation.
+allowed reads from filesystem root. The reviewed named profile denied the runtime home and trusted workspace but
+still allowed reads elsewhere at filesystem root. A direct non-secret Codex
+`0.164.0` probe independently observed an outside-tree canary readable. The
+revised profile instead grants Codex's minimal system paths plus only the exact
+packet directory, explicitly denies the home and workspace, denies writes and
+network access, prevents login shells, and supplies a fixed minimal subprocess
+environment. Controlled producer probes must pass immediately before invocation.
 
 These producer controls are not sufficient qualification by themselves.
 Authenticated model execution remains disabled until an independent reviewer
@@ -118,8 +124,12 @@ cannot create false terminal state.
 ## Residual blocker
 
 ChatGPT authentication is verified. The dedicated Codespaces-control transport
-passed T1–T6 in Actions run `40304872558`. A corrected profile has demonstrated
-the required producer-side non-secret canary outcomes, but independent security
-review remains missing. The repository variable that enables authenticated
-execution must remain unset until independent qualification accepts the exact
-filesystem, process, environment, and network observations.
+passed T1–T6 in Actions run `40304872558`. The historical root-readable profile passed its limited producer canaries but
+failed an outside-tree canary. A temporary minimal-read direct-sandbox probe
+observed denial of that outside canary, but did not test an authenticated
+model-tool invocation or establish parent-process, descriptor, hard-link, and
+output-channel safety. The installed historical profile is not silently
+upgraded: the revised installer fails closed on mismatch. The repository
+variable that enables authenticated execution must remain unset until
+independent qualification accepts the exact filesystem, process, environment,
+network, and output-channel observations and the profile migration is verified.

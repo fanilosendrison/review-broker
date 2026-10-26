@@ -5,7 +5,7 @@ asset_type: "security-contract"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Independence Contract"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Reviewer Independence Contract
@@ -23,12 +23,17 @@ schema-constrained output. It rejects any base user config and verifies the
 profile bytes, ownership, mode, runtime home, and trusted workspace before
 creating `attempt.json`.
 
-The profile grants read access at filesystem root only after denying the complete
-runtime home and trusted workspace. It denies network and writes, prevents login
-shells, and replaces inherited model-tool environment variables with a fixed
-minimal set. A controlled non-secret probe verifies the effective boundary.
-These producer checks do not establish semantic independence or replace
-independent security review.
+The revised profile grants only Codex's minimal system read set and the exact
+prepared packet directory. It explicitly denies the runtime home and trusted
+workspace, network and writes, prevents login shells, and sets a fixed minimal
+model-tool subprocess environment. It refuses packet roots overlapping either
+privileged tree. The historical root-readable profile remains documented by
+its original producer receipt; it is not accepted for the revised execution.
+The runtime still has that installed historical profile until a controlled
+migration. Profile mismatch stops execution rather than silently replacing it.
+A direct non-secret probe of a temporary minimal-read configuration is producer
+observation only: actual model-tool equivalence, parent-process interfaces,
+hard-link behavior, and effective isolation remain independently unqualified.
 
 ## Credential ownership
 
@@ -58,7 +63,8 @@ metadata. The broker never infers either from a CLI flag.
 Before authenticated content is exposed, independently reviewed controlled
 probes must demonstrate:
 
-- the effective user and process tree;
+- the effective user and process tree, including accessible parent environment,
+  inherited descriptors, and actual model-tool permissions;
 - packet read access and write restrictions;
 - denial of model-tool access to ChatGPT credential files;
 - absence of GitHub and API-key credentials in the child environment;

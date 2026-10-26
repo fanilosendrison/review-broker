@@ -5,7 +5,7 @@ asset_type: "operations"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Authentication"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Review Broker Authentication
@@ -49,11 +49,15 @@ content was observed or recorded.
 
 ## Post-authentication gate
 
-Authentication does not qualify credential isolation. The original built-in
-read-only profile was proven root-readable and was replaced with an exact named
-profile plus a controlled non-secret probe. Before a real model invocation, an
-external security review must accept the filesystem, process, environment, and
-network evidence in `docs/qualification/security-assessment.md`.
+Authentication does not qualify credential isolation. Both the original
+built-in read-only profile and the historical named profile allowed reads
+outside the packet. A revised named profile limits reads to minimal system
+paths and the exact packet, but its direct non-secret producer probe does not
+establish effective model-tool isolation. The installed historical profile
+is not silently overwritten: migration requires an explicitly verified,
+credential-preserving operation. Before a real model invocation, an external
+security review must accept filesystem, process, environment, network, and
+output-channel evidence in `docs/qualification/security-assessment.md`.
 
 Only then may the repository variables `REVIEW_BROKER_SECURITY_QUALIFIED` and
 `REVIEW_BROKER_SECURITY_EVIDENCE_ID` be set from independently preserved

@@ -5,7 +5,7 @@ asset_type: "contract"
 domain: "independent-review"
 severity: "strict"
 name: "Review Evidence v1 Contract"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Review Evidence v1 Contract
@@ -29,11 +29,17 @@ checks the untouched original bytes and mapping. Verification recomputes the
 program identity from the bound mission and policy, the source-manifest identity
 from exact source entries, and every prompt byte from those bound inputs. A
 mutable prompt hash and length cannot bless altered prompt text. This
-distinction permits CRLF review without source normalization.
+distinction permits CRLF review without source normalization. PR change
+packets also bind ordered changed-file status, exact merge-base and head
+images, and an untruncated Git-native binary-capable diff with SHA-256 and
+byte length. Renames and copies bind their previous paths. A packet with an
+unavailable image, unsupported path or size, or changed-path mismatch fails
+closed rather than claiming complete change coverage. No diff citation is
+qualified as a physical source-line citation; findings cite the bound images.
 
 ## Attempt artifacts
 
-Every attempted invocation preserves:
+An uncontaminated attempted invocation preserves:
 
 ```text
 attempt.json
@@ -48,6 +54,13 @@ input-after.sha256
 reviewer-security-probe.json
 validation.json
 ```
+
+Detected credential-shaped evidence is an exception to ordinary preservation:
+the runner's raw copy is destroyed before any generally accessible artifact is
+uploaded and replaced by a sanitized incident plus incomplete-recovery record.
+Remote retention is explicitly unverified until separately investigated; a
+producer pattern scan is not universal secret detection. No ordinary review
+result may publish a detected contaminated finding or nested validation data.
 
 `attempt.json` binds the exact trusted broker wheel SHA-256 used by the remote
 process. `reviewer-security-probe.json` binds the exact permission-profile

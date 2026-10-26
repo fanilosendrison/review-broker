@@ -5,7 +5,7 @@ asset_type: "architecture"
 domain: "independent-review"
 severity: "strict"
 name: "Dedicated Codespace Lifecycle"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Dedicated Codespace Lifecycle
@@ -65,8 +65,11 @@ constraint.
 
 `codex login status` returned `Logged in using ChatGPT` at the recorded
 post-authentication observation. No API key is permitted. The corrected
-permission profile passes a producer-run non-secret probe and the Codespace was
-returned to `Shutdown` after qualification work.
+historical named permission profile passed limited producer canaries but failed
+a later controlled outside-tree canary. A temporary minimal-read direct probe
+passed that outside-tree check; effective model-tool isolation is still
+unqualified. The Codespace was returned to `Shutdown` after the controlled
+probes.
 
 The Codespaces-control transport gate passes. No review packet may reach a model
 until independent security review accepts the exact candidate and evidence.

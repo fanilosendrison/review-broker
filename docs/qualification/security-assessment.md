@@ -5,7 +5,7 @@ asset_type: "qualification-record"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Credential-Isolation Assessment"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Reviewer Credential-Isolation Assessment
@@ -86,7 +86,32 @@ The corrected `review-broker` profile produced the receipt in
 - sensitive and process canary environment variables absent;
 - two processes visible in the sandbox namespace.
 
-This producer probe passed. It does not independently qualify the boundary. The
-repository security gate remains closed until a separate reviewer challenges
-the mechanism, evidence scope, alternate credential paths, and process
-isolation.
+This historical producer probe passed the specified canaries but did not test
+access outside the two denied trees. It does not independently qualify the
+boundary. The repository security gate remains closed.
+
+## External NO-GO and non-secret falsification
+
+The historical external static review record is
+`external-review-pr14-3cf97bb.md`. The reviewer reported
+`SECURITY_REVIEW=NO_GO` and `CONSTRUCTION_REVIEW=NO_GO` for exact commit
+`3cf97bb1958470f7e0c10244ddd4558cc5d59858`, with no independently
+executed tests or effective runtime qualification.
+
+A subsequent **remediation-agent** direct-sandbox probe on Codex CLI `0.164.0`
+read a controlled non-secret canary outside the home and workspace while the
+reviewed root-readable profile was active. Its bounded observation is retained
+in `receipts/external-nonsecret-isolation-3cf97bb.json`. A separate direct probe
+with a **temporary** minimal-system-plus-exact-packet profile denied that canary
+while preserving packet reads, and is retained in
+`receipts/minimal-read-nonsecret-probe-v1.json`. Neither ran a model or accessed
+credential contents. The hard-link test did not create a usable link; readable
+parent-process environment access remained observable without examining its
+contents. Model-tool equivalence, output-channel risks, and effective process
+isolation remain unverified.
+
+The revised profile does not overwrite an installed historical profile with
+different bytes. Migration and independent examination of the exact runtime
+profile are prerequisites for authenticated execution. The security-qualification
+repository variable must remain unset; no producer receipt here constitutes an
+independent GO.
