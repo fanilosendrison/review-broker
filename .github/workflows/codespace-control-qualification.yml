@@ -162,7 +162,7 @@ jobs:
           payload_path="$RUNNER_TEMP/review-broker-control-payload.bin"
           downloaded_path="$RUNNER_TEMP/review-broker-control-download.bin"
 
-          gh codespace cp -c "$CODESPACE_NAME" -- -O \
+          gh codespace cp --expand -c "$CODESPACE_NAME" -- -O \
             "remote:${REMOTE_DIRECTORY}/payload.bin" "$downloaded_path"
           cmp --silent "$payload_path" "$downloaded_path"
           downloaded_sha="$(sha256sum "$downloaded_path" | cut -d ' ' -f 1)"
