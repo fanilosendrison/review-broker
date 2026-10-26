@@ -124,6 +124,27 @@ nonce-bearing journal intent and exactly one independently observed comment from
 the expected GitHub actor. Artifact expiry, response loss, or duplicate comments
 cannot create false terminal state.
 
+## Proportional-security product decision and local synthetic pilot
+
+The October 26 product decision in #27 retires exhaustive Codex-internal
+attestation as a blanket prerequisite to bounded low-sensitivity v1. It does
+NOT nullify the historical producer probe, the hard-link read, managed-policy
+fallback, /proc visibility, or uncertainties about surviving tools. All are
+recorded as residual risks rather than quietly reclassified as PASS.
+
+RB-PILOT-01 (#26) is a one-off, fixed, non-secret synthetic experiment outside
+GitHub Actions, with no GitHub/App/Actions tokens or publication capabilities in
+its own execution path. Only existing Codex OAuth is an intended credential.
+The caller must launch it under a scrubbed environment; unexpected ambient
+credential-related keys cause preflight refusal. The pilot keeps the published
+runtime hash and profile checks, disallows arbitrary mission/source inputs,
+records a durable attempt marker, and never retries automatically. Any detected
+credential-shaped output is quarantined locally. It does not establish general
+credential isolation or satisfy production cleanup/recovery qualification.
+
+Low-sensitivity PR review requires a later bounded operational gate; the
+normal high-assurance qualification variable remains unset in the meantime.
+
 ## Residual blocker
 
 ChatGPT authentication is verified. The dedicated Codespaces-control transport
@@ -142,5 +163,6 @@ not establish upstream-source reproducibility. Synthetic managed-requirement
 probes also demonstrated that Codex can replace `shell_tool=false`, the named
 profile, `approval_policy=never`, and network denial. No supported interface was
 found that exposes all final values from the same `codex exec` process before
-model transport. Effective-policy attestation is therefore blocked, and the
-gate must remain closed.
+model transport. Effective-policy attestation is therefore blocked for the original complete
+production qualification gate, which remains closed. The fixed synthetic pilot
+is the narrowly scoped, explicit exception described above.

@@ -54,6 +54,31 @@ subscription. The qualified target is model `gpt-5.6-sol`, reasoning effort
 `xhigh`, read-only sandbox, schema-constrained final output, and JSONL event
 capture. API-key fallback and model substitution are forbidden.
 
+## Risk-proportionate security and staged v1 admission (2026-10-26)
+
+Review Broker v1 prioritizes the original agent-to-reviewer-to-structured-report
+workflow under security assurance proportionate to the sensitivity of the
+subject. Exhaustive attestation of all Codex internal policies, model-visible
+tools, plugins, aliases and process mechanisms is NOT a universal launch
+prerequisite for bounded, authorized low-sensitivity use. Review Broker must
+instead retain its essential controls, declare actual residual risks honestly,
+and refuse any path with observed material credential disclosure.
+
+The only currently authorized authenticated exception to the production gate is
+RB-PILOT-01 (#26): one explicitly acknowledged, fixed non-secret synthetic
+fixture, no consumer PR, no repository source execution, no GitHub publication,
+and no automatic retry. A separate local validation receipt is not production
+EvidenceStatus VALID. The pilot may use the pinned native Codex executable and
+its existing OAuth session while the exhaustive internal policy attestations
+remain unavailable; no claim of comprehensive credential isolation follows.
+
+After a successful pilot, ordinary authorized non-secret or low-sensitivity PR
+reviews may be admitted only by a separately versioned and tested operational
+admission policy. Until that implementation exists, the real-PR production gate
+remains closed. Sensitive/high-assurance requests require their own stronger
+authorization and evidence. Review reports never carry automatic merge or
+normative decision authority. See RB-PI-SEC-01 (#27).
+
 ## Required separations
 
 The implementation maintains distinct boundaries for:

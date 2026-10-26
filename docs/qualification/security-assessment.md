@@ -202,3 +202,15 @@ Therefore `OBL01_STATUS=IMPLEMENTED_PENDING_INDEPENDENT_REVIEW`,
 `OBL02_ATTESTATION_INTERFACE=UNAVAILABLE`, and `OBL02_STATUS=BLOCKED`. The
 security gate remains closed, and no authenticated model invocation is
 permitted.
+
+## Security-assurance policy change and pilot exception (2026-10-26)
+
+RB-PI-SEC-01 (#27) explicitly retires maximum assurance of Codex internals as
+a blanket launch prerequisite for low-sensitivity v1. This decision does not
+refute or erase any earlier probe or independent NO-GO. OBL-02/03/04 remain
+UNDETERMINED for complete qualification; the product accepts these disclosed
+residual risks only for the fixed, non-secret RB-PILOT-01 (#26) experiment.
+The ordinary production workflow and security gate remain closed. Pilot JSON
+and event checks establish only local synthetic functional behavior, not
+production recovery or security qualification. No live pilot has been
+observed by this documentation change.

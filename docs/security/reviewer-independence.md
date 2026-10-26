@@ -46,7 +46,10 @@ non-inference diagnostics are separate processes or expose only requirements;
 `codex exec --json` does not emit the required effective values before turn
 transport. The broker therefore records effective policy attestation as
 `UNAVAILABLE` rather than claiming that the requested profile became effective.
-The authenticated reviewer path remains disabled.
+The authenticated production reviewer path remains disabled. The narrowly
+specified, fixed-fixture synthetic pilot in the governing specification is a
+separate and explicitly authorized non-production exception. It retains all
+existing requested controls, but does not claim attested effective Codex policy.
 
 The revised profile grants only Codex's minimal system read set and the exact
 prepared packet directory. It explicitly denies the runtime home and trusted
@@ -62,6 +65,23 @@ trusted packet-tree guard rejects multi-linked files before model invocation;
 that guard has not been exercised in an actual model-tool session. The direct
 probe also observed an accessible parent `/proc` environment interface without
 synthetic parent-canary disclosure. Effective isolation remains unqualified.
+
+## Proportionate v1 assurance and residual risks
+
+The product owner explicitly retired exhaustive proof of Codex internals as a
+blanket admission prerequisite for low-sensitivity v1 (RB-PI-SEC-01 #27).
+The existing hard-link counterexample, observed managed-profile fallback and
+unavailable same-process attestation remain truthful recorded risks; they are
+not converted into passing controls. Protected materials are never intentionally
+placed in model input or evidence. A demonstrated credential disclosure or
+unexpected privileged capability blocks the affected path and requires a
+specific mitigation.
+
+Only RB-PILOT-01 (#26) is presently admitted outside the production workflow:
+fixed synthetic data, explicit one-shot consent, no privileged orchestration
+credentials, no GitHub publishing, and local evidence only. This is an
+accepted residual-risk experiment, not a certification of Codex. Subsequent
+ordinary reviews require a distinct bounded operational admission decision.
 
 ## Credential ownership
 
@@ -101,6 +121,8 @@ probes must demonstrate:
 - cleanup after success, failure, cancellation, and control-plane interruption.
 
 An external reviewer must examine the probe design and observations. The broker
-cannot review itself into qualification. Until that gate passes, workflow
-execution stops before Codespace startup with
-`SECURITY_BOUNDARY_NOT_QUALIFIED`.
+cannot review itself into comprehensive qualification. Until the production
+gate passes, the normal GitHub Actions review workflow stops before Codespace
+startup with `SECURITY_BOUNDARY_NOT_QUALIFIED`. The explicitly authorized,
+non-production RB-PILOT-01 local path is not this workflow and cannot set the
+production gate.

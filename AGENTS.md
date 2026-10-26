@@ -30,9 +30,14 @@ repository code. Never expose ChatGPT authentication, GitHub control
 credentials, API keys, authorization headers, or credential files to reviewed
 content, evidence, logs, or Issues.
 
-Do not run authenticated review content until the external security
-qualification gate has passed. Do not retry an attempt that reached `ARMED`
-without conclusive terminal evidence.
+Do not run authenticated reviews of actual consumer PRs through the production
+workflow until their applicable admission and qualification gates pass. The
+only presently implemented exception is the explicitly acknowledged, one-shot,
+fixed-fixture synthetic pilot (RB-PILOT-01 #26). This pilot never publishes,
+merges or claims security qualification. The Product Intent decision in #27
+retires maximal Codex-internal attestation as a blanket low-sensitivity v1
+prerequisite; it does not authorize real-PR review by itself. Do not retry an
+attempt that reached `ARMED` without conclusive terminal evidence.
 
 ## Engineering Project profile
 
