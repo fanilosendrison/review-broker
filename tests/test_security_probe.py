@@ -44,6 +44,7 @@ class SecurityProbeTests(unittest.TestCase):
             home, workspace, packet = self.fixture(Path(temporary))
 
             def runner(command, **kwargs):
+                self.assertEqual(command[0], "/trusted/codex")
                 self.assertIn(profile_name(packet), command)
                 self.assertEqual(
                     kwargs["env"]["REVIEW_BROKER_PROCESS_CANARY"],
@@ -54,7 +55,7 @@ class SecurityProbeTests(unittest.TestCase):
                 )
 
             receipt = run_reviewer_isolation_probe(
-                home, workspace, packet,
+                home, workspace, packet, Path("/trusted/codex"),
                 runner=runner,
                 environment={"HOME": str(home), "PATH": "/usr/bin"},
             )
@@ -78,7 +79,7 @@ class SecurityProbeTests(unittest.TestCase):
                 SecurityProbeError, "auth_parent_canary_readable"
             ):
                 run_reviewer_isolation_probe(
-                    home, workspace, packet,
+                    home, workspace, packet, Path("/trusted/codex"),
                     runner=runner,
                     environment={"HOME": str(home), "PATH": "/usr/bin"},
                 )
@@ -90,8 +91,10 @@ class SecurityProbeTests(unittest.TestCase):
             def runner(command, **kwargs):
                 return subprocess.CompletedProcess(command, 0, stdout=json.dumps(observed), stderr="")
             with self.assertRaisesRegex(SecurityProbeError, "outside_packet_canary_readable"):
-                run_reviewer_isolation_probe(home, workspace, packet, runner=runner,
-                    environment={"HOME": str(home), "PATH": "/usr/bin"})
+                run_reviewer_isolation_probe(
+                    home, workspace, packet, Path("/trusted/codex"), runner=runner,
+                    environment={"HOME": str(home), "PATH": "/usr/bin"},
+                )
 
     def test_unconstructed_hardlink_is_not_a_pass(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -100,8 +103,10 @@ class SecurityProbeTests(unittest.TestCase):
             def runner(command, **kwargs):
                 return subprocess.CompletedProcess(command, 0, stdout=json.dumps(observed), stderr="")
             with self.assertRaisesRegex(SecurityProbeError, "hardlink_created"):
-                run_reviewer_isolation_probe(home, workspace, packet, runner=runner,
-                    environment={"HOME": str(home), "PATH": "/usr/bin"})
+                run_reviewer_isolation_probe(
+                    home, workspace, packet, Path("/trusted/codex"), runner=runner,
+                    environment={"HOME": str(home), "PATH": "/usr/bin"},
+                )
 
     def test_probe_transport_failure_is_not_qualification(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -114,7 +119,7 @@ class SecurityProbeTests(unittest.TestCase):
                 SecurityProbeError, "SANDBOX_PROBE_EXECUTION_FAILED"
             ):
                 run_reviewer_isolation_probe(
-                    home, workspace, packet,
+                    home, workspace, packet, Path("/trusted/codex"),
                     runner=runner,
                     environment={"HOME": str(home), "PATH": "/usr/bin"},
                 )

@@ -9,20 +9,47 @@ import unittest
 from review_broker.codex import (
     CodexPolicy,
     InvocationError,
+    REQUIRED_FLAGS,
     build_command,
     classify_failure,
     ensure_cli_compatibility,
     invoke_once,
+    preflight_codex_runtime,
     sanitized_environment,
+)
+from review_broker.codex_runtime_identity import (
+    CodexRuntimeIdentityError,
+    VerifiedCodexRuntime,
 )
 from review_broker.reviewer_profile import install_reviewer_profile, profile_name
 from review_broker.packets import SourceRecord, build_packet
 
 
+def verified_runtime(root: Path) -> VerifiedCodexRuntime:
+    return VerifiedCodexRuntime(
+        executable=root / "protected" / "bin" / "codex",
+        launcher_selected=root / "bin" / "codex",
+        launcher_resolved=root / "package" / "bin" / "codex.js",
+        launcher_sha256="1" * 64,
+        installed_native=root / "package" / "native" / "codex",
+        native_sha256="2" * 64,
+        protected_runtime_root=root / "protected",
+        distribution="@openai/codex",
+        distribution_version="0.164.0",
+        platform_alias="@openai/codex-linux-x64",
+        platform_version="0.164.0-linux-x64",
+        root_dist_integrity="sha512-root-fixture",
+        platform_dist_integrity="sha512-platform-fixture",
+    )
+
+
 class CodexAdapterTests(unittest.TestCase):
     def test_command_is_pinned_and_read_only(self):
-        command = build_command(Path("/schema.json"), Path("/final.json"), CodexPolicy(), "review-broker-test")
-        self.assertEqual(command[:2], ["codex", "exec"])
+        command = build_command(
+            Path("/trusted/codex"), Path("/schema.json"), Path("/final.json"),
+            CodexPolicy(), "review-broker-test",
+        )
+        self.assertEqual(command[:2], ["/trusted/codex", "exec"])
         self.assertIn("--ephemeral", command)
         self.assertNotIn("--ignore-user-config", command)
         self.assertIn("--ignore-rules", command)
@@ -54,18 +81,73 @@ class CodexAdapterTests(unittest.TestCase):
             "GH_TOKEN": "forbidden",
             "GITHUB_TOKEN": "forbidden",
             "CODEX_HOME": "/qualified/auth/home",
+            "NODE_OPTIONS": "--require=forbidden",
+            "LD_PRELOAD": "/forbidden/library.so",
+            "CODEX_MANAGED_BY_PNPM": "1",
         }
         cleaned, removed = sanitized_environment(source)
         self.assertEqual(cleaned["CODEX_HOME"], "/qualified/auth/home")
         self.assertTrue({"OPENAI_API_KEY", "CODEX_API_KEY", "GH_TOKEN", "GITHUB_TOKEN"} <= set(removed))
         self.assertNotIn("OPENAI_API_KEY", cleaned)
+        self.assertNotIn("NODE_OPTIONS", cleaned)
+        self.assertNotIn("LD_PRELOAD", cleaned)
+        self.assertNotIn("CODEX_MANAGED_BY_PNPM", cleaned)
+        self.assertEqual(cleaned["CODEX_MANAGED_BY_NPM"], "1")
 
     def test_installed_help_must_support_every_qualified_flag(self):
-        command = build_command(Path("schema"), Path("final"), CodexPolicy(), "review-broker-test")
+        command = build_command(
+            Path("/trusted/codex"), Path("schema"), Path("final"),
+            CodexPolicy(), "review-broker-test",
+        )
         help_text = " ".join(x for x in command if x.startswith("--"))
         ensure_cli_compatibility(help_text)
         with self.assertRaisesRegex(InvocationError, "UNSUPPORTED_FLAG"):
             ensure_cli_compatibility(help_text.replace("--ignore-rules", ""))
+
+    def test_non_inference_preflight_binds_identity_and_cli_flags(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            runtime = verified_runtime(root)
+            calls = []
+
+            def runner(command, **kwargs):
+                calls.append(list(command))
+                return subprocess.CompletedProcess(
+                    command, 0, stdout=" ".join(REQUIRED_FLAGS).encode(), stderr=b"",
+                )
+
+            receipt = preflight_codex_runtime(
+                root / "protected",
+                environment={"PATH": "/trusted/bin"},
+                runner=runner,
+                runtime_verifier=lambda child, runtime_root: runtime,
+            )
+            self.assertEqual(calls, [[str(runtime.executable), "exec", "--help"]])
+            self.assertTrue(receipt["cli_compatibility_verified"])
+            self.assertEqual(
+                receipt["runtime_identity_verification"],
+                "VERIFIED_OFFICIAL_NPM_ARTIFACT",
+            )
+
+    def test_identity_failure_prevents_even_non_inference_cli_preflight(self):
+        called = False
+
+        def runner(*args, **kwargs):
+            nonlocal called
+            called = True
+            raise AssertionError("preflight subprocess reached")
+
+        def rejected(environment, runtime_root):
+            raise CodexRuntimeIdentityError("CODEX_NATIVE_IDENTITY_MISMATCH")
+
+        with self.assertRaisesRegex(InvocationError, "CODEX_RUNTIME_IDENTITY"):
+            preflight_codex_runtime(
+                Path("/protected"),
+                environment={"PATH": "/trusted/bin"},
+                runner=runner,
+                runtime_verifier=rejected,
+            )
+        self.assertFalse(called)
 
     def test_failure_classification_is_explicit(self):
         cases = {
@@ -116,7 +198,9 @@ class CodexAdapterTests(unittest.TestCase):
                     expected_packet_id=manifest["packet_id"],
                     broker_wheel_sha256="b" * 64,
                     trusted_workspace=workspace,
+                    codex_runtime_root=packet.parent / "protected",
                     runner=runner,
+                    runtime_verifier=lambda child, runtime_root: verified_runtime(packet.parent),
                     environment=environment,
                 )
             attempt = json.loads((packet / "attempt.json").read_text(encoding="utf-8"))
@@ -126,6 +210,9 @@ class CodexAdapterTests(unittest.TestCase):
             self.assertEqual(attempt["argv"][attempt["argv"].index("--profile") + 1],
                              profile_name(packet))
             self.assertEqual(attempt["permission_profile"], profile_name(packet))
+            self.assertEqual(attempt["effective_policy_attestation"], "UNAVAILABLE")
+            self.assertFalse(attempt["effective_shell_tool_verified"])
+            self.assertFalse(attempt["effective_permission_profile_verified"])
             self.assertEqual(attempt["permission_profile_sha256"],
                              hashlib.sha256((home / ".codex" / (profile_name(packet) + ".config.toml")).read_bytes()).hexdigest())
             for name in (
@@ -142,7 +229,9 @@ class CodexAdapterTests(unittest.TestCase):
                     expected_packet_id=manifest["packet_id"],
                     broker_wheel_sha256="b" * 64,
                     trusted_workspace=workspace,
+                    codex_runtime_root=packet.parent / "protected",
                     runner=runner,
+                    runtime_verifier=lambda child, runtime_root: verified_runtime(packet.parent),
                     environment=environment,
                 )
             self.assertEqual(calls, [attempt["argv"]])
@@ -169,8 +258,10 @@ class CodexAdapterTests(unittest.TestCase):
             with self.assertRaisesRegex(InvocationError, "PACKET_ID_MISMATCH"):
                 invoke_once(packet, schema, "attempt", expected_packet_id="packet:sha256:" + "0" * 64,
                             broker_wheel_sha256="b" * 64, trusted_workspace=workspace,
+                            codex_runtime_root=root / "protected",
                             environment={"HOME": str(home), "PATH": os.environ.get("PATH", "")},
-                            runner=forbidden_runner)
+                            runner=forbidden_runner,
+                            runtime_verifier=lambda child, runtime_root: verified_runtime(root))
             self.assertFalse((packet / "attempt.json").exists())
 
     def test_model_packet_rejects_hardlink_alias_before_transport(self):
@@ -188,7 +279,7 @@ class CodexAdapterTests(unittest.TestCase):
             with self.assertRaisesRegex(InvocationError, "PACKET_TREE_UNTRUSTED"):
                 invoke_once(packet, schema, "attempt", broker_wheel_sha256="b" * 64,
                             expected_packet_id="packet:sha256:" + "3" * 64,
-                            trusted_workspace=root)
+                            trusted_workspace=root, codex_runtime_root=root / "protected")
             self.assertFalse((packet / "attempt.json").exists())
 
     def test_missing_security_profile_is_rejected_before_attempt(self):
@@ -213,7 +304,9 @@ class CodexAdapterTests(unittest.TestCase):
                     expected_packet_id="packet:sha256:" + "3" * 64,
                     broker_wheel_sha256="b" * 64,
                     trusted_workspace=workspace,
+                    codex_runtime_root=root / "protected",
                     environment=environment,
+                    runtime_verifier=lambda child, runtime_root: verified_runtime(root),
                 )
             self.assertFalse((packet / "attempt.json").exists())
 
@@ -232,6 +325,7 @@ class CodexAdapterTests(unittest.TestCase):
                     expected_packet_id="packet:sha256:" + "3" * 64,
                     broker_wheel_sha256="b" * 64,
                     trusted_workspace=packet,
+                    codex_runtime_root=packet / "protected",
                     armed=False,
                 )
 
