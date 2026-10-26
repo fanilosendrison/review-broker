@@ -1,0 +1,246 @@
+name: Codespace control qualification
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: review-broker-codespace-control-qualification
+  cancel-in-progress: false
+
+jobs:
+  qualify-control-transport:
+    if: ${{ github.ref == 'refs/heads/dev' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CODESPACE_NAME: review-broker-reviewer-4q4v769jr65hjww9
+      EXPECTED_REPOSITORY: fanilosendrison/review-broker
+      REMOTE_DIRECTORY: review-broker-control-qualification
+
+    steps:
+      - name: T1 — authenticate and verify Codespace visibility
+        env:
+          GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          test -n "$GH_TOKEN" || {
+            echo "T1_CODESPACE_VISIBILITY=FAIL:CREDENTIAL_MISSING"
+            exit 1
+          }
+
+          account="$(gh api user --jq '.login')"
+          details="$(gh api "user/codespaces/${CODESPACE_NAME}")"
+          codespace="$(jq -r '.name' <<<"$details")"
+          owner="$(jq -r '.owner.login' <<<"$details")"
+          repository="$(jq -r '.repository.full_name' <<<"$details")"
+          state="$(jq -r '.state' <<<"$details")"
+
+          test -n "$account" && test "$account" != "null"
+          test "$account" = "$owner"
+          test "$codespace" = "$CODESPACE_NAME"
+          test "$repository" = "$EXPECTED_REPOSITORY"
+          test "$state" = "Shutdown"
+
+          printf 'CONTROL_CREDENTIAL_IDENTITY=%s\n' "$account"
+          printf 'T1_CODESPACE_VISIBILITY=PASS:%s:%s:%s\n' \
+            "$codespace" "$repository" "$state"
+          {
+            echo "### T1 — Authentication and visibility"
+            echo
+            echo "- Result: PASS"
+            echo "- Credential identity: \`$account\`"
+            echo "- Codespace: \`$codespace\`"
+            echo "- Repository: \`$repository\`"
+            echo "- Initial state: \`$state\`"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: T2 — start and observe Available
+        env:
+          GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          touch "$RUNNER_TEMP/codespace-control-may-have-started"
+          gh codespace start -c "$CODESPACE_NAME"
+
+          observed=""
+          for _ in $(seq 1 60); do
+            observed="$(gh codespace view -c "$CODESPACE_NAME" --json state --jq '.state')"
+            if [ "$observed" = "Available" ]; then
+              break
+            fi
+            sleep 5
+          done
+          test "$observed" = "Available"
+
+          echo "T2_START=PASS:Available"
+          {
+            echo "### T2 — Start"
+            echo
+            echo "- Result: PASS"
+            echo "- Observed state: \`Available\`"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: T3 — execute fixed SSH marker
+        env:
+          GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          expected="REVIEW_BROKER_CONTROL_T3_OK"
+          observed="$(gh codespace ssh -c "$CODESPACE_NAME" -- \
+            'printf "REVIEW_BROKER_CONTROL_T3_OK\n"')"
+          test "$observed" = "$expected"
+
+          echo "T3_SSH=PASS:$observed"
+          {
+            echo "### T3 — SSH"
+            echo
+            echo "- Result: PASS"
+            echo "- Exact marker: \`$observed\`"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Prepare fixed non-secret payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload_path="$RUNNER_TEMP/review-broker-control-payload.bin"
+          printf '%s' $'review-broker-control-qualification-v1\nsynthetic-non-secret-payload\n' \
+            >"$payload_path"
+          sha256sum "$payload_path" | cut -d ' ' -f 1 \
+            >"$RUNNER_TEMP/expected-sha256"
+          od -An -tx1 -v "$payload_path" | tr -d ' \n' \
+            >"$RUNNER_TEMP/expected-hex"
+
+      - name: T4 — upload and independently verify remote bytes
+        env:
+          GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          expected_sha="$(cat "$RUNNER_TEMP/expected-sha256")"
+          expected_hex="$(cat "$RUNNER_TEMP/expected-hex")"
+          payload_path="$RUNNER_TEMP/review-broker-control-payload.bin"
+
+          gh codespace ssh -c "$CODESPACE_NAME" -- \
+            'rm -rf -- review-broker-control-qualification && mkdir -- review-broker-control-qualification'
+          gh codespace cp -c "$CODESPACE_NAME" \
+            "$payload_path" "remote:${REMOTE_DIRECTORY}/payload.bin"
+
+          remote_sha="$(gh codespace ssh -c "$CODESPACE_NAME" -- \
+            'sha256sum review-broker-control-qualification/payload.bin | cut -d " " -f 1')"
+          remote_hex="$(gh codespace ssh -c "$CODESPACE_NAME" -- \
+            'od -An -tx1 -v review-broker-control-qualification/payload.bin | tr -d " \n"')"
+          test "$remote_sha" = "$expected_sha"
+          test "$remote_hex" = "$expected_hex"
+
+          printf 'T4_UPLOAD=PASS:sha256:%s\n' "$remote_sha"
+          {
+            echo "### T4 — Upload"
+            echo
+            echo "- Result: PASS"
+            echo "- Remote SHA-256: \`$remote_sha\`"
+            echo "- Exact remote bytes: verified"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: T5 — download and verify exact byte equality
+        env:
+          GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          expected_sha="$(cat "$RUNNER_TEMP/expected-sha256")"
+          payload_path="$RUNNER_TEMP/review-broker-control-payload.bin"
+          downloaded_path="$RUNNER_TEMP/review-broker-control-download.bin"
+
+          gh codespace cp -c "$CODESPACE_NAME" \
+            "remote:${REMOTE_DIRECTORY}/payload.bin" "$downloaded_path"
+          cmp --silent "$payload_path" "$downloaded_path"
+          downloaded_sha="$(sha256sum "$downloaded_path" | cut -d ' ' -f 1)"
+          test "$downloaded_sha" = "$expected_sha"
+
+          printf 'T5_DOWNLOAD=PASS:sha256:%s\n' "$downloaded_sha"
+          {
+            echo "### T5 — Download"
+            echo
+            echo "- Result: PASS"
+            echo "- Downloaded SHA-256: \`$downloaded_sha\`"
+            echo "- Exact byte equality: verified"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: T6 — stop and observe Shutdown
+        env:
+          GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          gh codespace ssh -c "$CODESPACE_NAME" -- \
+            'rm -rf -- review-broker-control-qualification' || \
+            echo "TEMPORARY_REMOTE_CLEANUP=WARNING"
+          gh codespace stop -c "$CODESPACE_NAME"
+
+          observed=""
+          for _ in $(seq 1 60); do
+            observed="$(gh codespace view -c "$CODESPACE_NAME" --json state --jq '.state')"
+            if [ "$observed" = "Shutdown" ]; then
+              break
+            fi
+            sleep 5
+          done
+          test "$observed" = "Shutdown"
+          touch "$RUNNER_TEMP/t6-shutdown-verified"
+
+          echo "T6_STOP=PASS:Shutdown"
+          {
+            echo "### T6 — Stop"
+            echo
+            echo "- Result: PASS"
+            echo "- Observed state: \`Shutdown\`"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Cleanup — independently require Shutdown after start attempt
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          if [ ! -e "$RUNNER_TEMP/codespace-control-may-have-started" ]; then
+            echo "CLEANUP=NOT_REQUIRED:START_NOT_ATTEMPTED"
+            exit 0
+          fi
+
+          observed="$(gh codespace view -c "$CODESPACE_NAME" --json state --jq '.state' || true)"
+          if [ "$observed" != "Shutdown" ]; then
+            gh codespace stop -c "$CODESPACE_NAME" || true
+          fi
+
+          for _ in $(seq 1 60); do
+            observed="$(gh codespace view -c "$CODESPACE_NAME" --json state --jq '.state' || true)"
+            if [ "$observed" = "Shutdown" ]; then
+              break
+            fi
+            sleep 5
+          done
+          if [ "$observed" != "Shutdown" ]; then
+            echo "INFRASTRUCTURE_INCIDENT:CODESPACE_SHUTDOWN_UNVERIFIED"
+            exit 1
+          fi
+
+          echo "CLEANUP=PASS:Shutdown"
+          {
+            echo "### Cleanup"
+            echo
+            echo "- Result: PASS"
+            echo "- Final observed state: \`Shutdown\`"
+          } >>"$GITHUB_STEP_SUMMARY"
