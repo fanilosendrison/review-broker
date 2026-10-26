@@ -132,7 +132,7 @@ jobs:
 
           gh codespace ssh -c "$CODESPACE_NAME" -- \
             'rm -rf -- review-broker-control-qualification /tmp/review-broker-control-qualification && mkdir -- /tmp/review-broker-control-qualification'
-          gh codespace cp -c "$CODESPACE_NAME" \
+          gh codespace cp -c "$CODESPACE_NAME" -- -O \
             "$payload_path" "remote:${REMOTE_DIRECTORY}/payload.bin"
 
           remote_sha="$(gh codespace ssh -c "$CODESPACE_NAME" -- \
@@ -162,7 +162,7 @@ jobs:
           payload_path="$RUNNER_TEMP/review-broker-control-payload.bin"
           downloaded_path="$RUNNER_TEMP/review-broker-control-download.bin"
 
-          gh codespace cp -c "$CODESPACE_NAME" \
+          gh codespace cp -c "$CODESPACE_NAME" -- -O \
             "remote:${REMOTE_DIRECTORY}/payload.bin" "$downloaded_path"
           cmp --silent "$payload_path" "$downloaded_path"
           downloaded_sha="$(sha256sum "$downloaded_path" | cut -d ' ' -f 1)"
