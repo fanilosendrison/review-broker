@@ -11,6 +11,11 @@ import subprocess
 import stat
 from typing import Callable, Mapping
 
+from .codex_runtime_identity import (
+    CodexRuntimeIdentityError,
+    VerifiedCodexRuntime,
+    verify_codex_runtime,
+)
 from .identity import canonical_bytes
 from .packets import PacketError, verify_packet
 from .reviewer_profile import (
@@ -54,14 +59,30 @@ REMOVED_ENVIRONMENT_KEYS = (
     "OPENAI_PROJECT_ID",
     "GH_TOKEN",
     "GITHUB_TOKEN",
+    "NODE_OPTIONS",
+    "NODE_PATH",
+    "CODEX_MANAGED_PACKAGE_ROOT",
+    "CODEX_MANAGED_BY_BUN",
+    "CODEX_MANAGED_BY_PNPM",
+    "CODEX_MANAGED_BY_VITE_PLUS",
 )
+REMOVED_ENVIRONMENT_PREFIXES = ("LD_", "DYLD_")
 
 Runner = Callable[..., subprocess.CompletedProcess[bytes]]
+RuntimeVerifier = Callable[[Mapping[str, str], Path], VerifiedCodexRuntime]
 
 
-def build_command(schema_path: Path, output_path: Path, policy: CodexPolicy, permission_profile: str) -> list[str]:
+def build_command(
+    executable: Path,
+    schema_path: Path,
+    output_path: Path,
+    policy: CodexPolicy,
+    permission_profile: str,
+) -> list[str]:
+    if not executable.is_absolute():
+        raise InvocationError("CODEX_EXECUTABLE_PATH_INVALID")
     return [
-        "codex",
+        str(executable),
         "exec",
         "--json",
         "--ephemeral",
@@ -93,11 +114,44 @@ def ensure_cli_compatibility(help_text: str) -> None:
 def sanitized_environment(source: Mapping[str, str]) -> tuple[dict[str, str], tuple[str, ...]]:
     environment = dict(source)
     removed: list[str] = []
-    for key in REMOVED_ENVIRONMENT_KEYS:
-        if key in environment:
+    for key in tuple(environment):
+        if key in REMOVED_ENVIRONMENT_KEYS or key.startswith(REMOVED_ENVIRONMENT_PREFIXES):
             removed.append(key)
             environment.pop(key)
-    return environment, tuple(removed)
+    environment["CODEX_MANAGED_BY_NPM"] = "1"
+    return environment, tuple(sorted(removed))
+
+
+def preflight_codex_runtime(
+    protected_runtime_root: Path,
+    *,
+    environment: Mapping[str, str] | None = None,
+    runner: Runner = subprocess.run,
+    runtime_verifier: RuntimeVerifier = verify_codex_runtime,
+) -> dict[str, object]:
+    """Verify official runtime identity and supported flags without model transport."""
+    child_environment, removed = sanitized_environment(environment or os.environ)
+    try:
+        runtime = runtime_verifier(child_environment, protected_runtime_root)
+    except CodexRuntimeIdentityError as exc:
+        raise InvocationError(f"CODEX_RUNTIME_IDENTITY:{exc}") from exc
+    result = runner(
+        [str(runtime.executable), "exec", "--help"],
+        env=child_environment,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        raise InvocationError("CODEX_RUNTIME_HELP_FAILED")
+    ensure_cli_compatibility(result.stdout.decode("utf-8", errors="strict"))
+    return {
+        "schema_version": 1,
+        "evidence_type": "codex-runtime-identity-preflight",
+        **runtime.evidence(),
+        "cli_compatibility_verified": True,
+        "environment_keys_removed": list(removed),
+    }
 
 
 def classify_failure(text: str) -> str:
@@ -119,9 +173,11 @@ def invoke_once(
     expected_packet_id: str,
     broker_wheel_sha256: str,
     trusted_workspace: Path,
+    codex_runtime_root: Path,
     policy: CodexPolicy = CodexPolicy(),
     armed: bool = True,
     runner: Runner = subprocess.run,
+    runtime_verifier: RuntimeVerifier = verify_codex_runtime,
     timeout_seconds: int = 3600,
     environment: Mapping[str, str] | None = None,
 ) -> None:
@@ -156,8 +212,19 @@ def invoke_once(
     _assert_packet_tree(packet_directory, schema_path)
     prompt_before = _digest(prompt_path.read_bytes())
     permission_profile = profile_name(packet_directory)
-    command = build_command(schema_path, output_path, policy, permission_profile)
     child_environment, removed = sanitized_environment(environment or os.environ)
+    try:
+        runtime = runtime_verifier(child_environment, codex_runtime_root)
+    except CodexRuntimeIdentityError as exc:
+        raise InvocationError(f"CODEX_RUNTIME_IDENTITY:{exc}") from exc
+    if (
+        runtime.distribution != policy.distribution
+        or runtime.distribution_version != policy.distribution_version
+    ):
+        raise InvocationError("CODEX_RUNTIME_POLICY_IDENTITY_MISMATCH")
+    command = build_command(
+        runtime.executable, schema_path, output_path, policy, permission_profile
+    )
     try:
         reviewer_home = reviewer_home_from_environment(child_environment)
         profile_path = verify_reviewer_profile(reviewer_home, trusted_workspace, packet_directory)
@@ -176,6 +243,7 @@ def invoke_once(
         "executor": "codex-cli",
         "distribution": policy.distribution,
         "distribution_version": policy.distribution_version,
+        **runtime.evidence(),
         "model_requested": policy.model,
         "reasoning_effort_requested": policy.reasoning_effort,
         "effective_model_identity_verified": False,
@@ -183,6 +251,13 @@ def invoke_once(
         "sandbox": policy.sandbox,
         "permission_profile": permission_profile,
         "permission_profile_sha256": _digest(profile_path.read_bytes()),
+        "shell_tool_requested": False,
+        "effective_policy_attestation": "UNAVAILABLE",
+        "effective_shell_tool_verified": False,
+        "effective_permission_profile_verified": False,
+        "effective_approval_policy_verified": False,
+        "effective_filesystem_policy_verified": False,
+        "effective_network_policy_verified": False,
         "credential_paths_denied": True,
         "trusted_workspace_denied": True,
         "network_access": False,

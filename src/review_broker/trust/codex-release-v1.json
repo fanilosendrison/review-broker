@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "distribution": {
+    "name": "@openai/codex",
+    "version": "0.164.0",
+    "registry_metadata_url": "https://registry.npmjs.org/@openai%2fcodex/0.164.0",
+    "tarball_url": "https://registry.npmjs.org/@openai/codex/-/codex-0.164.0.tgz",
+    "dist_integrity": "sha512-TWj7UGyPRe3Pj/A3ddNAxs1te3a/W/xAd+J0LHrrFTmsSfahGMOLF/vn88D3QCIgAT3B1rm1y/Z3NYE0rx6cZQ==",
+    "archive_sha256": "afb117ec0d382744583dd13154ba0ca6b0f1980f8ed6a23bffb3aaadb6226e30",
+    "package_json_sha256": "a7dec242d54cde5569fb242ddc632cf12be875b274f09116ac8a33d921547114",
+    "launcher_entry": "bin/codex.js",
+    "launcher_sha256": "61b0194f3bb6534439c8d26a3ed57d0805f84b884588b761795323eeb92fcf70"
+  },
+  "platforms": {
+    "linux-x86_64": {
+      "system": "Linux",
+      "machine": "x86_64",
+      "npm_alias": "@openai/codex-linux-x64",
+      "npm_spec": "npm:@openai/codex@0.164.0-linux-x64",
+      "published_name": "@openai/codex",
+      "published_version": "0.164.0-linux-x64",
+      "registry_metadata_url": "https://registry.npmjs.org/@openai%2fcodex/0.164.0-linux-x64",
+      "tarball_url": "https://registry.npmjs.org/@openai/codex/-/codex-0.164.0-linux-x64.tgz",
+      "dist_integrity": "sha512-XLAoaWsGOT2khzl+P4FYDPTkzAr9W0VFXFaVkqlFdkM0soa1gH/4S0wSD57Ek3HHwkirAEGz2/Mwehseh+l5Mg==",
+      "archive_sha256": "62659fefd9a8efa21a496402fde3c11c025bbeee735a582968f8ffd14cb5f79c",
+      "package_json_sha256": "1fa590124f40808551bef9115b3757166c4673ddfbfbbab2887d7b4db5267f45",
+      "package_relative_path": "node_modules/@openai/codex-linux-x64",
+      "target": "x86_64-unknown-linux-musl",
+      "target_manifest_entry": "vendor/x86_64-unknown-linux-musl/codex-package.json",
+      "target_manifest_sha256": "328cc6b7d776fed066a3b475766ec01bd8b8f31d91e4955a5588f37ff9ddb51b",
+      "native_entry": "vendor/x86_64-unknown-linux-musl/bin/codex",
+      "native_sha256": "b93f6811d3f653f0fb83be4050d857fb9abbb111dfa2ce160563327daff7f306",
+      "protected_runtime_directory": "codex-0.164.0-linux-x64"
+    }
+  }
+}

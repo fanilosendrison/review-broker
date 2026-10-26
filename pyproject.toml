@@ -20,4 +20,4 @@ reviewctl = "review_broker.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-review_broker = ["schemas/*.json", "profiles/*.json"]
+review_broker = ["schemas/*.json", "profiles/*.json", "trust/*.json"]

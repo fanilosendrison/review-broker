@@ -6,7 +6,8 @@ import os
 from pathlib import Path
 import sys
 
-from .codex import invoke_once
+from .codex import invoke_once, preflight_codex_runtime, sanitized_environment
+from .codex_runtime_identity import verify_codex_runtime
 from .evidence import quarantine_contaminated_evidence
 from .codespace import CodespaceController
 from .execution_recovery import (
@@ -72,6 +73,9 @@ def _parser() -> argparse.ArgumentParser:
     probe_profile = subcommands.add_parser("internal-probe-reviewer-profile")
     probe_profile.add_argument("--trusted-workspace", required=True, type=Path)
     probe_profile.add_argument("--packet-dir", required=True, type=Path)
+    probe_profile.add_argument("--codex-runtime-root", required=True, type=Path)
+    preflight_runtime = subcommands.add_parser("internal-preflight-codex-runtime")
+    preflight_runtime.add_argument("--runtime-root", required=True, type=Path)
     invoke = subcommands.add_parser("internal-invoke")
     invoke.add_argument("--packet-dir", required=True, type=Path)
     invoke.add_argument("--schema", required=True, type=Path)
@@ -79,6 +83,7 @@ def _parser() -> argparse.ArgumentParser:
     invoke.add_argument("--packet-id", required=True)
     invoke.add_argument("--broker-wheel-sha256", required=True)
     invoke.add_argument("--trusted-workspace", required=True, type=Path)
+    invoke.add_argument("--codex-runtime-root", required=True, type=Path)
     recover = subcommands.add_parser("internal-recover")
     recover.add_argument("--codespace", required=True)
     recover.add_argument("--remote-dir", required=True)
@@ -165,8 +170,20 @@ def main(argv: list[str] | None = None) -> int:
             install_reviewer_profile(home, args.trusted_workspace, args.packet_dir)
             return 0
         if args.command == "internal-probe-reviewer-profile":
-            home = reviewer_home_from_environment(dict(os.environ))
-            receipt = run_reviewer_isolation_probe(home, args.trusted_workspace, args.packet_dir)
+            child_environment, _ = sanitized_environment(dict(os.environ))
+            home = reviewer_home_from_environment(child_environment)
+            runtime = verify_codex_runtime(child_environment, args.codex_runtime_root)
+            receipt = run_reviewer_isolation_probe(
+                home,
+                args.trusted_workspace,
+                args.packet_dir,
+                runtime.executable,
+                environment=child_environment,
+            )
+            print(canonical_bytes(receipt).decode("utf-8"))
+            return 0
+        if args.command == "internal-preflight-codex-runtime":
+            receipt = preflight_codex_runtime(args.runtime_root)
             print(canonical_bytes(receipt).decode("utf-8"))
             return 0
         if args.command == "internal-invoke":
@@ -177,6 +194,7 @@ def main(argv: list[str] | None = None) -> int:
                 expected_packet_id=args.packet_id,
                 broker_wheel_sha256=args.broker_wheel_sha256,
                 trusted_workspace=args.trusted_workspace,
+                codex_runtime_root=args.codex_runtime_root,
             )
             return 0
         if args.command == "internal-recover":

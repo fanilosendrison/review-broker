@@ -39,6 +39,7 @@ def run_reviewer_isolation_probe(
     reviewer_home: Path,
     trusted_workspace: Path,
     packet_directory: Path,
+    codex_executable: Path,
     *,
     runner: Runner = subprocess.run,
     environment: Mapping[str, str] | None = None,
@@ -87,7 +88,7 @@ def run_reviewer_isolation_probe(
             child_environment, _ = sanitized_environment(source_environment)
             result = runner(
                 [
-                    "codex", "sandbox",
+                    str(codex_executable), "sandbox",
                     "-p", name,
                     "-P", name,
                     "-C", str(probe_root),
