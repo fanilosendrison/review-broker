@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,7 @@ from review_broker.codex import (
     sanitized_environment,
 )
 from review_broker.reviewer_profile import install_reviewer_profile
+from review_broker.packets import SourceRecord, build_packet
 
 
 class CodexAdapterTests(unittest.TestCase):
@@ -66,9 +68,14 @@ class CodexAdapterTests(unittest.TestCase):
 
     def test_one_shot_failure_preserves_evidence_and_forbids_retry(self):
         with tempfile.TemporaryDirectory() as temporary:
-            packet = Path(temporary).resolve()
-            (packet / "input.txt").write_bytes(b"prompt")
-            (packet / "input-manifest.json").write_text('{"packet_id":"packet:sha256:x"}')
+            packet = Path(temporary).resolve() / "packet"
+            packet.mkdir()
+            source = b"non-secret fixture\n"
+            oid = hashlib.sha1(b"blob " + str(len(source)).encode() + b"\0" + source).hexdigest()
+            record = SourceRecord.from_bytes("sample/repo", "a" * 40, "fixture.md", oid, source)
+            manifest = build_packet([record], request_id="request:sha256:" + "1" * 64,
+                subject_id="subject:sha256:" + "2" * 64, mission_instruction="Review.",
+                profile={"id": "code", "version": 1}, output_directory=packet)
             schema = packet / "response.schema.json"
             schema.write_text("{}")
 
@@ -77,11 +84,11 @@ class CodexAdapterTests(unittest.TestCase):
                 kwargs["stderr"].write(b"model unavailable")
                 return subprocess.CompletedProcess(command, 1)
 
-            home = packet / "home"
-            workspace = packet / "workspace"
+            home = packet.parent / "home"
+            workspace = packet.parent / "workspace"
             (home / ".codex").mkdir(parents=True)
             workspace.mkdir()
-            install_reviewer_profile(home, workspace)
+            install_reviewer_profile(home, workspace, packet)
             environment = {"HOME": str(home), "PATH": os.environ.get("PATH", "")}
 
             with self.assertRaisesRegex(InvocationError, "MODEL_UNAVAILABLE"):
@@ -89,6 +96,7 @@ class CodexAdapterTests(unittest.TestCase):
                     packet,
                     schema,
                     "attempt:sha256:" + "a" * 64,
+                    expected_packet_id=manifest["packet_id"],
                     broker_wheel_sha256="b" * 64,
                     trusted_workspace=workspace,
                     runner=runner,
@@ -107,11 +115,56 @@ class CodexAdapterTests(unittest.TestCase):
                     packet,
                     schema,
                     "attempt:sha256:" + "a" * 64,
+                    expected_packet_id=manifest["packet_id"],
                     broker_wheel_sha256="b" * 64,
                     trusted_workspace=workspace,
                     runner=runner,
                     environment=environment,
                 )
+
+    def test_model_transport_requires_prepared_packet_identity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            packet, home, workspace = (root / name for name in ("packet", "home", "workspace"))
+            packet.mkdir()
+            workspace.mkdir()
+            (home / ".codex").mkdir(parents=True)
+            source = b"safe\n"
+            oid = hashlib.sha1(b"blob 5\0" + source).hexdigest()
+            build_packet([SourceRecord.from_bytes("sample/repo", "a" * 40,
+                "safe.md", oid, source)], request_id="request:sha256:" + "1" * 64,
+                subject_id="subject:sha256:" + "2" * 64,
+                mission_instruction="Review.", profile={"id": "code", "version": 1},
+                output_directory=packet)
+            schema = packet / "schema.json"
+            schema.write_text("{}")
+            install_reviewer_profile(home, workspace, packet)
+            def forbidden_runner(*args, **kwargs):
+                self.fail("model-capable transport was reached")
+            with self.assertRaisesRegex(InvocationError, "PACKET_ID_MISMATCH"):
+                invoke_once(packet, schema, "attempt", expected_packet_id="packet:sha256:" + "0" * 64,
+                            broker_wheel_sha256="b" * 64, trusted_workspace=workspace,
+                            environment={"HOME": str(home), "PATH": os.environ.get("PATH", "")},
+                            runner=forbidden_runner)
+            self.assertFalse((packet / "attempt.json").exists())
+
+    def test_model_packet_rejects_hardlink_alias_before_transport(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            packet = root / "packet"
+            packet.mkdir()
+            outside = root / "controlled-nonsecret.txt"
+            outside.write_text("non-secret-canary")
+            (packet / "input.txt").write_text("prompt")
+            (packet / "input-manifest.json").write_text('{"sources":[]}')
+            os.link(outside, packet / "broker-metadata.json")
+            schema = packet / "schema.json"
+            schema.write_text("{}")
+            with self.assertRaisesRegex(InvocationError, "PACKET_TREE_UNTRUSTED"):
+                invoke_once(packet, schema, "attempt", broker_wheel_sha256="b" * 64,
+                            expected_packet_id="packet:sha256:" + "3" * 64,
+                            trusted_workspace=root)
+            self.assertFalse((packet / "attempt.json").exists())
 
     def test_missing_security_profile_is_rejected_before_attempt(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -123,7 +176,7 @@ class CodexAdapterTests(unittest.TestCase):
             (home / ".codex").mkdir(parents=True)
             workspace.mkdir()
             (packet / "input.txt").write_bytes(b"prompt")
-            (packet / "input-manifest.json").write_text("{}")
+            (packet / "input-manifest.json").write_text('{"sources":[]}')
             schema = packet / "schema.json"
             schema.write_text("{}")
             environment = {"HOME": str(home), "PATH": os.environ.get("PATH", "")}
@@ -132,6 +185,7 @@ class CodexAdapterTests(unittest.TestCase):
                     packet,
                     schema,
                     "attempt",
+                    expected_packet_id="packet:sha256:" + "3" * 64,
                     broker_wheel_sha256="b" * 64,
                     trusted_workspace=workspace,
                     environment=environment,
@@ -150,6 +204,7 @@ class CodexAdapterTests(unittest.TestCase):
                     packet,
                     schema,
                     "attempt",
+                    expected_packet_id="packet:sha256:" + "3" * 64,
                     broker_wheel_sha256="b" * 64,
                     trusted_workspace=packet,
                     armed=False,

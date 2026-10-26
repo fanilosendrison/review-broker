@@ -4,12 +4,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 import datetime as dt
 import hashlib
+import json
 import os
 from pathlib import Path
 import subprocess
+import stat
 from typing import Callable, Mapping
 
 from .identity import canonical_bytes
+from .packets import PacketError, verify_packet
 from .reviewer_profile import (
     PROFILE_NAME,
     ReviewerProfileError,
@@ -112,6 +115,7 @@ def invoke_once(
     schema_path: Path,
     attempt_id: str,
     *,
+    expected_packet_id: str,
     broker_wheel_sha256: str,
     trusted_workspace: Path,
     policy: CodexPolicy = CodexPolicy(),
@@ -148,14 +152,21 @@ def invoke_once(
     )
     if any((packet_directory / name).exists() for name in protected):
         raise InvocationError("ALREADY_ATTEMPTED")
+    _assert_packet_tree(packet_directory, schema_path)
     prompt_before = _digest(prompt_path.read_bytes())
     command = build_command(schema_path, output_path, policy)
     child_environment, removed = sanitized_environment(environment or os.environ)
     try:
         reviewer_home = reviewer_home_from_environment(child_environment)
-        profile_path = verify_reviewer_profile(reviewer_home, trusted_workspace)
+        profile_path = verify_reviewer_profile(reviewer_home, trusted_workspace, packet_directory)
     except ReviewerProfileError as exc:
         raise InvocationError(f"SECURITY_PROFILE_INVALID:{exc}") from exc
+    try:
+        observed_packet = verify_packet(packet_directory)
+    except (PacketError, OSError, KeyError) as exc:
+        raise InvocationError("INVOCATION_PACKET_INVALID") from exc
+    if observed_packet["packet_id"] != expected_packet_id:
+        raise InvocationError("INVOCATION_PACKET_ID_MISMATCH")
     attempt = {
         "schema_version": 1,
         "attempt_id": attempt_id,
@@ -220,6 +231,34 @@ def invoke_once(
         raise InvocationError(classify_failure(stderr_text + "\n" + event_text))
     if output_path.stat().st_size == 0:
         raise InvocationError("CODEX_FINAL_MISSING")
+
+
+def _assert_packet_tree(directory: Path, schema_path: Path) -> None:
+    """Deny extra paths and aliases before a model tool receives the packet root."""
+    try:
+        manifest = json.loads((directory / "input-manifest.json").read_bytes())
+        sources = manifest["sources"]
+        expected_sources = {entry["snapshot"] for entry in sources}
+        if not isinstance(sources, list) or len(expected_sources) != len(sources):
+            raise ValueError
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise InvocationError("PACKET_TREE_MANIFEST_INVALID") from exc
+    allowed = {"input.txt", "input-manifest.json", "resolved-request.json",
+               "broker-metadata.json"}
+    if "changes" in manifest:
+        allowed.add("changes.patch")
+    if schema_path.parent == directory:
+        allowed.add(schema_path.name)
+    for path in directory.rglob("*"):
+        relative = path.relative_to(directory)
+        metadata = path.lstat()
+        if (len(relative.parts) == 1 and relative.name == "sources"
+            and stat.S_ISDIR(metadata.st_mode)):
+            continue
+        if (not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1 or
+            not (len(relative.parts) == 1 and relative.name in allowed or
+                 len(relative.parts) == 2 and relative.as_posix() in expected_sources)):
+            raise InvocationError("PACKET_TREE_UNTRUSTED")
 
 
 def _digest(data: bytes) -> str:
