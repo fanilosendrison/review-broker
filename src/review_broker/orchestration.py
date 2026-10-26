@@ -10,16 +10,14 @@ import tempfile
 from typing import Any, Mapping
 
 from .admission import AuthorizationPolicy, authorize_and_resolve
-from .codespace import CodespaceController
 from .identity import artifact_identity, canonical_bytes
 from .packets import GitSourceReader, SourceSpec, build_packet
+from .github_journal import GitHubRefJournal
 from .publication import GitHubPublisher, build_review_result
-from .queue import AttemptState, GitHubRefJournal
+from .queue import AttemptState
 from .recovery import (
     PreparationRecoveryAction,
-    RecoveryAction,
     decide_preparation_recovery,
-    decide_recovery,
     verify_rebuilt_packet,
 )
 from .request import parse_issue_body
@@ -64,7 +62,9 @@ def prepare_issue(
         )
     profile = _load_profile(request["policy"]["profile"], request["policy"]["version"])
     changed = _pull_request_files(
-        request["subject"]["repository"], request["subject"]["pull_request"]
+        request["subject"]["repository"],
+        request["subject"]["pull_request"],
+        expected_head=resolved["subject"]["head_commit"],
     )
     if not changed:
         raise OrchestrationError("PULL_REQUEST_HAS_NO_FILES")
@@ -164,52 +164,6 @@ def publish_validated_result(
     return result
 
 
-def reconcile_repository(
-    broker_repository: str,
-    codespace_name: str,
-    *,
-    codespace_environment: Mapping[str, str] | None = None,
-) -> list[dict[str, str]]:
-    refs = _gh_json(
-        f"repos/{broker_repository}/git/matching-refs/heads/review-claims/"
-    )
-    if not isinstance(refs, list):
-        raise OrchestrationError("CLAIM_REF_RESPONSE_INVALID")
-    controller = CodespaceController(
-        codespace_name,
-        environment=codespace_environment,
-    )
-    codespace_state = controller.state()
-    journal = GitHubRefJournal(broker_repository)
-    decisions: list[dict[str, str]] = []
-    for ref in refs:
-        name = ref.get("ref", "")
-        digest = name.rsplit("/", 1)[-1]
-        request_id = f"request:sha256:{digest}"
-        try:
-            record = journal.get(request_id)
-        except (KeyError, ValueError):
-            continue
-        decision = decide_recovery(record, codespace_state=codespace_state)
-        decisions.append({
-            "request_id": request_id,
-            "state": record.state.value,
-            "action": decision.action.value,
-            "reason": decision.reason,
-        })
-        if decision.action is RecoveryAction.MARK_INDETERMINATE_AND_STOP:
-            evidence = artifact_identity(canonical_bytes(decisions[-1]))
-            journal.transition(request_id, AttemptState.INDETERMINATE, [evidence])
-            controller.stop()
-            codespace_state = "Shutdown"
-        elif decision.action is RecoveryAction.STOP_CODESPACE:
-            controller.stop()
-            codespace_state = "Shutdown"
-            evidence = artifact_identity(canonical_bytes(decisions[-1]))
-            journal.transition(request_id, AttemptState.STOPPED, [evidence])
-    return decisions
-
-
 def _review_instruction(request: dict[str, Any], profile: dict[str, Any]) -> str:
     mission = request["mission"]
     profile_rules = "\n".join(f"- {rule}" for rule in profile["mandatory_behavior"])
@@ -236,18 +190,33 @@ def _load_profile(profile_id: str, version: int) -> dict[str, Any]:
     return profile
 
 
-def _pull_request_files(repository: str, pull_request: int) -> list[dict[str, Any]]:
+def _pull_request_files(
+    repository: str,
+    pull_request: int,
+    *,
+    expected_head: str,
+    get_json: Any | None = None,
+) -> list[dict[str, Any]]:
+    getter = get_json or _gh_json
     files: list[dict[str, Any]] = []
+    complete = False
     for page in range(1, 31):
-        batch = _gh_json(
+        batch = getter(
             f"repos/{repository}/pulls/{pull_request}/files?per_page=100&page={page}"
         )
         if not isinstance(batch, list):
             raise OrchestrationError("PULL_REQUEST_FILE_RESPONSE_INVALID")
         files.extend(batch)
         if len(batch) < 100:
-            return files
-    raise OrchestrationError("PULL_REQUEST_FILE_SCOPE_EXCEEDS_QUALIFIED_LIMIT")
+            complete = True
+            break
+    if not complete:
+        raise OrchestrationError("PULL_REQUEST_FILE_SCOPE_EXCEEDS_QUALIFIED_LIMIT")
+    current = getter(f"repos/{repository}/pulls/{pull_request}")
+    current_head = current.get("head", {}).get("sha") if isinstance(current, dict) else None
+    if current_head != expected_head:
+        raise OrchestrationError("PULL_REQUEST_HEAD_CHANGED_DURING_PREPARATION")
+    return files
 
 
 def _gh_json(endpoint: str) -> Any:

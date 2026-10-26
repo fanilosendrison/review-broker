@@ -112,6 +112,7 @@ def invoke_once(
     schema_path: Path,
     attempt_id: str,
     *,
+    broker_wheel_sha256: str,
     trusted_workspace: Path,
     policy: CodexPolicy = CodexPolicy(),
     armed: bool = True,
@@ -122,6 +123,11 @@ def invoke_once(
     """Invoke Codex at most once for a caller-durably-armed attempt."""
     if not armed:
         raise InvocationError("NOT_ARMED")
+    if (
+        len(broker_wheel_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in broker_wheel_sha256)
+    ):
+        raise InvocationError("BROKER_WHEEL_IDENTITY_INVALID")
     packet_directory = packet_directory.resolve(strict=True)
     schema_path = schema_path.resolve(strict=True)
     prompt_path = packet_directory / "input.txt"
@@ -153,6 +159,7 @@ def invoke_once(
     attempt = {
         "schema_version": 1,
         "attempt_id": attempt_id,
+        "broker_wheel_sha256": broker_wheel_sha256,
         "executor": "codex-cli",
         "distribution": policy.distribution,
         "distribution_version": policy.distribution_version,

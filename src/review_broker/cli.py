@@ -10,11 +10,22 @@ import sys
 from typing import Any
 
 from .codex import invoke_once
+from .codespace import CodespaceController
+from .execution_recovery import (
+    capture_terminal_transition,
+    mark_ambiguous_execution_indeterminate,
+    record_stopped_transition,
+    recover_runtime_evidence,
+    stop_and_observe_shutdown,
+    workflow_context,
+)
+from .github_journal import GitHubRefJournal
 from .identity import canonical_bytes, request_identity
-from .orchestration import prepare_issue, publish_validated_result, reconcile_repository
+from .orchestration import prepare_issue, publish_validated_result
+from .reconciliation import reconcile_repository
 from .packets import verify_packet
 from .publication import extract_result_comment
-from .queue import AttemptState, GitHubRefJournal
+from .queue import AttemptState
 from .request import RequestContractError, build_issue_body, create_request, parse_issue_body
 from .reviewer_profile import install_reviewer_profile, reviewer_home_from_environment
 from .security_probe import run_reviewer_isolation_probe
@@ -69,10 +80,41 @@ def _parser() -> argparse.ArgumentParser:
     invoke.add_argument("--packet-dir", required=True, type=Path)
     invoke.add_argument("--schema", required=True, type=Path)
     invoke.add_argument("--attempt", required=True)
+    invoke.add_argument("--broker-wheel-sha256", required=True)
     invoke.add_argument("--trusted-workspace", required=True, type=Path)
+
+    recover = subcommands.add_parser("internal-recover")
+    recover.add_argument("--codespace", required=True)
+    recover.add_argument("--remote-dir", required=True)
+    recover.add_argument("--output", required=True, type=Path)
+    recover.add_argument("--request", required=True)
+    recover.add_argument("--attempt", required=True)
+
+    capture = subcommands.add_parser("internal-capture-terminal")
+    capture.add_argument("--packet-dir", required=True, type=Path)
+    capture.add_argument("--request", required=True)
+    capture.add_argument("--attempt", required=True)
+    capture.add_argument("--packet-id", required=True)
+
+    indeterminate = subcommands.add_parser("internal-mark-indeterminate")
+    indeterminate.add_argument("--recovery-manifest", required=True, type=Path)
+    indeterminate.add_argument("--request", required=True)
+    indeterminate.add_argument("--attempt", required=True)
 
     validate = subcommands.add_parser("internal-validate")
     validate.add_argument("--packet-dir", required=True, type=Path)
+
+    stop = subcommands.add_parser("internal-stop-codespace")
+    stop.add_argument("--codespace", required=True)
+    stop.add_argument("--output", required=True, type=Path)
+    stop.add_argument("--request", required=True)
+    stop.add_argument("--attempt", required=True)
+
+    stopped = subcommands.add_parser("internal-record-stopped")
+    stopped.add_argument("--observation", required=True, type=Path)
+    stopped.add_argument("--codespace", required=True)
+    stopped.add_argument("--request", required=True)
+    stopped.add_argument("--attempt", required=True)
 
     transition = subcommands.add_parser("internal-transition")
     transition.add_argument("--request", required=True)
@@ -122,11 +164,63 @@ def main(argv: list[str] | None = None) -> int:
                 args.packet_dir,
                 args.schema,
                 args.attempt,
+                broker_wheel_sha256=args.broker_wheel_sha256,
                 trusted_workspace=args.trusted_workspace,
             )
             return 0
+        if args.command == "internal-recover":
+            value = recover_runtime_evidence(
+                CodespaceController(args.codespace),
+                args.remote_dir,
+                args.output,
+                request_id=args.request,
+                attempt_id=args.attempt,
+                context=workflow_context(os.environ, source="review-workflow-recovery"),
+            )
+            print(canonical_bytes(value).decode("utf-8"))
+            return 0
+        if args.command == "internal-capture-terminal":
+            value = capture_terminal_transition(
+                args.broker_repo,
+                args.packet_dir,
+                request_id=args.request,
+                attempt_id=args.attempt,
+                packet_id=args.packet_id,
+                context=workflow_context(os.environ, source="review-workflow-capture"),
+            )
+            print(canonical_bytes(value).decode("utf-8"))
+            return 0
+        if args.command == "internal-mark-indeterminate":
+            value = mark_ambiguous_execution_indeterminate(
+                args.broker_repo,
+                args.recovery_manifest,
+                request_id=args.request,
+                attempt_id=args.attempt,
+            )
+            print(canonical_bytes(value).decode("utf-8"))
+            return 0
         if args.command == "internal-validate":
             print(canonical_bytes(validate_evidence(args.packet_dir)).decode("utf-8"))
+            return 0
+        if args.command == "internal-stop-codespace":
+            value = stop_and_observe_shutdown(
+                CodespaceController(args.codespace),
+                args.output,
+                request_id=args.request,
+                attempt_id=args.attempt,
+                context=workflow_context(os.environ, source="review-workflow-cleanup"),
+            )
+            print(canonical_bytes(value).decode("utf-8"))
+            return 0
+        if args.command == "internal-record-stopped":
+            value = record_stopped_transition(
+                args.broker_repo,
+                args.observation,
+                request_id=args.request,
+                attempt_id=args.attempt,
+                codespace_name=args.codespace,
+            )
+            print(canonical_bytes(value).decode("utf-8"))
             return 0
         if args.command == "internal-transition":
             GitHubRefJournal(args.broker_repo).transition(
@@ -149,6 +243,11 @@ def main(argv: list[str] | None = None) -> int:
                 codespace_environment=codespace_environment,
             )
             print(canonical_bytes(result).decode("utf-8"))
+            if any(
+                item.get("outcome") == "INFRASTRUCTURE_INCIDENT"
+                for item in result
+            ):
+                return 1
             return 0
     except Exception as exc:  # CLI boundary converts typed failures into a non-secret status.
         print(f"REVIEWCTL_ERROR={type(exc).__name__}:{exc}", file=sys.stderr)

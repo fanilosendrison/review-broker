@@ -18,9 +18,9 @@ class RecoveryAction(str, Enum):
     NONE = "NONE"
     RESUME_PRE_MODEL = "RESUME_PRE_MODEL"
     MARK_INDETERMINATE_AND_STOP = "MARK_INDETERMINATE_AND_STOP"
-    VALIDATE_EXISTING = "VALIDATE_EXISTING"
-    PUBLISH_EXISTING = "PUBLISH_EXISTING"
+    BLOCKED_EVIDENCE_LOCATION = "BLOCKED_EVIDENCE_LOCATION"
     STOP_CODESPACE = "STOP_CODESPACE"
+    RECORD_STOPPED = "RECORD_STOPPED"
     INFRASTRUCTURE_INCIDENT = "INFRASTRUCTURE_INCIDENT"
 
 
@@ -67,19 +67,22 @@ def decide_recovery(record: AttemptRecord, *, codespace_state: str) -> RecoveryD
         )
     if state is AttemptState.TERMINAL_CAPTURED:
         return RecoveryDecision(
-            RecoveryAction.VALIDATE_EXISTING,
-            "Validate captured evidence without another inference.",
+            RecoveryAction.BLOCKED_EVIDENCE_LOCATION,
+            "Validation is authorized, but no durable artifact locator is recorded in the journal.",
         )
     if state is AttemptState.VALIDATED:
         return RecoveryDecision(
-            RecoveryAction.PUBLISH_EXISTING,
-            "Publish the already validated bounded result.",
+            RecoveryAction.BLOCKED_EVIDENCE_LOCATION,
+            "Publication is authorized, but no durable artifact locator is recorded in the journal.",
         )
     if state in {AttemptState.REPORTED, AttemptState.INDETERMINATE}:
         if codespace_state in {"Available", "ShuttingDown"}:
             return RecoveryDecision(RecoveryAction.STOP_CODESPACE, "Cleanup remains observable and required.")
         if codespace_state == "Shutdown":
-            return RecoveryDecision(RecoveryAction.NONE, "Terminal result and Shutdown are already observed.")
+            return RecoveryDecision(
+                RecoveryAction.RECORD_STOPPED,
+                "Shutdown is observed and must be bound before recording STOPPED.",
+            )
         return RecoveryDecision(
             RecoveryAction.INFRASTRUCTURE_INCIDENT,
             "Codespace terminal state cannot be established.",

@@ -10,8 +10,15 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from .evidence import REQUIRED_EVIDENCE_FILES, evidence_manifest, scan_for_credentials
-from .identity import canonical_bytes
+from .evidence import (
+    EvidenceCaptureError,
+    REQUIRED_EVIDENCE_FILES,
+    TERMINAL_CAPTURE_FILES,
+    evidence_manifest,
+    scan_for_credentials,
+    validate_terminal_capture_receipt,
+)
+from .identity import artifact_identity, canonical_bytes
 from .packets import PacketError, source_lines, verify_packet
 from .security_probe import validate_probe_receipt
 
@@ -45,6 +52,7 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
     if contaminated:
         reasons.append("CREDENTIAL_MATERIAL_DETECTED:" + ",".join(contaminated))
     reasons.extend(_security_profile_errors(directory))
+    reasons.extend(_terminal_capture_errors(directory, manifest, inventory))
     exit_value = _read_text(directory / "codex-exit-code.txt").strip()
     if exit_value and exit_value != "0":
         execution_status = "INDETERMINATE" if exit_value in {"TIMEOUT", "NOT_STARTED"} else "FAILED"
@@ -138,6 +146,63 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
     return result
 
 
+def _terminal_capture_errors(
+    directory: Path,
+    manifest: dict[str, Any],
+    inventory: dict[str, dict[str, Any]],
+) -> list[str]:
+    try:
+        attempt = json.loads((directory / "attempt.json").read_text(encoding="utf-8"))
+        receipt = json.loads(
+            (directory / "terminal-capture.json").read_text(encoding="utf-8")
+        )
+        recovery = json.loads(
+            (directory / "recovery-manifest.json").read_text(encoding="utf-8")
+        )
+        if not all(isinstance(value, dict) for value in (attempt, receipt, recovery)):
+            raise TypeError
+        validate_terminal_capture_receipt(
+            receipt,
+            request_id=manifest["request_id"],
+            attempt_id=attempt["attempt_id"],
+        )
+    except (OSError, KeyError, TypeError, json.JSONDecodeError, EvidenceCaptureError):
+        return ["TERMINAL_CAPTURE_RECEIPT_INVALID"]
+    errors: list[str] = []
+    if receipt.get("packet_id") != manifest.get("packet_id"):
+        errors.append("TERMINAL_CAPTURE_PACKET_ID_MISMATCH")
+    if (
+        recovery.get("evidence_type") != "runtime-evidence-recovery"
+        or recovery.get("request_id") != manifest.get("request_id")
+        or recovery.get("attempt_id") != attempt.get("attempt_id")
+        or recovery.get("complete") is not True
+    ):
+        errors.append("RECOVERY_MANIFEST_INVALID")
+    recovered = recovery.get("artifacts")
+    for name in TERMINAL_CAPTURE_FILES:
+        actual = inventory[name]
+        captured = receipt["artifacts"][name]
+        recovered_entry = recovered.get(name) if isinstance(recovered, dict) else None
+        if (
+            not actual["present"]
+            or captured["sha256"] != actual["sha256"]
+            or captured["byte_length"] != actual["byte_length"]
+        ):
+            errors.append(f"TERMINAL_CAPTURE_ARTIFACT_MISMATCH:{name}")
+        actual_artifact_id = (
+            artifact_identity((directory / name).read_bytes())
+            if actual["present"]
+            else None
+        )
+        if (
+            not isinstance(recovered_entry, dict)
+            or recovered_entry.get("recovered") is not True
+            or recovered_entry.get("artifact_id") != actual_artifact_id
+        ):
+            errors.append(f"RECOVERY_ARTIFACT_MISMATCH:{name}")
+    return errors
+
+
 def _security_profile_errors(directory: Path) -> list[str]:
     try:
         attempt = json.loads((directory / "attempt.json").read_text(encoding="utf-8"))
@@ -157,6 +222,13 @@ def _security_profile_errors(directory: Path) -> list[str]:
         errors.append("ATTEMPT_TRUSTED_WORKSPACE_DENIAL_UNVERIFIED")
     if attempt.get("network_access") is not False:
         errors.append("ATTEMPT_NETWORK_ACCESS_INVALID")
+    broker_wheel_sha256 = attempt.get("broker_wheel_sha256")
+    if (
+        not isinstance(broker_wheel_sha256, str)
+        or len(broker_wheel_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in broker_wheel_sha256)
+    ):
+        errors.append("ATTEMPT_BROKER_WHEEL_SHA256_INVALID")
     profile_sha256 = attempt.get("permission_profile_sha256")
     if (
         not isinstance(profile_sha256, str)
