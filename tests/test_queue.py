@@ -2,11 +2,16 @@ from concurrent.futures import ThreadPoolExecutor
 import threading
 import unittest
 
+from review_broker.evidence import build_shutdown_observation
+from review_broker.identity import artifact_identity, canonical_bytes
 from review_broker.queue import (
+    AttemptRecord,
     AttemptState,
     InMemoryJournal,
     ReviewerBusy,
     StateTransitionError,
+    record_shutdown_transition,
+    transition_record,
 )
 
 
@@ -68,6 +73,69 @@ class QueueTests(unittest.TestCase):
         attempt = journal.claim("request:sha256:" + "1" * 64)
         with self.assertRaises(StateTransitionError):
             journal.transition(attempt.attempt_id, AttemptState.VALIDATED, ["invented"])
+
+    def test_generic_terminal_capture_transition_is_rejected(self):
+        record = AttemptRecord(
+            request_id="request:sha256:" + "7" * 64,
+            attempt_id="attempt:sha256:" + "8" * 64,
+            state=AttemptState.ARMED,
+            invocation_count=1,
+        )
+        with self.assertRaisesRegex(StateTransitionError, "SPECIALIZED_EVIDENCE_REQUIRED"):
+            transition_record(
+                record,
+                AttemptState.TERMINAL_CAPTURED,
+                ["artifact:sha256:" + "9" * 64],
+            )
+
+    def test_generic_stopped_transition_is_rejected(self):
+        record = AttemptRecord(
+            request_id="request:sha256:" + "7" * 64,
+            attempt_id="attempt:sha256:" + "8" * 64,
+            state=AttemptState.REPORTED,
+        )
+        with self.assertRaisesRegex(StateTransitionError, "SPECIALIZED_EVIDENCE_REQUIRED"):
+            transition_record(record, AttemptState.STOPPED, ["artifact:sha256:" + "9" * 64])
+
+    def test_stopped_transition_requires_matching_shutdown_observation(self):
+        record = AttemptRecord(
+            request_id="request:sha256:" + "7" * 64,
+            attempt_id="attempt:sha256:" + "8" * 64,
+            state=AttemptState.REPORTED,
+        )
+        receipt = build_shutdown_observation(
+            codespace_name="review-broker-safe",
+            request_id=record.request_id,
+            attempt_id=record.attempt_id,
+            observed_state="Shutdown",
+            context={"workflow_run_id": "123", "workflow_run_attempt": "1"},
+        )
+        updated = record_shutdown_transition(record, receipt)
+        self.assertEqual(updated.state, AttemptState.STOPPED)
+        self.assertEqual(
+            updated.evidence_ids[-1],
+            artifact_identity(canonical_bytes(receipt) + b"\n"),
+        )
+        contradictory = dict(receipt)
+        contradictory["observed_state"] = "Available"
+        with self.assertRaisesRegex(StateTransitionError, "SHUTDOWN_OBSERVATION_INVALID"):
+            record_shutdown_transition(record, contradictory)
+
+    def test_shutdown_observation_must_bind_attempt(self):
+        record = AttemptRecord(
+            request_id="request:sha256:" + "7" * 64,
+            attempt_id="attempt:sha256:" + "8" * 64,
+            state=AttemptState.INDETERMINATE,
+        )
+        receipt = build_shutdown_observation(
+            codespace_name="review-broker-safe",
+            request_id=record.request_id,
+            attempt_id="attempt:sha256:" + "0" * 64,
+            observed_state="Shutdown",
+            context={"workflow_run_id": "123", "workflow_run_attempt": "1"},
+        )
+        with self.assertRaisesRegex(StateTransitionError, "SHUTDOWN_ATTEMPT_MISMATCH"):
+            record_shutdown_transition(record, receipt)
 
     def test_evidence_is_required_for_every_transition(self):
         journal = InMemoryJournal()

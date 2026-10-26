@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -88,10 +89,13 @@ class CodexAdapterTests(unittest.TestCase):
                     packet,
                     schema,
                     "attempt:sha256:" + "a" * 64,
+                    broker_wheel_sha256="b" * 64,
                     trusted_workspace=workspace,
                     runner=runner,
                     environment=environment,
                 )
+            attempt = json.loads((packet / "attempt.json").read_text(encoding="utf-8"))
+            self.assertEqual(attempt["broker_wheel_sha256"], "b" * 64)
             for name in (
                 "attempt.json", "input-manifest.json", "prompt.sha256",
                 "codex-events.jsonl", "codex-stderr.txt", "codex-exit-code.txt",
@@ -103,6 +107,7 @@ class CodexAdapterTests(unittest.TestCase):
                     packet,
                     schema,
                     "attempt:sha256:" + "a" * 64,
+                    broker_wheel_sha256="b" * 64,
                     trusted_workspace=workspace,
                     runner=runner,
                     environment=environment,
@@ -127,6 +132,7 @@ class CodexAdapterTests(unittest.TestCase):
                     packet,
                     schema,
                     "attempt",
+                    broker_wheel_sha256="b" * 64,
                     trusted_workspace=workspace,
                     environment=environment,
                 )
@@ -140,7 +146,14 @@ class CodexAdapterTests(unittest.TestCase):
             schema = packet / "schema.json"
             schema.write_text("{}")
             with self.assertRaisesRegex(InvocationError, "NOT_ARMED"):
-                invoke_once(packet, schema, "attempt", trusted_workspace=packet, armed=False)
+                invoke_once(
+                    packet,
+                    schema,
+                    "attempt",
+                    broker_wheel_sha256="b" * 64,
+                    trusted_workspace=packet,
+                    armed=False,
+                )
 
 
 if __name__ == "__main__":

@@ -59,17 +59,32 @@ class RecoveryTests(unittest.TestCase):
         decision = decide_recovery(self.record(AttemptState.ARMED, 1), codespace_state="Available")
         self.assertEqual(decision.action, RecoveryAction.MARK_INDETERMINATE_AND_STOP)
 
-    def test_terminal_capture_resumes_validation_without_inference(self):
-        decision = decide_recovery(self.record(AttemptState.TERMINAL_CAPTURED, 1), codespace_state="Available")
-        self.assertEqual(decision.action, RecoveryAction.VALIDATE_EXISTING)
+    def test_terminal_capture_is_blocked_without_durable_artifact_locator(self):
+        decision = decide_recovery(
+            self.record(AttemptState.TERMINAL_CAPTURED, 1),
+            codespace_state="Available",
+        )
+        self.assertEqual(decision.action, RecoveryAction.BLOCKED_EVIDENCE_LOCATION)
+        self.assertIn("artifact locator", decision.reason)
 
-    def test_validated_attempt_resumes_publication(self):
-        decision = decide_recovery(self.record(AttemptState.VALIDATED, 1), codespace_state="Shutdown")
-        self.assertEqual(decision.action, RecoveryAction.PUBLISH_EXISTING)
+    def test_validated_publication_is_blocked_without_durable_artifact_locator(self):
+        decision = decide_recovery(
+            self.record(AttemptState.VALIDATED, 1),
+            codespace_state="Shutdown",
+        )
+        self.assertEqual(decision.action, RecoveryAction.BLOCKED_EVIDENCE_LOCATION)
+        self.assertIn("artifact locator", decision.reason)
 
     def test_reported_attempt_with_running_codespace_is_stopped(self):
         decision = decide_recovery(self.record(AttemptState.REPORTED, 1), codespace_state="Available")
         self.assertEqual(decision.action, RecoveryAction.STOP_CODESPACE)
+
+    def test_reported_attempt_with_observed_shutdown_records_stopped(self):
+        decision = decide_recovery(
+            self.record(AttemptState.REPORTED, 1),
+            codespace_state="Shutdown",
+        )
+        self.assertEqual(decision.action, RecoveryAction.RECORD_STOPPED)
 
     def test_stopped_attempt_needs_no_action(self):
         decision = decide_recovery(self.record(AttemptState.STOPPED, 1), codespace_state="Shutdown")

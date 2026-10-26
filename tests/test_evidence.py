@@ -4,8 +4,15 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from review_broker.evidence import REQUIRED_EVIDENCE_FILES, evidence_manifest, scan_for_credentials
-from review_broker.identity import canonical_bytes
+from review_broker.evidence import (
+    EvidenceCaptureError,
+    REQUIRED_EVIDENCE_FILES,
+    TERMINAL_CAPTURE_FILES,
+    build_terminal_capture_receipt,
+    evidence_manifest,
+    scan_for_credentials,
+)
+from review_broker.identity import artifact_identity, canonical_bytes
 from review_broker.packets import SourceRecord, build_packet
 from review_broker.validation import validate_evidence
 
@@ -49,6 +56,7 @@ class EvidenceValidationTests(unittest.TestCase):
         profile_sha256 = "4" * 64
         (root / "attempt.json").write_bytes(canonical_bytes({
             "attempt_id": "attempt:sha256:" + "3" * 64,
+            "broker_wheel_sha256": "6" * 64,
             "permission_profile": "review-broker",
             "permission_profile_sha256": profile_sha256,
             "credential_paths_denied": True,
@@ -76,9 +84,40 @@ class EvidenceValidationTests(unittest.TestCase):
         (root / "codex-events.jsonl").write_text("\n".join(json.dumps(e) for e in events) + "\n")
         (root / "codex-stderr.txt").write_text("")
         (root / "codex-final.json").write_text(final_text)
-        (root / "codex-exit-code.txt").write_text("0\n")
+        (root / "codex-exit-code.txt").write_text("1\n" if failure else "0\n")
         for name in ("input-before.sha256", "input-after.sha256"):
             (root / name).write_text(manifest["prompt_sha256"] + "\n")
+        recovered = {}
+        for name in TERMINAL_CAPTURE_FILES:
+            data = (root / name).read_bytes()
+            recovered[name] = {
+                "recovered": True,
+                "artifact_id": artifact_identity(data),
+                "byte_length": len(data),
+            }
+        context = {"workflow_run_id": "123", "workflow_run_attempt": "1"}
+        (root / "recovery-manifest.json").write_bytes(canonical_bytes({
+            "schema_version": 1,
+            "evidence_type": "runtime-evidence-recovery",
+            "codespace_name": "review-broker-safe",
+            "remote_directory": "/tmp/evidence",
+            "request_id": manifest["request_id"],
+            "attempt_id": "attempt:sha256:" + "3" * 64,
+            "observed_at": "2026-10-26T00:00:00+00:00",
+            "context": context,
+            "artifacts": recovered,
+            "complete": True,
+        }))
+        if terminal or failure:
+            receipt = build_terminal_capture_receipt(
+                root,
+                request_id=manifest["request_id"],
+                attempt_id="attempt:sha256:" + "3" * 64,
+                packet_id=manifest["packet_id"],
+                context=context,
+                observed_at="2026-10-26T00:00:01+00:00",
+            )
+            (root / "terminal-capture.json").write_bytes(canonical_bytes(receipt))
         return manifest
 
     def test_valid_citations_do_not_validate_conclusions(self):
@@ -110,6 +149,80 @@ class EvidenceValidationTests(unittest.TestCase):
             (root / "codex-events.jsonl").write_text("\n".join(json.dumps(e) for e in events) + "\n")
             result = validate_evidence(root, setup=manifest)
             self.assertEqual(result["evidence_status"], "INVALID")
+
+    def test_complete_terminal_artifacts_produce_bound_capture_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = self.fixture(root)
+            receipt = build_terminal_capture_receipt(
+                root,
+                request_id=manifest["request_id"],
+                attempt_id="attempt:sha256:" + "3" * 64,
+                packet_id=manifest["packet_id"],
+                context={"workflow_run_id": "123", "workflow_run_attempt": "1"},
+            )
+            self.assertEqual(receipt["terminal_event"], "turn.completed")
+            self.assertEqual(
+                receipt["artifacts"]["codex-events.jsonl"]["sha256"],
+                hashlib.sha256((root / "codex-events.jsonl").read_bytes()).hexdigest(),
+            )
+
+    def test_missing_terminal_artifact_cannot_be_captured(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = self.fixture(root)
+            (root / "codex-final.json").unlink()
+            with self.assertRaisesRegex(EvidenceCaptureError, "TERMINAL_ARTIFACT_MISSING"):
+                build_terminal_capture_receipt(
+                    root,
+                    request_id=manifest["request_id"],
+                    attempt_id="attempt:sha256:" + "3" * 64,
+                    packet_id=manifest["packet_id"],
+                    context={},
+                )
+
+    def test_truncated_terminal_event_stream_cannot_be_captured(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = self.fixture(root)
+            (root / "codex-events.jsonl").write_text('{"type":"turn.started"}\n{"type":')
+            with self.assertRaisesRegex(EvidenceCaptureError, "TERMINAL_EVENTS_JSON_INVALID"):
+                build_terminal_capture_receipt(
+                    root,
+                    request_id=manifest["request_id"],
+                    attempt_id="attempt:sha256:" + "3" * 64,
+                    packet_id=manifest["packet_id"],
+                    context={},
+                )
+
+    def test_malformed_terminal_event_stream_cannot_be_captured(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = self.fixture(root)
+            (root / "codex-events.jsonl").write_text('{"not_type":"turn.started"}\n')
+            with self.assertRaisesRegex(EvidenceCaptureError, "TERMINAL_EVENT_INVALID"):
+                build_terminal_capture_receipt(
+                    root,
+                    request_id=manifest["request_id"],
+                    attempt_id="attempt:sha256:" + "3" * 64,
+                    packet_id=manifest["packet_id"],
+                    context={},
+                )
+
+    def test_contradictory_terminal_events_cannot_be_captured(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = self.fixture(root)
+            with (root / "codex-events.jsonl").open("a", encoding="utf-8") as stream:
+                stream.write('{"type":"turn.failed"}\n')
+            with self.assertRaisesRegex(EvidenceCaptureError, "TERMINAL_EVENT_SEQUENCE_INVALID"):
+                build_terminal_capture_receipt(
+                    root,
+                    request_id=manifest["request_id"],
+                    attempt_id="attempt:sha256:" + "3" * 64,
+                    packet_id=manifest["packet_id"],
+                    context={},
+                )
 
     def test_lost_terminal_response_is_indeterminate(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -143,7 +143,44 @@ class SecurityTests(unittest.TestCase):
             Path(__file__).parents[1] / ".github/workflows/review-request.yml"
         ).read_text(encoding="utf-8")
         self.assertIn('cp -c "$CODESPACE_NAME" -r -- -O', workflow)
-        self.assertIn('cp --expand -c "$CODESPACE_NAME" -- -O', workflow)
+        self.assertIn("internal-recover", workflow)
+
+    def test_privileged_workflows_refuse_non_default_dispatch_refs(self):
+        workflow_root = Path(__file__).parents[1] / ".github/workflows"
+        for name in ("review-request.yml", "review-reconciler.yml"):
+            workflow = (workflow_root / name).read_text(encoding="utf-8")
+            with self.subTest(name=name):
+                self.assertIn(
+                    "github.ref == format('refs/heads/{0}', github.event.repository.default_branch)",
+                    workflow,
+                )
+                self.assertIn("ref: ${{ github.sha }}", workflow)
+
+    def test_remote_broker_executable_is_pinned_and_not_loaded_from_workspace(self):
+        workflow = (
+            Path(__file__).parents[1] / ".github/workflows/review-request.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("ref: ${{ github.sha }}", workflow)
+        self.assertIn("broker-wheel.sha256", workflow)
+        self.assertIn("python3 -P -m review_broker.cli", workflow)
+        self.assertNotIn("python3 -m pip install --user .", workflow)
+
+    def test_workflow_cannot_record_stopped_after_failed_observation(self):
+        workflow = (
+            Path(__file__).parents[1] / ".github/workflows/review-request.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("steps.stop.outcome == 'success'", workflow)
+        self.assertIn("internal-record-stopped", workflow)
+        self.assertNotIn("printf '%s' Shutdown", workflow)
+
+    def test_workflow_cannot_promote_partial_recovery_to_terminal_capture(self):
+        workflow = (
+            Path(__file__).parents[1] / ".github/workflows/review-request.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("internal-capture-terminal", workflow)
+        self.assertIn("internal-mark-indeterminate", workflow)
+        self.assertNotIn("--state TERMINAL_CAPTURED", workflow)
+        self.assertNotIn('"remote:$REMOTE_ROOT/evidence/$name"', workflow)
 
     def test_codespace_controller_uses_only_supplied_control_environment(self):
         runner = FakeCodespaceRunner(["Available"])
