@@ -13,6 +13,7 @@ from review_broker.codex import (
     invoke_once,
     sanitized_environment,
 )
+from review_broker.reviewer_profile import install_reviewer_profile
 
 
 class CodexAdapterTests(unittest.TestCase):
@@ -20,9 +21,11 @@ class CodexAdapterTests(unittest.TestCase):
         command = build_command(Path("/schema.json"), Path("/final.json"), CodexPolicy())
         self.assertEqual(command[:2], ["codex", "exec"])
         self.assertIn("--ephemeral", command)
-        self.assertIn("--ignore-user-config", command)
+        self.assertNotIn("--ignore-user-config", command)
         self.assertIn("--ignore-rules", command)
-        self.assertEqual(command[command.index("--sandbox") + 1], "read-only")
+        self.assertNotIn("--sandbox", command)
+        self.assertIn("--strict-config", command)
+        self.assertEqual(command[command.index("--profile") + 1], "review-broker")
         self.assertEqual(command[command.index("--model") + 1], "gpt-5.6-sol")
         self.assertIn('model_reasoning_effort="xhigh"', command)
         self.assertEqual(command[-1], "-")
@@ -62,7 +65,7 @@ class CodexAdapterTests(unittest.TestCase):
 
     def test_one_shot_failure_preserves_evidence_and_forbids_retry(self):
         with tempfile.TemporaryDirectory() as temporary:
-            packet = Path(temporary)
+            packet = Path(temporary).resolve()
             (packet / "input.txt").write_bytes(b"prompt")
             (packet / "input-manifest.json").write_text('{"packet_id":"packet:sha256:x"}')
             schema = packet / "response.schema.json"
@@ -73,8 +76,22 @@ class CodexAdapterTests(unittest.TestCase):
                 kwargs["stderr"].write(b"model unavailable")
                 return subprocess.CompletedProcess(command, 1)
 
+            home = packet / "home"
+            workspace = packet / "workspace"
+            (home / ".codex").mkdir(parents=True)
+            workspace.mkdir()
+            install_reviewer_profile(home, workspace)
+            environment = {"HOME": str(home), "PATH": os.environ.get("PATH", "")}
+
             with self.assertRaisesRegex(InvocationError, "MODEL_UNAVAILABLE"):
-                invoke_once(packet, schema, "attempt:sha256:" + "a" * 64, runner=runner)
+                invoke_once(
+                    packet,
+                    schema,
+                    "attempt:sha256:" + "a" * 64,
+                    trusted_workspace=workspace,
+                    runner=runner,
+                    environment=environment,
+                )
             for name in (
                 "attempt.json", "input-manifest.json", "prompt.sha256",
                 "codex-events.jsonl", "codex-stderr.txt", "codex-exit-code.txt",
@@ -82,7 +99,38 @@ class CodexAdapterTests(unittest.TestCase):
             ):
                 self.assertTrue((packet / name).is_file(), name)
             with self.assertRaisesRegex(InvocationError, "ALREADY_ATTEMPTED"):
-                invoke_once(packet, schema, "attempt:sha256:" + "a" * 64, runner=runner)
+                invoke_once(
+                    packet,
+                    schema,
+                    "attempt:sha256:" + "a" * 64,
+                    trusted_workspace=workspace,
+                    runner=runner,
+                    environment=environment,
+                )
+
+    def test_missing_security_profile_is_rejected_before_attempt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            packet = root / "packet"
+            home = root / "home"
+            workspace = root / "workspace"
+            packet.mkdir()
+            (home / ".codex").mkdir(parents=True)
+            workspace.mkdir()
+            (packet / "input.txt").write_bytes(b"prompt")
+            (packet / "input-manifest.json").write_text("{}")
+            schema = packet / "schema.json"
+            schema.write_text("{}")
+            environment = {"HOME": str(home), "PATH": os.environ.get("PATH", "")}
+            with self.assertRaisesRegex(InvocationError, "SECURITY_PROFILE_INVALID"):
+                invoke_once(
+                    packet,
+                    schema,
+                    "attempt",
+                    trusted_workspace=workspace,
+                    environment=environment,
+                )
+            self.assertFalse((packet / "attempt.json").exists())
 
     def test_unarmed_invocation_is_rejected_before_transport(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -92,7 +140,7 @@ class CodexAdapterTests(unittest.TestCase):
             schema = packet / "schema.json"
             schema.write_text("{}")
             with self.assertRaisesRegex(InvocationError, "NOT_ARMED"):
-                invoke_once(packet, schema, "attempt", armed=False)
+                invoke_once(packet, schema, "attempt", trusted_workspace=packet, armed=False)
 
 
 if __name__ == "__main__":

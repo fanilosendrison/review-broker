@@ -13,6 +13,7 @@ from jsonschema import Draft202012Validator
 from .evidence import REQUIRED_EVIDENCE_FILES, evidence_manifest, scan_for_credentials
 from .identity import canonical_bytes
 from .packets import PacketError, source_lines, verify_packet
+from .security_probe import validate_probe_receipt
 
 
 def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -43,6 +44,7 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
     contaminated = scan_for_credentials(directory)
     if contaminated:
         reasons.append("CREDENTIAL_MATERIAL_DETECTED:" + ",".join(contaminated))
+    reasons.extend(_security_profile_errors(directory))
     exit_value = _read_text(directory / "codex-exit-code.txt").strip()
     if exit_value and exit_value != "0":
         execution_status = "INDETERMINATE" if exit_value in {"TIMEOUT", "NOT_STARTED"} else "FAILED"
@@ -134,6 +136,37 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
     }
     _write_exclusive(directory / "validation.json", canonical_bytes(result) + b"\n")
     return result
+
+
+def _security_profile_errors(directory: Path) -> list[str]:
+    try:
+        attempt = json.loads((directory / "attempt.json").read_text(encoding="utf-8"))
+        receipt = json.loads(
+            (directory / "reviewer-security-probe.json").read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError):
+        return ["SECURITY_PROFILE_EVIDENCE_INVALID"]
+    if not isinstance(attempt, dict) or not isinstance(receipt, dict):
+        return ["SECURITY_PROFILE_EVIDENCE_INVALID"]
+    errors: list[str] = []
+    if attempt.get("permission_profile") != "review-broker":
+        errors.append("ATTEMPT_PERMISSION_PROFILE_INVALID")
+    if attempt.get("credential_paths_denied") is not True:
+        errors.append("ATTEMPT_CREDENTIAL_DENIAL_UNVERIFIED")
+    if attempt.get("trusted_workspace_denied") is not True:
+        errors.append("ATTEMPT_TRUSTED_WORKSPACE_DENIAL_UNVERIFIED")
+    if attempt.get("network_access") is not False:
+        errors.append("ATTEMPT_NETWORK_ACCESS_INVALID")
+    profile_sha256 = attempt.get("permission_profile_sha256")
+    if (
+        not isinstance(profile_sha256, str)
+        or len(profile_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in profile_sha256)
+    ):
+        errors.append("ATTEMPT_PERMISSION_PROFILE_SHA256_INVALID")
+        return errors
+    errors.extend(validate_probe_receipt(receipt, profile_sha256))
+    return errors
 
 
 def _citation_errors(response: dict[str, Any], indexed: dict[str, tuple[str, ...]]) -> list[str]:

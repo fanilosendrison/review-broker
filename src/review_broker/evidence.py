@@ -16,6 +16,7 @@ REQUIRED_EVIDENCE_FILES = (
     "codex-exit-code.txt",
     "input-before.sha256",
     "input-after.sha256",
+    "reviewer-security-probe.json",
     "validation.json",
 )
 

@@ -16,6 +16,8 @@ from .packets import verify_packet
 from .publication import extract_result_comment
 from .queue import AttemptState, GitHubRefJournal
 from .request import RequestContractError, build_issue_body, create_request, parse_issue_body
+from .reviewer_profile import install_reviewer_profile, reviewer_home_from_environment
+from .security_probe import run_reviewer_isolation_probe
 from .validation import validate_evidence
 
 DEFAULT_BROKER_REPOSITORY = "fanilosendrison/review-broker"
@@ -57,10 +59,17 @@ def _parser() -> argparse.ArgumentParser:
     arm.add_argument("--request", required=True)
     arm.add_argument("--packet-id", required=True)
 
+    install_profile = subcommands.add_parser("internal-install-reviewer-profile")
+    install_profile.add_argument("--trusted-workspace", required=True, type=Path)
+
+    probe_profile = subcommands.add_parser("internal-probe-reviewer-profile")
+    probe_profile.add_argument("--trusted-workspace", required=True, type=Path)
+
     invoke = subcommands.add_parser("internal-invoke")
     invoke.add_argument("--packet-dir", required=True, type=Path)
     invoke.add_argument("--schema", required=True, type=Path)
     invoke.add_argument("--attempt", required=True)
+    invoke.add_argument("--trusted-workspace", required=True, type=Path)
 
     validate = subcommands.add_parser("internal-validate")
     validate.add_argument("--packet-dir", required=True, type=Path)
@@ -99,8 +108,22 @@ def main(argv: list[str] | None = None) -> int:
             journal.transition(args.request, AttemptState.ARMED, [args.packet_id])
             journal.record_invocation(args.request)
             return 0
+        if args.command == "internal-install-reviewer-profile":
+            home = reviewer_home_from_environment(dict(os.environ))
+            install_reviewer_profile(home, args.trusted_workspace)
+            return 0
+        if args.command == "internal-probe-reviewer-profile":
+            home = reviewer_home_from_environment(dict(os.environ))
+            receipt = run_reviewer_isolation_probe(home, args.trusted_workspace)
+            print(canonical_bytes(receipt).decode("utf-8"))
+            return 0
         if args.command == "internal-invoke":
-            invoke_once(args.packet_dir, args.schema, args.attempt)
+            invoke_once(
+                args.packet_dir,
+                args.schema,
+                args.attempt,
+                trusted_workspace=args.trusted_workspace,
+            )
             return 0
         if args.command == "internal-validate":
             print(canonical_bytes(validate_evidence(args.packet_dir)).decode("utf-8"))
@@ -114,7 +137,18 @@ def main(argv: list[str] | None = None) -> int:
             print(canonical_bytes(publish_validated_result(args.broker_repo, args.packet_dir)).decode("utf-8"))
             return 0
         if args.command == "internal-reconcile":
-            print(canonical_bytes(reconcile_repository(args.broker_repo, args.codespace)).decode("utf-8"))
+            codespace_token = os.environ.get("REVIEW_BROKER_CODESPACE_TOKEN")
+            if not codespace_token:
+                raise CliError("CODESPACE_CREDENTIAL_MISSING")
+            codespace_environment = dict(os.environ)
+            codespace_environment["GH_TOKEN"] = codespace_token
+            codespace_environment.pop("GITHUB_TOKEN", None)
+            result = reconcile_repository(
+                args.broker_repo,
+                args.codespace,
+                codespace_environment=codespace_environment,
+            )
+            print(canonical_bytes(result).decode("utf-8"))
             return 0
     except Exception as exc:  # CLI boundary converts typed failures into a non-secret status.
         print(f"REVIEWCTL_ERROR={type(exc).__name__}:{exc}", file=sys.stderr)

@@ -46,7 +46,32 @@ class EvidenceValidationTests(unittest.TestCase):
             events.append({"type": "item.completed", "item": {"type": "agent_message", "text": final_text}})
             if terminal:
                 events.append({"type": "turn.completed"})
-        (root / "attempt.json").write_bytes(canonical_bytes({"attempt_id": "attempt:sha256:" + "3" * 64}))
+        profile_sha256 = "4" * 64
+        (root / "attempt.json").write_bytes(canonical_bytes({
+            "attempt_id": "attempt:sha256:" + "3" * 64,
+            "permission_profile": "review-broker",
+            "permission_profile_sha256": profile_sha256,
+            "credential_paths_denied": True,
+            "trusted_workspace_denied": True,
+            "network_access": False,
+        }))
+        security_observations = {
+            "packet_canary_readable": True,
+            "auth_parent_canary_readable": False,
+            "auth_file_os_access_readable": False,
+            "trusted_workspace_readable": False,
+            "packet_directory_writable": False,
+            "unauthorized_network_connect": False,
+            "sensitive_environment_visible": False,
+            "process_canary_visible": False,
+        }
+        (root / "reviewer-security-probe.json").write_bytes(canonical_bytes({
+            "qualified": True,
+            "permission_profile": "review-broker",
+            "permission_profile_sha256": profile_sha256,
+            "mismatches": [],
+            "observations": security_observations,
+        }))
         (root / "prompt.sha256").write_text(manifest["prompt_sha256"] + "\n")
         (root / "codex-events.jsonl").write_text("\n".join(json.dumps(e) for e in events) + "\n")
         (root / "codex-stderr.txt").write_text("")
@@ -108,6 +133,20 @@ class EvidenceValidationTests(unittest.TestCase):
             result = validate_evidence(root, setup=manifest)
             self.assertEqual(result["execution_status"], "INDETERMINATE")
             self.assertEqual(result["evidence_status"], "INVALID")
+
+    def test_security_probe_must_bind_the_exact_permission_profile(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = self.fixture(root)
+            receipt = json.loads((root / "reviewer-security-probe.json").read_text())
+            receipt["permission_profile_sha256"] = "5" * 64
+            (root / "reviewer-security-probe.json").write_text(json.dumps(receipt))
+            result = validate_evidence(root, setup=manifest)
+            self.assertEqual(result["evidence_status"], "INVALID")
+            self.assertIn(
+                "SECURITY_PROBE_PROFILE_SHA256_MISMATCH",
+                result["validation_reasons"],
+            )
 
     def test_evidence_manifest_binds_every_required_artifact(self):
         with tempfile.TemporaryDirectory() as temporary:

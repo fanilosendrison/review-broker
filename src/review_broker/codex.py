@@ -10,6 +10,12 @@ import subprocess
 from typing import Callable, Mapping
 
 from .identity import canonical_bytes
+from .reviewer_profile import (
+    PROFILE_NAME,
+    ReviewerProfileError,
+    reviewer_home_from_environment,
+    verify_reviewer_profile,
+)
 
 
 class InvocationError(RuntimeError):
@@ -22,15 +28,16 @@ class CodexPolicy:
     distribution_version: str = "0.164.0"
     model: str = "gpt-5.6-sol"
     reasoning_effort: str = "xhigh"
-    sandbox: str = "read-only"
+    sandbox: str = "credential-isolated-read-only"
+    permission_profile: str = PROFILE_NAME
 
 
 REQUIRED_FLAGS = (
     "--json",
     "--ephemeral",
-    "--ignore-user-config",
+    "--profile",
+    "--strict-config",
     "--ignore-rules",
-    "--sandbox",
     "--skip-git-repo-check",
     "--model",
     "--output-schema",
@@ -56,10 +63,10 @@ def build_command(schema_path: Path, output_path: Path, policy: CodexPolicy) -> 
         "exec",
         "--json",
         "--ephemeral",
-        "--ignore-user-config",
+        "--profile",
+        policy.permission_profile,
+        "--strict-config",
         "--ignore-rules",
-        "--sandbox",
-        policy.sandbox,
         "--skip-git-repo-check",
         "--model",
         policy.model,
@@ -105,6 +112,7 @@ def invoke_once(
     schema_path: Path,
     attempt_id: str,
     *,
+    trusted_workspace: Path,
     policy: CodexPolicy = CodexPolicy(),
     armed: bool = True,
     runner: Runner = subprocess.run,
@@ -137,6 +145,11 @@ def invoke_once(
     prompt_before = _digest(prompt_path.read_bytes())
     command = build_command(schema_path, output_path, policy)
     child_environment, removed = sanitized_environment(environment or os.environ)
+    try:
+        reviewer_home = reviewer_home_from_environment(child_environment)
+        profile_path = verify_reviewer_profile(reviewer_home, trusted_workspace)
+    except ReviewerProfileError as exc:
+        raise InvocationError(f"SECURITY_PROFILE_INVALID:{exc}") from exc
     attempt = {
         "schema_version": 1,
         "attempt_id": attempt_id,
@@ -148,6 +161,11 @@ def invoke_once(
         "effective_model_identity_verified": False,
         "effective_reasoning_effort_verified": False,
         "sandbox": policy.sandbox,
+        "permission_profile": policy.permission_profile,
+        "permission_profile_sha256": _digest(profile_path.read_bytes()),
+        "credential_paths_denied": True,
+        "trusted_workspace_denied": True,
+        "network_access": False,
         "api_key_fallback_forbidden": True,
         "environment_keys_removed": list(removed),
         "argv": command,
