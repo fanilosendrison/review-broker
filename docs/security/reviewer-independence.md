@@ -5,7 +5,7 @@ asset_type: "security-contract"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Independence Contract"
-version: "0.1.2"
+version: "0.1.3"
 ---
 
 # Reviewer Independence Contract
@@ -15,7 +15,14 @@ version: "0.1.2"
 A reviewer instance must not inherit the producing agent's conversation,
 working tree, mutable configuration, local rules, or result. It receives only
 the trusted mission, mandatory profile, immutable packet, output schema, and
-minimum runtime metadata required for examination.
+minimum runtime metadata required for examination. For the bounded v1
+reviewer, model-controlled shell execution is intentionally unavailable:
+the broker sends the complete verified packet and instructions through stdin
+and explicitly selects `features.shell_tool=false`. The existing named
+permission sandbox remains defense in depth. Other independently registered
+model tools have distinct privilege implications and are not disabled or
+qualified by this shell setting. See
+[`reviewer-tool-surface.md`](../qualification/reviewer-tool-surface.md).
 
 The v1 adapter uses `--ephemeral`, `--ignore-rules`, `--strict-config`, the
 exact attempt-bound `review-broker-<packet-path-sha256>` permission profile,
@@ -70,7 +77,7 @@ Before authenticated content is exposed, independently reviewed controlled
 probes must demonstrate:
 
 - the effective user and process tree, including accessible parent environment,
-  inherited descriptors, and actual model-tool permissions;
+  inherited descriptors, effective tool inventory, and actual model-tool permissions;
 - packet read access and write restrictions;
 - denial of model-tool access to ChatGPT credential files;
 - absence of GitHub and API-key credentials in the child environment;

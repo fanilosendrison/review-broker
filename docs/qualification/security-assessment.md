@@ -5,7 +5,7 @@ asset_type: "qualification-record"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Credential-Isolation Assessment"
-version: "0.1.2"
+version: "0.1.3"
 ---
 
 # Reviewer Credential-Isolation Assessment
@@ -133,3 +133,27 @@ exposing outside material. Independent adjudication is still required.
 The historical installed profile was not replaced. The security-qualification
 repository variable must remain unset; no producer receipt here constitutes an
 independent GO.
+
+## Bounded v1 shell-tool correction
+
+The v1 product decision excludes model-controlled shell execution because the
+broker already supplies the verified source images, diffs and instructions
+through stdin. The candidate adds `-c features.shell_tool=false` to the
+one-shot Codex command without removing the existing reasoning-effort override
+or changing its attempt-bound profile and evidence. On the installed Codex CLI
+`0.164.0` in the dedicated Codespace, non-inference `codex features list`
+with an empty temporary `CODEX_HOME` reported `shell_tool` enabled by default,
+disabled by this override, and enabled by a positive-control override. Tagged
+source `rust-v0.164.0` returns before `exec_command`/`write_stdin` registration
+when that feature is disabled. No effective **model** tool inventory was
+observed. The Codespace returned to observed `Shutdown` without accessing
+OAuth material or invoking an authenticated model.
+
+The conditional inventory in [`reviewer-tool-surface.md`](reviewer-tool-surface.md)
+records other independently registered tools: `apply_patch`, MCP, subagents,
+code mode, web, extension and image tools. Their effective exposure and
+privilege behavior remain unqualified. The previously established readable
+hard-link counterexample remains valid for direct sandbox path permissions;
+disabling shell does not establish global credential isolation. Independent
+security and construction review of the exact published delta are still
+required.
