@@ -43,7 +43,6 @@ PILOT_RISK = (
 )
 _FORBIDDEN_ENV_MARKERS = ("TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL",
                           "API_KEY", "DOPPLER", "AUTH", "GH_", "GITHUB_")
-_SAFE_ENV_KEYS = frozenset({"HOME", "PATH", "CODEX_HOME", "LANG", "TZ"})
 
 
 class PilotError(ValueError):
@@ -251,6 +250,8 @@ def run_synthetic_pilot(
         "production_security_gate": "UNCHANGED_UNQUALIFIED",
         "github_publication": "NONE",
         "reviewer_authority": "NONE",
+        "codespace_shutdown_observed": False,
+        "end_to_end_pilot": "PENDING_INDEPENDENT_SHUTDOWN_OBSERVATION",
         "risk_disclosure": PILOT_RISK,
     }
     invocation_failure = ""

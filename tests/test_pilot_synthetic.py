@@ -1,9 +1,7 @@
 """Offline, no-inference tests for the explicit synthetic pilot."""
 from __future__ import annotations
 
-import hashlib
 import json
-import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -100,6 +98,8 @@ class SyntheticPilotTests(unittest.TestCase):
             self.assertEqual(result["verdict"], "NO_GO")
             self.assertEqual(result["github_publication"], "NONE")
             self.assertFalse(result["pilot_security_qualified"])
+            self.assertFalse(result["codespace_shutdown_observed"])
+            self.assertEqual(result["end_to_end_pilot"], "PENDING_INDEPENDENT_SHUTDOWN_OBSERVATION")
             self.assertTrue((run / "pilot-armed.json").exists())
             self.assertEqual(json.loads((run / "pilot-summary.json").read_text()), result)
             with self.assertRaisesRegex(PilotError, "PILOT_FRESH_ABSOLUTE_RUN_DIR_REQUIRED"):
