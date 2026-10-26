@@ -95,7 +95,8 @@ jobs:
           GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
         run: |
           gh codespace ssh -c "$CODESPACE_NAME" -- mkdir -m 700 "$REMOTE_ROOT"
-          gh codespace cp -c "$CODESPACE_NAME" -r evidence "remote:$REMOTE_ROOT"
+          gh codespace cp -c "$CODESPACE_NAME" -r -- -O \
+            evidence "remote:$REMOTE_ROOT"
           gh codespace ssh -c "$CODESPACE_NAME" -- python3 -m pip install --user .
           gh codespace ssh -c "$CODESPACE_NAME" -- \
             python3 -m review_broker.cli internal-install-reviewer-profile \
@@ -135,7 +136,7 @@ jobs:
         run: |
           for name in attempt.json prompt.sha256 codex-events.jsonl codex-stderr.txt \
             codex-final.json codex-exit-code.txt input-before.sha256 input-after.sha256; do
-            gh codespace cp -c "$CODESPACE_NAME" \
+            gh codespace cp --expand -c "$CODESPACE_NAME" -- -O \
               "remote:$REMOTE_ROOT/evidence/$name" "evidence/$name" || true
           done
       - name: Record terminal capture and validate

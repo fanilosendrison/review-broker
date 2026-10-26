@@ -62,7 +62,7 @@ class CodespaceController:
         if source.is_symlink() or not re.fullmatch(r"/[A-Za-z0-9_./-]+", remote_directory):
             raise CodespaceError("TRANSFER_PATH_INVALID")
         self._run([
-            "gh", "codespace", "cp", "-c", self.name, "-r",
+            "gh", "codespace", "cp", "-c", self.name, "-r", "--", "-O",
             str(source), f"remote:{remote_directory}",
         ])
 
@@ -72,8 +72,8 @@ class CodespaceController:
         destination = destination.resolve()
         destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         self._run([
-            "gh", "codespace", "cp", "-c", self.name, "-r",
-            f"remote:{remote_path}", str(destination),
+            "gh", "codespace", "cp", "--expand", "-c", self.name, "-r",
+            "--", "-O", f"remote:{remote_path}", str(destination),
         ])
 
     def execute(self, arguments: list[str]) -> subprocess.CompletedProcess[str]:

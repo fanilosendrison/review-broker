@@ -1,4 +1,6 @@
 import json
+from pathlib import Path
+import tempfile
 import unittest
 
 from review_broker.admission import AdmissionError, AuthorizationPolicy, authorize
@@ -109,6 +111,39 @@ class SecurityTests(unittest.TestCase):
         controller.wait_for("Available", attempts=1, interval_seconds=0)
         self.assertIsInstance(runner.commands[0], list)
         self.assertNotIn("shell=True", runner.commands[0])
+
+    def test_codespace_copy_uses_qualified_scp_modes(self):
+        runner = FakeCodespaceRunner([])
+        controller = CodespaceController("safe-name", runner=runner)
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source"
+            source.write_bytes(b"fixed")
+            expected_source = source.resolve()
+            destination = Path(temporary) / "recovered"
+            controller.transfer(source, "/tmp/fixed-upload")
+            controller.recover("/tmp/fixed-download", destination)
+
+        self.assertEqual(
+            runner.commands[0][:9],
+            [
+                "gh", "codespace", "cp", "-c", "safe-name",
+                "-r", "--", "-O", str(expected_source),
+            ],
+        )
+        self.assertEqual(
+            runner.commands[1][:10],
+            [
+                "gh", "codespace", "cp", "--expand", "-c", "safe-name",
+                "-r", "--", "-O", "remote:/tmp/fixed-download",
+            ],
+        )
+
+    def test_review_workflow_uses_qualified_codespace_copy_transport(self):
+        workflow = (
+            Path(__file__).parents[1] / ".github/workflows/review-request.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn('cp -c "$CODESPACE_NAME" -r -- -O', workflow)
+        self.assertIn('cp --expand -c "$CODESPACE_NAME" -- -O', workflow)
 
     def test_codespace_controller_uses_only_supplied_control_environment(self):
         runner = FakeCodespaceRunner(["Available"])
