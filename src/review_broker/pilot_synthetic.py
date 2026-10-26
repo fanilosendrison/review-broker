@@ -205,12 +205,13 @@ def run_synthetic_pilot(
         raise PilotError("PILOT_EXPLICIT_ACK_REQUIRED")
     if not re.fullmatch(r"[0-9a-f]{64}", broker_wheel_sha256):
         raise PilotError("PILOT_WHEEL_SHA256_INVALID")
-    clean_env = pilot_environment(os.environ if environment is None else environment)
-    home = Path(clean_env["HOME"]).resolve(strict=True)
-    workspace = trusted_workspace.resolve(strict=True)
+    # Refuse a spent run identity before touching the runtime environment.
     target = Path(run_directory)
     if not target.is_absolute() or target.is_symlink() or target.exists():
         raise PilotError("PILOT_FRESH_ABSOLUTE_RUN_DIR_REQUIRED")
+    clean_env = pilot_environment(os.environ if environment is None else environment)
+    home = Path(clean_env["HOME"]).resolve(strict=True)
+    workspace = trusted_workspace.resolve(strict=True)
     if target.resolve() != target or not target.parent.is_dir():
         raise PilotError("PILOT_RUN_DIR_PARENT_UNTRUSTED")
     if any(target == root or target.is_relative_to(root) or root.is_relative_to(target)
