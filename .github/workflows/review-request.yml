@@ -98,6 +98,13 @@ jobs:
           gh codespace cp -c "$CODESPACE_NAME" -r evidence "remote:$REMOTE_ROOT"
           gh codespace ssh -c "$CODESPACE_NAME" -- python3 -m pip install --user .
           gh codespace ssh -c "$CODESPACE_NAME" -- \
+            python3 -m review_broker.cli internal-install-reviewer-profile \
+            --trusted-workspace /workspaces/review-broker
+          gh codespace ssh -c "$CODESPACE_NAME" -- \
+            python3 -m review_broker.cli internal-probe-reviewer-profile \
+            --trusted-workspace /workspaces/review-broker \
+            > evidence/reviewer-security-probe.json
+          gh codespace ssh -c "$CODESPACE_NAME" -- \
             python3 -m review_broker.cli internal-verify-packet \
             --packet-dir "$REMOTE_ROOT/evidence"
       - name: Durably arm exactly one invocation
@@ -119,7 +126,8 @@ jobs:
             python3 -m review_broker.cli internal-invoke \
             --packet-dir "$REMOTE_ROOT/evidence" \
             --schema /workspaces/review-broker/src/review_broker/schemas/reviewer-findings-v1.schema.json \
-            --attempt '${{ steps.prepare.outputs.attempt_id }}'
+            --attempt '${{ steps.prepare.outputs.attempt_id }}' \
+            --trusted-workspace /workspaces/review-broker
       - name: Recover exact evidence
         if: steps.prepare.outputs.duplicate == 'false' && always()
         env:

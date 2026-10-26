@@ -28,10 +28,11 @@ jobs:
       - run: python -m pip install .
       - name: Discover durable attempts and stranded Codespace
         env:
-          GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_BROKER_CODESPACE_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
           CODESPACE_NAME: ${{ vars.REVIEW_BROKER_CODESPACE_NAME }}
         run: |
-          test -n "$GH_TOKEN" || { echo "CODESPACE_CREDENTIAL_MISSING"; exit 1; }
+          test -n "$REVIEW_BROKER_CODESPACE_TOKEN" || { echo "CODESPACE_CREDENTIAL_MISSING"; exit 1; }
           test -n "$CODESPACE_NAME" || { echo "CODESPACE_NAME_MISSING"; exit 1; }
           reviewctl --broker-repo "$GITHUB_REPOSITORY" internal-reconcile \
             --codespace "$CODESPACE_NAME" | tee reconciliation.json
