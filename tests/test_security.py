@@ -262,6 +262,19 @@ class SecurityTests(unittest.TestCase):
         self.assertIn("python3 -P -m review_broker.cli", workflow)
         self.assertNotIn("python3 -m pip install --user .", workflow)
 
+    def test_artifact_uploads_are_guarded_by_sanitizing_steps(self):
+        workflow = (Path(__file__).parents[1] /
+                    ".github/workflows/review-request.yml").read_text(encoding="utf-8")
+        self.assertLess(workflow.index("id: prepared_quarantine"),
+                        workflow.index("name: Preserve prepared packet"))
+        self.assertLess(workflow.index("id: runtime_quarantine"),
+                        workflow.index("name: Upload durable terminal evidence artifact"))
+        self.assertLess(workflow.index("name: Recheck terminal artifact for contamination"),
+                        workflow.index("id: terminal_artifact"))
+        self.assertLess(workflow.index("id: final_quarantine"),
+                        workflow.index("name: Preserve recovered evidence"))
+        self.assertIn("steps.final_quarantine.outcome == 'success'", workflow)
+
     def test_terminal_artifact_is_planned_bound_and_uploaded_before_validation(self):
         workflow = (
             Path(__file__).parents[1] / ".github/workflows/review-request.yml"

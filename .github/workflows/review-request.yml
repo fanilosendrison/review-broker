@@ -88,6 +88,16 @@ jobs:
               print("attempt_id=" + value["attempt"]["attempt_id"])
               print("packet_id=" + value["packet"]["packet_id"])
           PY
+      - name: Quarantine unsafe prepared packet
+        id: prepared_quarantine
+        if: steps.prepare.outputs.duplicate == 'false'
+        run: |
+          reviewctl internal-quarantine-evidence --evidence-dir evidence \
+            --request '${{ steps.prepare.outputs.request_id }}' \
+            --attempt '${{ steps.prepare.outputs.attempt_id }}' > prepared-quarantine.json
+          test "$(python -c 'import json; print(json.load(open("prepared-quarantine.json"))["contaminated"])')" = False || {
+            echo "CREDENTIAL_SHAPED_MATERIAL_QUARANTINED"; exit 1;
+          }
       - name: Preserve prepared packet
         if: steps.prepare.outputs.duplicate == 'false'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -108,6 +118,7 @@ jobs:
           test -n "$CODESPACE_TOKEN" || { echo "CODESPACE_CREDENTIAL_MISSING"; exit 1; }
           test -n "$CODESPACE_NAME" || { echo "CODESPACE_NAME_MISSING"; exit 1; }
       - name: Start and observe dedicated Codespace
+        id: start
         if: steps.prepare.outputs.duplicate == 'false'
         env:
           GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
@@ -139,14 +150,17 @@ jobs:
             python3 -m pip install --user --no-deps --force-reinstall "$remote_wheel"
           gh codespace ssh -c "$CODESPACE_NAME" -- \
             env -u PYTHONPATH python3 -P -m review_broker.cli internal-install-reviewer-profile \
-            --trusted-workspace /workspaces/review-broker
+            --trusted-workspace /workspaces/review-broker \
+            --packet-dir "$REMOTE_ROOT/evidence"
           gh codespace ssh -c "$CODESPACE_NAME" -- \
             env -u PYTHONPATH python3 -P -m review_broker.cli internal-probe-reviewer-profile \
             --trusted-workspace /workspaces/review-broker \
+            --packet-dir "$REMOTE_ROOT/evidence" \
             > evidence/reviewer-security-probe.json
           gh codespace ssh -c "$CODESPACE_NAME" -- \
             env -u PYTHONPATH python3 -P -m review_broker.cli internal-verify-packet \
-            --packet-dir "$REMOTE_ROOT/evidence"
+            --packet-dir "$REMOTE_ROOT/evidence" \
+            --expected-packet-id '${{ steps.prepare.outputs.packet_id }}' > /dev/null
       - name: Durably arm exactly one invocation
         if: steps.prepare.outputs.duplicate == 'false'
         env:
@@ -167,11 +181,12 @@ jobs:
             --packet-dir "$REMOTE_ROOT/evidence" \
             --schema "$REMOTE_ROOT/broker-dist/reviewer-findings-v1.schema.json" \
             --attempt '${{ steps.prepare.outputs.attempt_id }}' \
+            --packet-id '${{ steps.prepare.outputs.packet_id }}' \
             --broker-wheel-sha256 "$BROKER_WHEEL_SHA256" \
             --trusted-workspace /workspaces/review-broker
       - name: Recover available runtime evidence
         id: recover
-        if: steps.prepare.outputs.duplicate == 'false' && always()
+        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.start.outcome != 'skipped'
         env:
           GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
         run: |
@@ -181,9 +196,16 @@ jobs:
             --output evidence \
             --request '${{ steps.prepare.outputs.request_id }}' \
             --attempt '${{ steps.prepare.outputs.attempt_id }}'
+      - name: Quarantine detected runtime material
+        id: runtime_quarantine
+        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.start.outcome != 'skipped'
+        run: |
+          reviewctl internal-quarantine-evidence --evidence-dir evidence \
+            --request '${{ steps.prepare.outputs.request_id }}' \
+            --attempt '${{ steps.prepare.outputs.attempt_id }}' > runtime-quarantine.json
       - name: Establish complete terminal capture
         id: capture
-        if: steps.prepare.outputs.duplicate == 'false' && always()
+        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.start.outcome != 'skipped' && steps.runtime_quarantine.outcome == 'success'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -202,6 +224,15 @@ jobs:
             --evidence-dir evidence \
             --output evidence-artifact-plan.json \
             --artifact-name "terminal-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - name: Recheck terminal artifact for contamination
+        if: steps.prepare.outputs.duplicate == 'false' && steps.capture.outcome == 'success'
+        run: |
+          reviewctl internal-quarantine-evidence --evidence-dir evidence \
+            --request '${{ steps.prepare.outputs.request_id }}' \
+            --attempt '${{ steps.prepare.outputs.attempt_id }}' > terminal-quarantine.json
+          test "$(python -c 'import json; print(json.load(open("terminal-quarantine.json"))["contaminated"])')" = False || {
+            echo "CREDENTIAL_SHAPED_MATERIAL_QUARANTINED"; exit 1;
+          }
       - name: Upload durable terminal evidence artifact
         id: terminal_artifact
         if: steps.prepare.outputs.duplicate == 'false' && steps.capture.outcome == 'success'
@@ -249,7 +280,7 @@ jobs:
         run: reviewctl --broker-repo "$BROKER_REPOSITORY" internal-publish --packet-dir evidence
       - name: Stop and independently observe Shutdown
         id: stop
-        if: steps.prepare.outputs.duplicate == 'false' && always()
+        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.start.outcome != 'skipped'
         env:
           GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
         run: |
@@ -268,8 +299,15 @@ jobs:
             --codespace "$CODESPACE_NAME" \
             --request '${{ steps.prepare.outputs.request_id }}' \
             --attempt '${{ steps.prepare.outputs.attempt_id }}'
-      - name: Preserve recovered evidence
+      - name: Recheck all recovered evidence before final artifact
+        id: final_quarantine
         if: steps.prepare.outputs.duplicate == 'false' && always()
+        run: |
+          reviewctl internal-quarantine-evidence --evidence-dir evidence \
+            --request '${{ steps.prepare.outputs.request_id }}' \
+            --attempt '${{ steps.prepare.outputs.attempt_id }}' > final-quarantine.json
+      - name: Preserve recovered evidence
+        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.final_quarantine.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: evidence-${{ github.run_id }}-${{ github.run_attempt }}
