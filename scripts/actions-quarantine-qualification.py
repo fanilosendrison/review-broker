@@ -4,11 +4,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from review_broker.evidence import (
-    quarantine_contaminated_evidence, scan_for_credentials,
+    quarantine_contaminated_evidence,
+    scan_for_credentials,
 )
 from review_broker.publication import PublicationError, build_review_result
 from review_broker.validation import validate_evidence
