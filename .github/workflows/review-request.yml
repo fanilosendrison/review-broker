@@ -36,6 +36,7 @@ jobs:
       REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES: ${{ vars.REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES }}
       REVIEW_BROKER_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       REMOTE_ROOT: /tmp/review-broker-${{ github.run_id }}-${{ github.run_attempt }}
+      CODEX_RUNTIME_ROOT: /var/lib/review-broker/codex-0.164.0-linux-x64
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -153,9 +154,14 @@ jobs:
             --trusted-workspace /workspaces/review-broker \
             --packet-dir "$REMOTE_ROOT/evidence"
           gh codespace ssh -c "$CODESPACE_NAME" -- \
+            env -u PYTHONPATH python3 -P -m review_broker.cli internal-preflight-codex-runtime \
+            --runtime-root "$CODEX_RUNTIME_ROOT" \
+            > evidence/codex-runtime-preflight.json
+          gh codespace ssh -c "$CODESPACE_NAME" -- \
             env -u PYTHONPATH python3 -P -m review_broker.cli internal-probe-reviewer-profile \
             --trusted-workspace /workspaces/review-broker \
             --packet-dir "$REMOTE_ROOT/evidence" \
+            --codex-runtime-root "$CODEX_RUNTIME_ROOT" \
             > evidence/reviewer-security-probe.json
           gh codespace ssh -c "$CODESPACE_NAME" -- \
             env -u PYTHONPATH python3 -P -m review_broker.cli internal-verify-packet \
@@ -183,7 +189,8 @@ jobs:
             --attempt '${{ steps.prepare.outputs.attempt_id }}' \
             --packet-id '${{ steps.prepare.outputs.packet_id }}' \
             --broker-wheel-sha256 "$BROKER_WHEEL_SHA256" \
-            --trusted-workspace /workspaces/review-broker
+            --trusted-workspace /workspaces/review-broker \
+            --codex-runtime-root "$CODEX_RUNTIME_ROOT"
       - name: Recover available runtime evidence
         id: recover
         if: steps.prepare.outputs.duplicate == 'false' && always() && steps.start.outcome != 'skipped'
