@@ -17,7 +17,7 @@ jobs:
     env:
       CODESPACE_NAME: review-broker-reviewer-4q4v769jr65hjww9
       EXPECTED_REPOSITORY: fanilosendrison/review-broker
-      REMOTE_DIRECTORY: review-broker-control-qualification
+      REMOTE_DIRECTORY: /tmp/review-broker-control-qualification
 
     steps:
       - name: T1 — authenticate and verify Codespace visibility
@@ -131,14 +131,14 @@ jobs:
           payload_path="$RUNNER_TEMP/review-broker-control-payload.bin"
 
           gh codespace ssh -c "$CODESPACE_NAME" -- \
-            'rm -rf -- review-broker-control-qualification && mkdir -- review-broker-control-qualification'
+            'rm -rf -- review-broker-control-qualification /tmp/review-broker-control-qualification && mkdir -- /tmp/review-broker-control-qualification'
           gh codespace cp -c "$CODESPACE_NAME" \
             "$payload_path" "remote:${REMOTE_DIRECTORY}/payload.bin"
 
           remote_sha="$(gh codespace ssh -c "$CODESPACE_NAME" -- \
-            'sha256sum review-broker-control-qualification/payload.bin | cut -d " " -f 1')"
+            'sha256sum /tmp/review-broker-control-qualification/payload.bin | cut -d " " -f 1')"
           remote_hex="$(gh codespace ssh -c "$CODESPACE_NAME" -- \
-            'od -An -tx1 -v review-broker-control-qualification/payload.bin | tr -d " \n"')"
+            'od -An -tx1 -v /tmp/review-broker-control-qualification/payload.bin | tr -d " \n"')"
           test "$remote_sha" = "$expected_sha"
           test "$remote_hex" = "$expected_hex"
 
@@ -185,7 +185,7 @@ jobs:
           set -euo pipefail
           set +x
           gh codespace ssh -c "$CODESPACE_NAME" -- \
-            'rm -rf -- review-broker-control-qualification' || \
+            'rm -rf -- review-broker-control-qualification /tmp/review-broker-control-qualification' || \
             echo "TEMPORARY_REMOTE_CLEANUP=WARNING"
           gh codespace stop -c "$CODESPACE_NAME"
 
