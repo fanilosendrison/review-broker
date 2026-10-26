@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "subject_baseline_sha": "e6fe43c2aeaeacb7a79e6eff68dd1896cd4a09d2",
+  "tested_uncommitted_wheel_sha256": "e546771ed0203ececac7bc038213e1cd52bece7d2a809514f31ea00e1dfd4c57",
+  "codespace": "review-broker-reviewer-4q4v769jr65hjww9",
+  "cli_version": "codex-cli 0.164.0",
+  "profile_name": "review-broker-775fac54b94c1a6fc17ff2fdef882a25a2f971e7c532fa2f48e8c575ac5c3c91",
+  "profile_sha256": "6ce802939bf1d7292766122f82e30bcdd3f919140dd84f6ebfd28d2e8692fe6d",
+  "second_profile_sha256": "54f118c82100b7232b67ce0372a15e33b7c46a0228d7c1fa2589c8c85a0f9a09",
+  "two_distinct_attempt_profiles_installed": true,
+  "historical_profile_present": true,
+  "historical_profile_contents_examined": false,
+  "reviewer_config_directory_mode_migrated": "0775 -> 0700; owner unchanged; no credential file opened",
+  "hardlink_constructed": true,
+  "observations": {
+    "packet_readable": true,
+    "outside_readable": false,
+    "home_readable": false,
+    "workspace_readable": false,
+    "symlink_readable": false,
+    "hardlink_readable": true,
+    "write_succeeded": false,
+    "network": "PermissionError:1",
+    "sensitive_env_visible": false,
+    "process_canary_visible": false,
+    "fd_canary_readable": false,
+    "proc_parent_canary_visible": false,
+    "proc_parent_environ_accessible": true,
+    "proc_self_fd_accessible": true
+  },
+  "final_codespace_state": "Shutdown",
+  "qualified": false,
+  "limits": [
+    "Direct sandbox, not model-controlled tools. Hard-linked outside material was readable through an allowed packet alias; model pre-invocation nlink==1 rejection was tested offline, not live.",
+    "Parent /proc environ was accessible but the synthetic canary was not disclosed; the proc exposure boundary remains incompletely understood.",
+    "No credential file or credential contents were accessed; a real credential exposure is not claimed.",
+    "No authenticated Codex invocation or independent acceptance occurred."
+  ]
+}

@@ -5,7 +5,7 @@ asset_type: "security-contract"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Independence Contract"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # Reviewer Independence Contract
@@ -18,10 +18,13 @@ the trusted mission, mandatory profile, immutable packet, output schema, and
 minimum runtime metadata required for examination.
 
 The v1 adapter uses `--ephemeral`, `--ignore-rules`, `--strict-config`, the
-exact `review-broker` permission profile, exact model selection, and
-schema-constrained output. It rejects any base user config and verifies the
-profile bytes, ownership, mode, runtime home, and trusted workspace before
-creating `attempt.json`.
+exact attempt-bound `review-broker-<packet-path-sha256>` permission profile,
+exact model selection, and schema-constrained output. It rejects any base user
+config and verifies profile bytes, owner, mode, runtime home, and trusted
+workspace before creating `attempt.json`. Installation uses exclusive creation
+and never replaces another attempt's profile; a partial or conflicting file
+blocks execution. The CLI selects the same immutable name for configuration
+and filesystem permissions. The authenticated reviewer path is still disabled.
 
 The revised profile grants only Codex's minimal system read set and the exact
 prepared packet directory. It explicitly denies the runtime home and trusted
@@ -29,11 +32,14 @@ workspace, network and writes, prevents login shells, and sets a fixed minimal
 model-tool subprocess environment. It refuses packet roots overlapping either
 privileged tree. The historical root-readable profile remains documented by
 its original producer receipt; it is not accepted for the revised execution.
-The runtime still has that installed historical profile until a controlled
-migration. Profile mismatch stops execution rather than silently replacing it.
-A direct non-secret probe of a temporary minimal-read configuration is producer
-observation only: actual model-tool equivalence, parent-process interfaces,
-hard-link behavior, and effective isolation remain independently unqualified.
+The runtime retains the historical installed profile. Distinct attempt-bound
+profiles do not overwrite it. A direct non-secret Codex `0.164.0` probe of
+installed attempt-bound profiles found that a controlled hard link to an
+outside-packet file **was readable through the allowed packet path**. The
+trusted packet-tree guard rejects multi-linked files before model invocation;
+that guard has not been exercised in an actual model-tool session. The direct
+probe also observed an accessible parent `/proc` environment interface without
+synthetic parent-canary disclosure. Effective isolation remains unqualified.
 
 ## Credential ownership
 

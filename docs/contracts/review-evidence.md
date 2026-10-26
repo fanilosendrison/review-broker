@@ -5,7 +5,7 @@ asset_type: "contract"
 domain: "independent-review"
 severity: "strict"
 name: "Review Evidence v1 Contract"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # Review Evidence v1 Contract
@@ -58,14 +58,17 @@ validation.json
 Detected credential-shaped evidence is an exception to ordinary preservation:
 the runner's raw copy is destroyed before any generally accessible artifact is
 uploaded and replaced by a sanitized incident plus incomplete-recovery record.
+The incident marker remains a publication veto after quarantine removes the
+raw matched bytes; subsequent validation must not forget that contamination
+occurred. A malformed incident marker also fails closed.
 Remote retention is explicitly unverified until separately investigated; a
 producer pattern scan is not universal secret detection. No ordinary review
 result may publish a detected contaminated finding or nested validation data.
 
 `attempt.json` binds the exact trusted broker wheel SHA-256 used by the remote
-process. `reviewer-security-probe.json` binds the exact permission-profile
-SHA-256 to controlled non-secret filesystem, environment, write, and network
-observations. A missing or mismatched identity invalidates the evidence; a
+process and its attempt-bound permission-profile name and SHA-256.
+`reviewer-security-probe.json` binds that same profile name and SHA-256 to
+controlled non-secret filesystem, environment, write, and network observations. A missing or mismatched identity invalidates the evidence; a
 passing producer receipt does not replace independent security review.
 
 Attempted recovery writes `recovery-manifest.json` with a success or sanitized

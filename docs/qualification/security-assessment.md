@@ -5,7 +5,7 @@ asset_type: "qualification-record"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Credential-Isolation Assessment"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # Reviewer Credential-Isolation Assessment
@@ -110,8 +110,26 @@ parent-process environment access remained observable without examining its
 contents. Model-tool equivalence, output-channel risks, and effective process
 isolation remain unverified.
 
-The revised profile does not overwrite an installed historical profile with
-different bytes. Migration and independent examination of the exact runtime
-profile are prerequisites for authenticated execution. The security-qualification
+The original single-name profile fails the second valid attempt with
+`PROFILE_MISMATCH`. An attempt-bound immutable profile name now allows two
+separate packet directories without replacing either profile. The Codespace's
+`.codex` directory was owner-owned but group-writable (`0775`); only its
+directory mode was hardened to `0700` after an exact metadata check. No
+credential file was opened or modified.
+
+The exact producer direct-sandbox observations from Codex `0.164.0` are in
+`receipts/attempt-bound-direct-sandbox-v1.json`. The tested hard link was
+actually constructed and readable, unlike the earlier inconclusive link
+attempt. An allowed packet alias can therefore bypass the profile's outside
+read boundary. The separate pre-invocation packet-tree guard rejects hard
+links, but the combined model-tool path remains unqualified. Parent `/proc`
+environment access was reported while the controlled parent canary was not
+readable; no real credential content was accessed. The profile probe fails
+closed on the readable hard link, so workflow invocation cannot be treated as
+qualified. This finding is `no-normative-impact` in qualification evidence and
+implementation: the accepted credential-isolation contract already forbids
+exposing outside material. Independent adjudication is still required.
+
+The historical installed profile was not replaced. The security-qualification
 repository variable must remain unset; no producer receipt here constitutes an
 independent GO.
