@@ -15,7 +15,12 @@ pilot issue #26. This is not a production ReviewRequest.
 
 The existing reviewed PR #14 remains unmerged; the code must be independently
 inspected before it is installed in the credential-bearing Codespace.
-No actual invocation is claimed by this procedure.
+
+RB-PILOT-01 binds its fixed request identity to fixture ordinal `1` and derives
+its attempt identity with attempt ordinal `1`. That identity was armed and
+consumed by the authorized #26 invocation on 2026-10-27. Do not invoke it again.
+Require a separately authorized pilot identity, with a distinct request and
+attempt identity, before any future model-capable attempt.
 
 ## Boundaries
 
@@ -53,16 +58,31 @@ No actual invocation is claimed by this procedure.
        --broker-wheel-sha256 VERIFIED_WHEEL_SHA256 \
        --acknowledge-unqualified-pilot
 
-5. Never automatically rerun this command for the same run directory.
-   The pilot-armed.json record is flushed before any model-capable invocation.
+5. Never automatically rerun this command for the same run directory or the
+   consumed RB-PILOT-01 identity. The `pilot-armed.json` record is flushed
+   before any model-capable invocation. Treat request ordinal `1` and attempt
+   ordinal `1` as consumed. A future expressly authorized pilot must define a
+   distinct request and attempt identity; a fresh directory alone is not new
+   invocation authority.
 
 ## Local evidence and interpretation
 
 The pilot produces private local files under its run directory:
-- evidence/input-manifest.json, source snapshot and input prompt.
-- pilot-armed.json: durable one-shot marker.
-- evidence/codex-events.jsonl, codex-final.json and exit state where available.
-- pilot-summary.json: sanitized local output.
+
+- `evidence/input-manifest.json`, source snapshot and input prompt.
+- `pilot-armed.json`: durable one-shot marker.
+- `evidence/codex-events.jsonl`, `codex-final.json` and exit state where
+  available.
+- `pilot-failure.json`: private sanitized failure receipt when the pilot fails.
+- `pilot-summary.json`: sanitized local output.
+
+Treat `CODEX_FAILURE_UNCLASSIFIED` and `CODEX_NONZERO_EXIT_UNCLASSIFIED` as
+unknown causes, not native crashes. Accept `CODEX_NATIVE_CRASH` only when the
+direct child process reports a native signal. The failure receipt may retain
+only bounded structured fields actually present in `error` or `turn.failed`
+events, process outcome, identities and artifact hashes. Do not retain raw
+provider messages in that receipt. Keep absent fields `UNDETERMINED` and let
+credential quarantine take priority over diagnostic extraction.
 
 A local PASS requires a single completed Codex turn, a schema-valid JSON
 message matching the final event, request/subject/packet identities and exact
@@ -75,9 +95,22 @@ must not be retried automatically.
 
 ## Operator cleanup (outside the pilot process)
 
-From an independently authenticated host, stop the existing Codespace with
-the normal GitHub CLI and independently verify its final state is Shutdown.
-Do not place lifecycle tokens in the pilot process. If Shutdown is not observed,
+Before stopping the Codespace, use the independently authenticated controller
+to recover private copies of `pilot-armed.json`, `pilot-summary.json` and, when
+present, `pilot-failure.json`. Store them in a private controller directory,
+verify that each copied file is regular JSON with the expected identities, and
+verify its SHA-256 against the remote file. Perform this recovery after both
+successful and failed inference.
+
+Do not copy raw JSONL, model output, stderr or credential material into a GitHub
+Issue, Actions artifact, repository path or other publication surface. Keep
+sanitized-receipt recovery separate from the reviewer process. If recovery or
+verification fails, report `PILOT_SANITIZED_RECEIPT_RETENTION=FAIL` and preserve
+that uncertainty; do not delay or skip Codespace shutdown.
+
+From the independently authenticated host, stop the existing Codespace with the
+normal GitHub CLI and independently verify its final state is `Shutdown`. Do not
+place lifecycle tokens in the pilot process. If `Shutdown` is not observed,
 report an infrastructure incident. The pilot command itself cannot attest the
 host's Codespace lifecycle.
 
