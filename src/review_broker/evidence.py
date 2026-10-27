@@ -114,6 +114,7 @@ def scan_for_credentials(directory: Path) -> list[str]:
 def _stream_contains_credential(stream: BinaryIO) -> bool:
     """Scan complete bytes with fixed memory, preserving cross-block matches."""
     carry, whitespace_pending = b"", False
+    detected = False
     while chunk := stream.read(_FILE_READ_BLOCK_BYTES):
         normalized = bytearray()
         for value in chunk:
@@ -123,9 +124,9 @@ def _stream_contains_credential(stream: BinaryIO) -> bool:
             whitespace_pending = whitespace
         window = carry + bytes(normalized)
         if any(pattern.search(window) for pattern in _CREDENTIAL_PATTERNS):
-            return True
+            detected = True
         carry = window[-_CREDENTIAL_SCAN_CARRY_BYTES:]
-    return False
+    return detected
 
 
 def quarantine_contaminated_evidence(

@@ -254,7 +254,11 @@ def _failure_events(value: bytes | None) -> tuple[str, list[dict[str, Any]]]:
 def _failure_events_file(path: Path) -> tuple[str, list[dict[str, Any]]]:
     try:
         with observed_regular_file(path) as stream:
-            return _parse_failure_lines(_bounded_lines(stream))
+            lines = _bounded_lines(stream)
+            observation = _parse_failure_lines(lines)
+            for _ in lines:
+                pass
+            return observation
     except (OSError, FileObservationError):
         return "UNAVAILABLE", []
 
