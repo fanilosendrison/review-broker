@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from review_broker.codex import InvocationError
 from review_broker.codexfailure import observe_codex_failure
+from review_broker.evidence import EvidenceCaptureError
 from review_broker.identity import attempt_identity, request_identity
 from review_broker.cli import main
 from review_broker.pilot_synthetic import PILOT_SOURCE, PilotError, run_synthetic_pilot
@@ -83,6 +84,24 @@ class SyntheticPilotFailureReceiptTests(unittest.TestCase):
             self.assertEqual(receipt["failure_observation"], observation)
             self.assertEqual(stat.S_IMODE(receipt_path.stat().st_mode), 0o600)
             self.assertNotIn("raw provider message", receipt_path.read_text(encoding="utf-8"))
+
+    def test_unavailable_observation_still_writes_private_failure_receipt(self):
+        def failed(*_args, **_kwargs):
+            raise InvocationError("CODEX_NONZERO_EXIT_UNCLASSIFIED")
+
+        with tempfile.TemporaryDirectory(
+            dir=Path(tempfile.gettempdir()).resolve()
+        ) as temporary, patch(
+            "review_broker.pilot_synthetic.scan_for_credentials",
+            side_effect=EvidenceCaptureError("CREDENTIAL_SCREENING_UNDETERMINED"),
+        ):
+            run, result = self._run(temporary, failed)
+            receipt_path = run / "pilot-failure.json"
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(result["failure"], "PILOT_CREDENTIAL_SCREEN_UNAVAILABLE")
+            self.assertEqual(receipt["credential_screen"], "UNDETERMINED")
+            self.assertEqual(receipt["failure_observation"], "UNDETERMINED")
+            self.assertEqual(stat.S_IMODE(receipt_path.stat().st_mode), 0o600)
 
     def test_credential_quarantine_has_priority_over_extracted_error(self):
         raw_secret = "Bearer SYNTHETIC00000000000000000000"
