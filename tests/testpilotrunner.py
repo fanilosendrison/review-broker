@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 from review_broker.codex import invoke_once
 from review_broker.codex_runtime_identity import CodexRuntimeIdentityError
 from review_broker.pilot_runner import PilotRunner
-from review_broker.pilot_synthetic import run_synthetic_pilot_02
+from review_broker.pilot_synthetic import _run_synthetic_pilot, pilot_fixture_02
 
 
 class PilotRunnerTests(unittest.TestCase):
@@ -107,7 +107,10 @@ class PilotRunnerTests(unittest.TestCase):
                     "review_broker.pilot_synthetic.invoke_once",
                     side_effect=simulated_invoke,
                 ):
-                    result = run_synthetic_pilot_02(
+                    result = _run_synthetic_pilot(
+                        run,
+                        fixture_builder=pilot_fixture_02,
+                        pilot_id="RB-PILOT-02",
                         acknowledge_unqualified_pilot=True,
                         broker_wheel_sha256="a" * 64,
                         trusted_workspace=workspace,
@@ -154,7 +157,10 @@ class PilotRunnerTests(unittest.TestCase):
                 "review_broker.pilot_synthetic.invoke_once",
                 side_effect=invoke_with_runtime_rejection,
             ):
-                result = run_synthetic_pilot_02(
+                result = _run_synthetic_pilot(
+                    run,
+                    fixture_builder=pilot_fixture_02,
+                    pilot_id="RB-PILOT-02",
                     acknowledge_unqualified_pilot=True,
                     broker_wheel_sha256="a" * 64,
                     trusted_workspace=workspace,

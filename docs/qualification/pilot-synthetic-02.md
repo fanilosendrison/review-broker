@@ -4,131 +4,127 @@ kind: "KnowledgeAsset"
 asset_type: "qualification-procedure"
 domain: "independent-review"
 severity: "strict"
-name: "RB-PILOT-02 Prepared Synthetic Pilot Procedure"
-version: "0.1.1"
+name: "RB-PILOT-02 Historical Synthetic Pilot Record"
+version: "0.2.0"
 ---
 
-# RB-PILOT-02: prepared, unauthorized synthetic review
+# RB-PILOT-02: consumed and permanently closed
 
 Authority: Review Broker specification, issue #26, and the risk-proportionate
-security decision in issue #27. This procedure prepares a future operation; it
-does not authorize or record an inference.
+security decision in issue #27. This procedure is a historical record. It does
+not authorize or expose an executable pilot identity.
 
 ```text
-RB-PILOT-01=CONSUMED
-RB-PILOT-02=PREPARED
-RB-PILOT-02_INFERENCE_AUTHORIZED=NO
+RB_PILOT_01=CONSUMED
+RB_PILOT_02=CONSUMED
+RB_PILOT_03=NOT_CREATED
+NEW_AUTHENTICATED_INFERENCE_AUTHORIZED=NO
 ```
 
-The executable entry point does not grant authority to use it. Do not reinterpret
-the historical RB-PILOT-01 authorization as applying to RB-PILOT-02. Require a
-separate future mandate for one invocation after independent review of the
-installed candidate and the operating conditions.
+Both historical Python and CLI entry points remain present only to return their
+stable consumed-identity errors before argument validation, environment
+inspection, runtime preflight, fixture construction, directory creation,
+credential consultation, claim writes, or model invocation. Deleting a remote
+`/tmp` directory cannot reopen either identity.
 
-## Fixed identity and boundary
+The historical fixtures remain available for deterministic offline verification.
+Their request, attempt, source, mission, packet, model, and policy identities
+must not be interpreted as future authorization.
 
-RB-PILOT-02 uses the exact RB-PILOT-01 source bytes, mission, subject identity,
-source records, Codex distribution `@openai/codex`, version `0.164.0`, model
-`gpt-5.6-sol`, reasoning effort `xhigh`, disabled shell feature, and forbidden
-API-key fallback. Its request identity uses kind `RB-PILOT-02`, fixture ordinal
-`1`, and the unchanged fixture SHA-256. Its attempt identity uses ordinal `1`
-under that new request identity. Both identities differ from RB-PILOT-01.
+## Historical outcome
 
-The command accepts no repository, pull request, source, mission, model,
-identity, or run-directory selection. It uses the fixed directory
-`/tmp/review-broker-pilot-26-rb02` and a separate durable claim at
-`/tmp/review-broker-pilot-26-rb02.claim.json`. An existing, unreadable,
-non-regular, malformed, or ambiguous claim blocks execution. An `ARMED` claim
-is never removed automatically after success, failure, timeout, or cleanup.
-This prevents ordinary replay; it does not protect against a privileged
-controller deliberately deleting both persistent traces.
-
-The pilot has no GitHub publication capability and does not use the production
-workflow. No automatic retry is permitted. A local success does not qualify
-Codex security, controller retention, Codespace shutdown, or production use.
-
-## Future operator preflight
-
-Before any future invocation, the independent controller must:
-
-1. Verify the exact independently reviewed candidate commit SHA.
-2. Build the wheel from that SHA and independently verify its SHA-256.
-3. Verify the transferred wheel against that digest.
-4. Verify that the pinned Codex runtime and requested policy remain unchanged.
-5. Check the existing ChatGPT/Codex authentication state without exposing a
-   token. `codex login status` may be used only during that future operation.
-6. Verify availability of the fixed run path and absence of the RB-PILOT-02
-   claim.
-7. Verify that the intended existing Codespace is being used.
-8. Obtain explicit operator authorization for exactly one invocation.
-
-A valid login status does not prove that the backend will accept
-`gpt-5.6-sol`. Only an expressly authorized invocation can establish that
-observation. If the session has expired, treat interactive renewal as a
-separate operational decision. Do not install a new identity or use an API-key
-fallback.
-
-## Future one-shot execution
-
-Only after the separate authorization, install the verified wheel and run:
-
-```bash
-reviewctl pilot-synthetic-02 \
-  --broker-wheel-sha256 VERIFIED_WHEEL_SHA256 \
-  --acknowledge-unqualified-pilot
-```
-
-The command must create the durable claim before its single model-capable
-transport. Do not retry automatically after the claim reaches `ARMED`, including
-a provider rejection, timeout, validation failure, or incomplete receipt.
-
-## Private receipts and interpretation
-
-The fixed run directory retains `pilot-armed.json`, `pilot-summary.json`, and,
-on failure, `pilot-failure.json`. Receipts bind the RB-PILOT-02 request,
-attempt, and packet identities; wheel digest; requested model and effort;
-functional state; bounded failure classification when observable; factual
-runner dispatch and process-start state; and credential-screening or quarantine
-state. Raw provider messages are not receipt facts.
-
-`runner_dispatches` records entry into the single subprocess runner.
-`process_start_status=CONFIRMED` requires a returned process result or timeout;
-an `OSError` or another exception without sufficient start evidence remains
-`UNDETERMINED`. `inference_process_invocations` is derived from that observation,
-not presumed from the Python call to `invoke_once()`. Process creation does not
-prove provider acceptance or authenticated inference.
-
-A structurally invalid result is not interpreted semantically. It produces a
-sanitized local failure and receipt closure when local writes remain available.
-An unexpected output-validation exception is reduced to
-`PILOT_OUTPUT_VALIDATION_UNAVAILABLE`; exception text, tracebacks, and raw model
-output are not copied into receipts.
-
-A local PASS requires valid terminal events, the last agent message, matching
-identities, schema-valid findings, and an exact `S001` line 3 citation containing
-`return age > 18`. Interpret the outcome only as:
+RB-PILOT-02 produced one confirmed Codex process dispatch and failed with the
+bounded classification `CODEX_APPLICATION_ERROR`. The private failure receipt
+contained two parsed failure events but no recognized category, code, or HTTP
+status. The supported cause remains:
 
 ```text
-PILOT_FUNCTIONAL=PASS|FAIL
+HISTORICAL_PILOT_02_CAUSE=APPLICATION_ERROR_UNCLASSIFIED
+HISTORICAL_RAW_ARTIFACTS_AVAILABLE=NO
+```
+
+The remote raw diagnostics were lost after Codespace Shutdown because only the
+sanitized receipts had been recovered. This correction does not reconstruct
+those bytes and does not weaken the historical uncertainty.
+
+## Three distinct controls
+
+### Permanent historical closure
+
+The Review Broker package rejects RB-PILOT-01 and RB-PILOT-02 unconditionally.
+This is a code-level historical boundary, independent of remote filesystem
+state. It does not create another identity.
+
+### Persistent controller reservation
+
+The independent controller stores future authorized request reservations under
+`~/.local/state/review-broker/pilots/`. A reservation is keyed by the canonical
+SHA-256 of the supplied request identity and binds pilot, request, attempt, and
+source identities. It is written exclusively with private permissions and
+file/directory durability barriers before any model-capable command.
+
+A valid or ambiguous existing reservation blocks reuse. Reservations are never
+automatically removed after success, failure, timeout, lost SSH, transfer
+failure, process restart, remote cleanup, or Codespace restart. This guarantee
+covers the designated controller and its persistent storage. It is not
+consensus between controllers and does not resist deliberate deletion by a
+privileged administrator.
+
+No RB-PILOT-03 request or attempt identity exists. The reservation module does
+not generate identities or authorize an invocation. A future mandate must
+separately define and authorize any new identity, then integrate command
+emission with the durable reservation boundary.
+
+### Private diagnostic retention
+
+Before Shutdown, the controller first retains verified sanitized receipts. Raw
+Codex events, stderr, final output, and exit state are eligible only when a valid
+summary establishes `credential_screen=PASS_NO_MATCH`, remote observation is
+regular and coherent, known-pattern screening passes, and explicit size limits
+hold.
+
+Eligible files are copied through a fixed literal-path boundary without remote
+expansion. The controller rechecks type, size, digest, and credential patterns
+before atomically publishing private mode-0600 files. A private retention
+manifest records absence, refusal, failure, or verified retention without
+turning diagnostic bytes into a causal claim.
+
+Known-pattern screening is bounded risk reduction, not proof of universal
+confidentiality. Raw diagnostics remain private: they must not enter Git,
+Issues, Actions artifacts, logs, agent output, or LLM context.
+
+## Required future controller order
+
+Before a separately authorized invocation, the controller must:
+
+1. Verify the exact software and authorization identities.
+2. Verify persistent controller storage and absence of an existing reservation.
+3. Complete required offline and runtime preflights.
+4. Durably write the controller claim.
+5. Emit at most one model-capable command.
+
+After that command, regardless of outcome, the controller must:
+
+1. Preserve the observed result or uncertainty without retry.
+2. Verify and recover sanitized receipts.
+3. Admit raw diagnostics only after the sanitary credential gate.
+4. Verify remote/local digests and write the retention manifest durably.
+5. Attempt Codespace stop even if retention fails.
+6. Independently observe `Shutdown`.
+7. Publish only bounded sanitary status.
+
+Partial retention remains partial. Missing files remain absent. A successful
+Shutdown does not manufacture successful retention, and retention failure does
+not authorize another inference.
+
+## Current qualification boundary
+
+```text
 PILOT_SECURITY_QUALIFIED=NO
 PRODUCTION_SECURITY_QUALIFIED=NO
+CONTROLLER_RETENTION_FOR_HISTORICAL_RB_PILOT_02=SANITIZED_RECEIPTS_ONLY
+PR14_MERGED=NO
+ISSUE26_CLOSED=NO
 ```
 
-## Future recovery and shutdown
-
-After either success or failure, the independent controller must:
-
-1. Recover private receipt copies and verify regular JSON, expected identities,
-   and SHA-256 against the remote files.
-2. Keep raw events, model output, stderr, credentials, and secrets away from
-   public Issues, pull requests, repositories, and artifacts.
-3. Preserve an explicit failure or uncertainty status if receipt retention or
-   verification fails.
-4. Stop the Codespace and independently observe the actual `Shutdown` state.
-5. Preserve shutdown uncertainty as an infrastructure incident rather than
-   inferring success from a requested state.
-
-These instructions are not evidence that retention or shutdown occurred.
-`CONTROLLER_RETENTION=UNVERIFIED` remains true until the future controller
-records the observations. PR #14 remains unmerged, issue #26 remains open, and
-production security remains unqualified.
+The production workflow and risk-proportionate decision #27 remain unchanged.

@@ -17,6 +17,7 @@ from review_broker.pilot_synthetic import (
     PILOT_MISSION,
     PILOT_SOURCE,
     PilotError,
+    _run_synthetic_pilot,
     pilot_fixture,
     pilot_fixture_02,
     run_synthetic_pilot_02,
@@ -45,7 +46,10 @@ class SyntheticPilot02Tests(unittest.TestCase):
         ) as preflight, patch(
             "review_broker.pilot_synthetic.invoke_once", side_effect=invoke,
         ) as invoked:
-            result = run_synthetic_pilot_02(
+            result = _run_synthetic_pilot(
+                run,
+                fixture_builder=pilot_fixture_02,
+                pilot_id="RB-PILOT-02",
                 acknowledge_unqualified_pilot=True,
                 broker_wheel_sha256="a" * 64,
                 trusted_workspace=workspace,
@@ -118,28 +122,49 @@ class SyntheticPilot02Tests(unittest.TestCase):
             self.assertEqual(first["subject_id"], second["subject_id"])
             self.assertEqual(first["sources"], second["sources"])
 
-    def test_acknowledgement_and_privileged_environment_fail_before_claim(self):
+    def test_consumed_identity_refuses_before_arguments_environment_or_tmp(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             claim = root / "claim.json"
             run = root / "run"
             with patch("review_broker.pilot_synthetic.PILOT_02_RUN_DIR", run), patch(
                 "review_broker.pilot_synthetic.PILOT_02_CLAIM_PATH", claim,
-            ), patch("review_broker.pilot_synthetic.preflight_codex_runtime") as preflight:
-                with self.assertRaisesRegex(PilotError, "PILOT_EXPLICIT_ACK_REQUIRED"):
-                    run_synthetic_pilot_02(
-                        acknowledge_unqualified_pilot=False,
-                        broker_wheel_sha256="a" * 64,
-                    )
-                with self.assertRaisesRegex(PilotError, "PILOT_PRIVILEGED_PARENT_ENVIRONMENT"):
-                    run_synthetic_pilot_02(
-                        acknowledge_unqualified_pilot=True,
-                        broker_wheel_sha256="a" * 64,
-                        environment={"HOME": "/tmp/home", "PATH": "/bin", "GH_TOKEN": "x"},
-                    )
-            preflight.assert_not_called()
-            self.assertFalse(claim.exists())
-            self.assertFalse(run.exists())
+            ), patch("review_broker.pilot_synthetic.preflight_codex_runtime") as preflight, patch(
+                "review_broker.pilot_synthetic._write_pilot_02_claim",
+            ) as claim_write, patch("review_broker.pilot_synthetic.invoke_once") as invoked:
+                for acknowledge, environment, wheel in (
+                    (False, None, "invalid"),
+                    (True, {"HOME": "/tmp/home", "PATH": "/bin", "GH_TOKEN": "x"}, "a" * 64),
+                ):
+                    with self.assertRaisesRegex(PilotError, "PILOT_02_ALREADY_CONSUMED"):
+                        run_synthetic_pilot_02(
+                            acknowledge_unqualified_pilot=acknowledge,
+                            broker_wheel_sha256=wheel,
+                            environment=environment,
+                        )
+            preflight.assert_not_called(); claim_write.assert_not_called(); invoked.assert_not_called()
+            self.assertFalse(claim.exists()); self.assertFalse(run.exists())
+
+    def test_tmp_state_never_restores_consumed_identity(self):
+        for claim_kind, run_present in (("absent", False), ("corrupt", False), ("regular", True)):
+            with self.subTest(claim=claim_kind, run=run_present), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary); claim = root / "claim.json"; run = root / "run"
+                if claim_kind == "corrupt": claim.write_text("{")
+                elif claim_kind == "regular": claim.write_text("{}")
+                if claim.exists(): claim.chmod(0o600)
+                if run_present: run.mkdir()
+                with patch("review_broker.pilot_synthetic.PILOT_02_RUN_DIR", run), patch(
+                    "review_broker.pilot_synthetic.PILOT_02_CLAIM_PATH", claim,
+                ), patch("review_broker.pilot_synthetic.preflight_codex_runtime") as preflight, patch(
+                    "review_broker.pilot_synthetic._write_pilot_02_claim",
+                ) as claim_write, patch("review_broker.pilot_synthetic.invoke_once") as invoked:
+                    with self.assertRaisesRegex(PilotError, "PILOT_02_ALREADY_CONSUMED"):
+                        run_synthetic_pilot_02(
+                            acknowledge_unqualified_pilot=True,
+                            broker_wheel_sha256="a" * 64,
+                            environment={"HOME": "/tmp/home", "PATH": "/bin"},
+                        )
+                preflight.assert_not_called(); claim_write.assert_not_called(); invoked.assert_not_called()
 
     def test_existing_claim_and_nonregular_claim_refuse_before_preflight(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -169,17 +194,13 @@ class SyntheticPilot02Tests(unittest.TestCase):
                         environment={"HOME": "/tmp/home", "PATH": "/bin"},
                     )
             preflight.assert_not_called()
-            claim.unlink()
-            claim.mkdir()
-            with patch("review_broker.pilot_synthetic.PILOT_02_RUN_DIR", run), patch(
-                "review_broker.pilot_synthetic.PILOT_02_CLAIM_PATH", claim,
-            ):
-                with self.assertRaisesRegex(PilotError, "PILOT_02_CLAIM_UNAVAILABLE"):
-                    run_synthetic_pilot_02(
-                        acknowledge_unqualified_pilot=True,
-                        broker_wheel_sha256="a" * 64,
-                        environment={"HOME": "/tmp/home", "PATH": "/bin"},
-                    )
+            claim.unlink(); claim.mkdir()
+            with self.assertRaisesRegex(PilotError, "PILOT_02_ALREADY_CONSUMED"):
+                run_synthetic_pilot_02(
+                    acknowledge_unqualified_pilot=True,
+                    broker_wheel_sha256="a" * 64,
+                    environment={"HOME": "/tmp/home", "PATH": "/bin"},
+                )
 
     def test_success_writes_durable_claim_and_identity_bound_receipts(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -317,10 +338,14 @@ class SyntheticPilot02Tests(unittest.TestCase):
                 side_effect=PilotError("PILOT_02_CLAIM_WRITE_FAILED"),
             ), patch("review_broker.pilot_synthetic.invoke_once") as invoked:
                 with self.assertRaisesRegex(PilotError, "PILOT_02_CLAIM_WRITE_FAILED"):
-                    run_synthetic_pilot_02(
+                    _run_synthetic_pilot(
+                        root / "run",
+                        fixture_builder=pilot_fixture_02,
+                        pilot_id="RB-PILOT-02",
                         acknowledge_unqualified_pilot=True,
                         broker_wheel_sha256="a" * 64,
                         trusted_workspace=workspace,
+                        codex_runtime_root=root / "runtime",
                         environment={"HOME": str(home), "PATH": "/bin"},
                     )
             invoked.assert_not_called()
@@ -328,7 +353,7 @@ class SyntheticPilot02Tests(unittest.TestCase):
     def test_cli_has_no_run_directory_and_does_not_pop_source_token(self):
         with patch.dict("os.environ", {"REVIEW_BROKER_SOURCE_TOKEN": "synthetic"}, clear=False), patch(
             "review_broker.cli.run_synthetic_pilot_02",
-            side_effect=PilotError("PILOT_PRIVILEGED_PARENT_ENVIRONMENT"),
+            side_effect=PilotError("PILOT_02_ALREADY_CONSUMED"),
         ):
             result = main([
                 "pilot-synthetic-02", "--broker-wheel-sha256", "a" * 64,

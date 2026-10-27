@@ -58,6 +58,11 @@ def _require_unconsumed_pilot_identity() -> None:
     raise PilotError("PILOT_IDENTITY_ALREADY_CONSUMED")
 
 
+def _require_unconsumed_pilot_02_identity() -> None:
+    """RB-PILOT-02 ordinal 1 is permanently closed after its consumed attempt."""
+    raise PilotError("PILOT_02_ALREADY_CONSUMED")
+
+
 def pilot_environment(source: Mapping[str, str]) -> dict[str, str]:
     """Refuse privileged parent environments; pass only non-secret essentials."""
     unsafe = [
@@ -179,7 +184,8 @@ def run_synthetic_pilot_02(
     codex_runtime_root: Path = CODEX_RUNTIME_ROOT,
     environment: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Run the fixed prepared RB-PILOT-02 path after explicit authorization."""
+    """Refuse the permanently consumed RB-PILOT-02 identity without side effects."""
+    _require_unconsumed_pilot_02_identity()
     return _run_synthetic_pilot(
         PILOT_02_RUN_DIR,
         fixture_builder=pilot_fixture_02,

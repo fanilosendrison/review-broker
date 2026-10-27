@@ -5,7 +5,7 @@ asset_type: "agent-instructions"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Agent Instructions"
-version: "0.2.0"
+version: "0.3.0"
 ---
 
 # Review Broker Agent Instructions
@@ -31,14 +31,16 @@ credentials, API keys, authorization headers, or credential files to reviewed
 content, evidence, logs, or Issues.
 
 Do not run authenticated reviews of actual consumer PRs through the production
-workflow until their applicable admission and qualification gates pass. RB-PILOT-01 (#26) is consumed and permanently closed. RB-PILOT-02 is prepared
-as a distinct fixed-fixture path but has no inference authorization. Its CLI
-must not be run without a separate future mandate authorizing exactly one
-invocation. Neither pilot publishes, merges, or claims security qualification.
-The Product Intent decision in #27 retires maximal Codex-internal attestation as
-a blanket low-sensitivity v1 prerequisite; it does not authorize real-PR review
-or RB-PILOT-02 inference by itself. Do not retry an attempt that reached `ARMED`
-without conclusive terminal evidence.
+workflow until their applicable admission and qualification gates pass.
+RB-PILOT-01 and RB-PILOT-02 (#26) are consumed and permanently closed; their
+historical CLI entry points must refuse before side effects. RB-PILOT-03 has not
+been created or authorized. A future synthetic identity requires separate
+product authorization, a persistent controller reservation before any
+model-capable command, and private pre-Shutdown evidence retention. No pilot
+publishes, merges, or claims security qualification. The Product Intent decision
+in #27 retires maximal Codex-internal attestation as a blanket low-sensitivity
+v1 prerequisite; it does not authorize real-PR review or any new pilot inference
+by itself. Never retry an attempt that reached `ARMED`.
 
 ## Engineering Project profile
 

@@ -13,20 +13,24 @@ from review_broker.codex import InvocationError
 from review_broker.identity import canonical_bytes
 from review_broker.packets import verify_packet
 from review_broker.pilot_synthetic import (
-    PILOT_SOURCE, PilotError, pilot_environment, pilot_fixture, run_synthetic_pilot,
+    PILOT_SOURCE, PilotError, _run_synthetic_pilot, pilot_environment,
+    pilot_fixture, run_synthetic_pilot,
 )
 
 
 class SyntheticPilotTests(unittest.TestCase):
     def test_acknowledgement_required_without_side_effects(self):
-        with tempfile.TemporaryDirectory() as temp, patch(
-            "review_broker.pilot_synthetic._require_unconsumed_pilot_identity",
-            return_value=None,
-        ):
+        with tempfile.TemporaryDirectory() as temp:
             run = Path(temp) / "pilot"
             with self.assertRaisesRegex(PilotError, "PILOT_EXPLICIT_ACK_REQUIRED"):
-                run_synthetic_pilot(run, acknowledge_unqualified_pilot=False,
-                                    broker_wheel_sha256="a" * 64)
+                _run_synthetic_pilot(
+                    run, fixture_builder=pilot_fixture, pilot_id="RB-PILOT-01",
+                    acknowledge_unqualified_pilot=False,
+                    broker_wheel_sha256="a" * 64,
+                    trusted_workspace=Path(temp) / "workspace",
+                    codex_runtime_root=Path(temp) / "runtime",
+                    environment=None,
+                )
             self.assertFalse(run.exists())
 
     def test_parent_with_privileged_environment_rejected(self):
@@ -53,14 +57,13 @@ class SyntheticPilotTests(unittest.TestCase):
         workspace.mkdir()
         env = {"HOME": str(home), "CODEX_HOME": str(home / ".codex"),
                "PATH": "/usr/bin", "LANG": "C.UTF-8"}
-        with patch(
-            "review_broker.pilot_synthetic._require_unconsumed_pilot_identity",
-            return_value=None,
-        ), patch("review_broker.pilot_synthetic.preflight_codex_runtime",
+        with patch("review_broker.pilot_synthetic.preflight_codex_runtime",
                    return_value={"cli_compatibility_verified": True}) as preflight, \
              patch("review_broker.pilot_synthetic.invoke_once", side_effect=invoke) as called:
-            result = run_synthetic_pilot(
+            result = _run_synthetic_pilot(
                 root / "pilot",
+                fixture_builder=pilot_fixture,
+                pilot_id="RB-PILOT-01",
                 acknowledge_unqualified_pilot=True,
                 broker_wheel_sha256="a" * 64,
                 trusted_workspace=workspace,

@@ -5,7 +5,7 @@ asset_type: "specification"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker v1 Specification"
-version: "0.2.0"
+version: "0.3.0"
 ---
 
 # Review Broker v1 Specification
@@ -64,17 +64,21 @@ prerequisite for bounded, authorized low-sensitivity use. Review Broker must
 instead retain its essential controls, declare actual residual risks honestly,
 and refuse any path with observed material credential disclosure.
 
-RB-PILOT-01 (#26) was the only authenticated exception to the production gate.
-Its identity is consumed and permanently closed. RB-PILOT-02 is prepared as a
-separate, explicitly acknowledged, fixed non-secret synthetic fixture with no
-consumer PR, repository source execution, GitHub publication, or automatic
-retry. Its executable entry point does not authorize inference:
-`RB-PILOT-02_INFERENCE_AUTHORIZED=NO`. A future mandate must authorize exactly
-one invocation after independent code-identity and operating-condition checks.
-A local validation receipt is not production EvidenceStatus VALID. The pilot
-retains the pinned native Codex executable and requested policy while exhaustive
-internal policy attestations remain unavailable; no claim of comprehensive
-credential isolation follows.
+RB-PILOT-01 and RB-PILOT-02 (#26) were authenticated exceptions to the
+production gate. Both identities are consumed and their historical Python and
+CLI entry points are permanently closed independently of remote `/tmp` state.
+RB-PILOT-02 ended with `APPLICATION_ERROR_UNCLASSIFIED`; its raw diagnostics
+were not retained before Shutdown and are unavailable. No RB-PILOT-03 identity
+has been created or authorized.
+
+A future separately authorized synthetic attempt must reserve its supplied
+request identity durably on the designated controller before any model-capable
+command. After execution, the controller must recover verified sanitized
+receipts and may retain bounded raw diagnostics privately only after the
+credential-screening gate passes. Controller persistence is not distributed
+consensus and does not protect against privileged deletion. A local validation
+or retention receipt is not production EvidenceStatus VALID, and no claim of
+comprehensive credential isolation follows.
 
 After a successful pilot, ordinary authorized non-secret or low-sensitivity PR
 reviews may be admitted only by a separately versioned and tested operational
