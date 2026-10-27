@@ -154,7 +154,7 @@ class CodexAdapterTests(unittest.TestCase):
             "model gpt-5.6-sol is not available": "MODEL_UNAVAILABLE",
             "login required; authentication expired": "OAUTH_EXPIRED",
             "usage limit reached quota exceeded": "QUOTA_EXHAUSTED",
-            "process terminated unexpectedly": "CODEX_CRASH",
+            "process terminated unexpectedly": "CODEX_FAILURE_UNCLASSIFIED",
         }
         for message, expected in cases.items():
             with self.subTest(expected=expected):
@@ -179,8 +179,17 @@ class CodexAdapterTests(unittest.TestCase):
                 calls.append(list(command))
                 self.assertFalse(kwargs["shell"])
                 self.assertNotIn("OPENAI_API_KEY", kwargs["env"])
-                kwargs["stdout"].write(b'{"type":"turn.started"}\n')
-                kwargs["stderr"].write(b"model unavailable")
+                events = [
+                    {"type": "turn.started"},
+                    {"type": "error", "id": "provider-1", "status": 400,
+                     "error": {"type": "invalid_request_error",
+                               "code": "unsupported_value", "param": "model",
+                               "message": "raw provider detail"}},
+                    {"type": "turn.failed", "error": {"type": "request_failed"}},
+                ]
+                kwargs["stdout"].write(
+                    ("\n".join(json.dumps(event) for event in events) + "\n").encode()
+                )
                 return subprocess.CompletedProcess(command, 1)
 
             home = packet.parent / "home"
@@ -190,7 +199,7 @@ class CodexAdapterTests(unittest.TestCase):
             install_reviewer_profile(home, workspace, packet)
             environment = {"HOME": str(home), "PATH": os.environ.get("PATH", "")}
 
-            with self.assertRaisesRegex(InvocationError, "MODEL_UNAVAILABLE"):
+            with self.assertRaisesRegex(InvocationError, "CODEX_PROVIDER_ERROR") as caught:
                 invoke_once(
                     packet,
                     schema,
@@ -203,6 +212,10 @@ class CodexAdapterTests(unittest.TestCase):
                     runtime_verifier=lambda child, runtime_root: verified_runtime(packet.parent),
                     environment=environment,
                 )
+            observation = caught.exception.failure_observation
+            self.assertEqual(observation["classification"], "CODEX_PROVIDER_ERROR")
+            self.assertEqual(observation["failure_events"][0]["http_status"], 400)
+            self.assertNotIn("raw provider detail", json.dumps(observation))
             attempt = json.loads((packet / "attempt.json").read_text(encoding="utf-8"))
             self.assertEqual(attempt["broker_wheel_sha256"], "b" * 64)
             self.assertEqual(calls, [attempt["argv"]])

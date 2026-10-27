@@ -16,6 +16,7 @@ from .codex_runtime_identity import (
     VerifiedCodexRuntime,
     verify_codex_runtime,
 )
+from .codexfailure import classify_diagnostic_text, observe_codex_failure_files
 from .identity import canonical_bytes
 from .packets import PacketError, verify_packet
 from .reviewer_profile import (
@@ -28,6 +29,13 @@ from .reviewer_profile import (
 
 class InvocationError(RuntimeError):
     """Codex invocation was rejected or did not complete successfully."""
+
+    def __init__(self, message: str, *,
+                 failure_observation: Mapping[str, object] | None = None) -> None:
+        super().__init__(message)
+        self.failure_observation = (
+            dict(failure_observation) if failure_observation is not None else None
+        )
 
 
 @dataclass(frozen=True)
@@ -166,14 +174,8 @@ def preflight_codex_runtime(
 
 
 def classify_failure(text: str) -> str:
-    lowered = text.lower()
-    if "model" in lowered and any(word in lowered for word in ("unavailable", "not available", "not found")):
-        return "MODEL_UNAVAILABLE"
-    if any(word in lowered for word in ("login required", "authentication expired", "not logged in", "oauth expired")):
-        return "OAUTH_EXPIRED"
-    if any(word in lowered for word in ("quota", "usage limit", "rate limit")):
-        return "QUOTA_EXHAUSTED"
-    return "CODEX_CRASH"
+    """Retain the public diagnostic classifier with a truthful neutral fallback."""
+    return classify_diagnostic_text(text)
 
 
 def invoke_once(
@@ -271,7 +273,7 @@ def invoke_once(
     _write_exclusive(packet_directory / "prompt.sha256", (prompt_before + "\n").encode("ascii"))
     _write_exclusive(packet_directory / "input-before.sha256", (prompt_before + "\n").encode("ascii"))
     exit_value = "NOT_STARTED"
-    transport_error: str | None = None
+    transport: str | None = None
     try:
         with prompt_path.open("rb") as source, _exclusive_stream(packet_directory / "codex-events.jsonl") as events, _exclusive_stream(packet_directory / "codex-stderr.txt") as stderr:
             try:
@@ -289,10 +291,10 @@ def invoke_once(
                 exit_value = str(result.returncode)
             except subprocess.TimeoutExpired:
                 exit_value = "TIMEOUT"
-                transport_error = "CODEX_TIMEOUT_INDETERMINATE"
+                transport = "TIMEOUT"
             except OSError:
                 exit_value = "OS_ERROR"
-                transport_error = "CODEX_OS_ERROR"
+                transport = "OS_ERROR"
     finally:
         prompt_after = _digest(prompt_path.read_bytes())
         _write_exclusive(packet_directory / "input-after.sha256", (prompt_after + "\n").encode("ascii"))
@@ -301,12 +303,25 @@ def invoke_once(
             _write_exclusive(output_path, b"")
     if prompt_after != prompt_before:
         raise InvocationError("INPUT_CHANGED_DURING_EXECUTION")
-    if transport_error is not None:
-        raise InvocationError(transport_error)
+    if transport is not None:
+        observation = observe_codex_failure_files(
+            returncode=None,
+            events_path=packet_directory / "codex-events.jsonl",
+            stderr_path=packet_directory / "codex-stderr.txt",
+            transport=transport,
+        )
+        raise InvocationError(
+            observation["classification"], failure_observation=observation,
+        )
     if exit_value != "0":
-        stderr_text = (packet_directory / "codex-stderr.txt").read_text(encoding="utf-8", errors="replace")
-        event_text = (packet_directory / "codex-events.jsonl").read_text(encoding="utf-8", errors="replace")
-        raise InvocationError(classify_failure(stderr_text + "\n" + event_text))
+        observation = observe_codex_failure_files(
+            returncode=int(exit_value),
+            events_path=packet_directory / "codex-events.jsonl",
+            stderr_path=packet_directory / "codex-stderr.txt",
+        )
+        raise InvocationError(
+            observation["classification"], failure_observation=observation,
+        )
     if output_path.stat().st_size == 0:
         raise InvocationError("CODEX_FINAL_MISSING")
 

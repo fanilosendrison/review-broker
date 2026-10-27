@@ -22,6 +22,10 @@ from .codex import (
     preflight_codex_runtime,
     verify_post_invocation_packet,
 )
+from .codexfailure import (
+    build_pilot_failure_receipt,
+    failure_artifact_manifest,
+)
 from .evidence import quarantine_contaminated_evidence, scan_for_credentials
 from .identity import attempt_identity, canonical_bytes, request_identity, subject_identity
 from .packets import SourceRecord, build_packet, source_lines, verify_packet
@@ -256,6 +260,7 @@ def run_synthetic_pilot(
         "risk_disclosure": PILOT_RISK,
     }
     invocation_failure = ""
+    failure_observation: Mapping[str, Any] | None = None
     schema = Path(str(resources.files("review_broker.schemas").joinpath(
         "reviewer-findings-v1.schema.json"
     ))).resolve(strict=True)
@@ -272,6 +277,7 @@ def run_synthetic_pilot(
     except InvocationError as exc:
         candidate = str(exc)
         invocation_failure = candidate if re.fullmatch(r"[A-Z0-9_:]{3,100}", candidate) else "INVOKE_FAILED"
+        failure_observation = exc.failure_observation
     except Exception:
         invocation_failure = "INVOKE_UNEXPECTED_ERROR"
     post_invocation_failure = ""
@@ -280,6 +286,8 @@ def run_synthetic_pilot(
             verify_post_invocation_packet(evidence, schema, manifest)
         except InvocationError:
             post_invocation_failure = "PILOT_POST_INVOCATION_PACKET_INVALID"
+    failure_artifacts = failure_artifact_manifest(evidence)
+    credential_screen = "UNDETERMINED"
     try:
         contaminated = scan_for_credentials(evidence)
     except Exception:
@@ -295,17 +303,21 @@ def run_synthetic_pilot(
                     evidence, request_id=manifest["request_id"], attempt_id=attempt_id,
                 )
             except Exception:
+                credential_screen = "CONTAMINATION_DETECTED_QUARANTINE_FAILED"
                 outcome["failure"] = "PILOT_QUARANTINE_FAILED"
             else:
+                credential_screen = "CONTAMINATED_QUARANTINED"
                 outcome["failure"] = "PILOT_CREDENTIAL_OUTPUT_QUARANTINED"
             outcome.update({"pilot_functional": "FAIL", "pilot_execution": "INDETERMINATE"})
         elif invocation_failure:
+            credential_screen = "PASS_NO_MATCH"
             outcome.update({
                 "pilot_functional": "FAIL",
                 "pilot_execution": "INDETERMINATE" if "TIMEOUT" in invocation_failure else "FAILED",
                 "failure": invocation_failure,
             })
         elif post_invocation_failure:
+            credential_screen = "PASS_NO_MATCH"
             outcome.update({
                 "pilot_functional": "FAIL",
                 "pilot_execution": "INDETERMINATE",
@@ -313,6 +325,31 @@ def run_synthetic_pilot(
                 "validation_reasons": [post_invocation_failure],
             })
         else:
+            credential_screen = "PASS_NO_MATCH"
             outcome.update(_pilot_output(evidence, manifest))
+    if outcome["pilot_functional"] == "FAIL":
+        classification = outcome.get("failure", "PILOT_OUTPUT_VALIDATION_FAILED")
+        try:
+            failure_receipt = build_pilot_failure_receipt(
+                request_id=manifest["request_id"],
+                attempt_id=attempt_id,
+                packet_id=manifest["packet_id"],
+                classification=classification,
+                failure_observation=failure_observation,
+                credential_screen=credential_screen,
+                artifacts=failure_artifacts,
+            )
+            failure_path = target / "pilot-failure.json"
+            _write_once(failure_path, failure_receipt)
+        except (OSError, TypeError, ValueError):
+            outcome.update({
+                "pilot_execution": "INDETERMINATE",
+                "failure": "PILOT_FAILURE_RECEIPT_WRITE_FAILED",
+                "failure_receipt_sha256": None,
+            })
+        else:
+            outcome["failure_receipt_sha256"] = hashlib.sha256(
+                failure_path.read_bytes()
+            ).hexdigest()
     _write_once(target / "pilot-summary.json", outcome)
     return outcome
