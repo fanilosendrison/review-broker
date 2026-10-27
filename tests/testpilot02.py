@@ -197,6 +197,95 @@ class SyntheticPilot02Tests(unittest.TestCase):
             self.assertEqual(result["model_requested"], "gpt-5.6-sol")
             self.assertEqual(result["effort_requested"], "xhigh")
 
+    def test_structurally_invalid_results_close_with_private_failure_receipts(self):
+        invalid_findings = (
+            None,
+            7,
+            [None],
+            [{
+                "id": "F001", "category": "contradiction", "claim": "Invalid evidence.",
+                "consequence": "The result is structurally invalid.", "evidence": None,
+            }],
+        )
+        for findings in invalid_findings:
+            with self.subTest(findings=findings), tempfile.TemporaryDirectory() as temporary:
+                def invalid(evidence, *_args, **_kwargs):
+                    manifest = verify_packet(evidence)
+                    response = self._valid_response(manifest, findings=findings)
+                    self._write_response(evidence, response)
+
+                run, claim, result = self._run(temporary, invalid)
+                armed = json.loads((run / "pilot-armed.json").read_text(encoding="utf-8"))
+                summary_path = run / "pilot-summary.json"
+                failure_path = run / "pilot-failure.json"
+                summary = json.loads(summary_path.read_text(encoding="utf-8"))
+                failure = json.loads(failure_path.read_text(encoding="utf-8"))
+                self.assertEqual(result["pilot_functional"], "FAIL")
+                self.assertEqual(result["schema_and_citations"], "FAIL")
+                self.assertEqual(result["verdict"], "UNDETERMINED")
+                self.assertEqual(result["validation_reasons"],
+                                 ["PILOT_RESULT_SCHEMA_INVALID"])
+                self.assertEqual(summary, result)
+                self.assertEqual(stat.S_IMODE(summary_path.stat().st_mode), 0o600)
+                self.assertEqual(stat.S_IMODE(failure_path.stat().st_mode), 0o600)
+                for key in ("request_id", "attempt_id", "packet_id"):
+                    self.assertEqual(failure[key], armed[key])
+                    self.assertEqual(summary[key], armed[key])
+                self.assertNotIn("Invalid evidence", failure_path.read_text(encoding="utf-8"))
+                with patch("review_broker.pilot_synthetic.PILOT_02_RUN_DIR", run), patch(
+                    "review_broker.pilot_synthetic.PILOT_02_CLAIM_PATH", claim,
+                ), patch("review_broker.pilot_synthetic.invoke_once") as invoked:
+                    with self.assertRaisesRegex(PilotError, "PILOT_02_ALREADY_CONSUMED"):
+                        run_synthetic_pilot_02(
+                            acknowledge_unqualified_pilot=True,
+                            broker_wheel_sha256="a" * 64,
+                        )
+                invoked.assert_not_called()
+
+    def test_unexpected_output_validation_error_is_sanitized_and_closed(self):
+        with tempfile.TemporaryDirectory() as temporary, patch(
+            "review_broker.pilot_synthetic.pilot_output",
+            side_effect=RuntimeError("raw synthetic provider material"),
+        ):
+            run, _, result = self._run(temporary, self._completed)
+            self.assertEqual(result["failure"], "PILOT_OUTPUT_VALIDATION_UNAVAILABLE")
+            self.assertEqual(result["pilot_functional"], "FAIL")
+            self.assertEqual(result["pilot_execution"], "INDETERMINATE")
+            self.assertEqual(result["schema_and_citations"], "FAIL")
+            self.assertEqual(result["verdict"], "UNDETERMINED")
+            self.assertTrue((run / "pilot-summary.json").is_file())
+            receipt = (run / "pilot-failure.json").read_text(encoding="utf-8")
+            self.assertNotIn("raw synthetic provider material", receipt)
+            self.assertNotIn("Traceback", receipt)
+
+    @staticmethod
+    def _valid_response(manifest, *, findings):
+        return {
+            "schema_version": 1,
+            "request_id": manifest["request_id"],
+            "subject_id": manifest["subject_id"],
+            "packet_id": manifest["packet_id"],
+            "verdict": "NO_GO",
+            "sources_examined": ["S001"],
+            "findings": findings,
+            "remaining_uncertainties": [],
+        }
+
+    @staticmethod
+    def _write_response(evidence, response):
+        message = json.dumps(response)
+        events = [
+            {"type": "thread.started", "thread_id": "synthetic"},
+            {"type": "turn.started"},
+            {"type": "item.completed", "item": {"type": "agent_message", "text": message}},
+            {"type": "turn.completed"},
+        ]
+        (evidence / "codex-final.json").write_text(message, encoding="utf-8")
+        (evidence / "codex-events.jsonl").write_text(
+            "\n".join(json.dumps(event) for event in events) + "\n", encoding="utf-8",
+        )
+        (evidence / "codex-exit-code.txt").write_text("0\n", encoding="ascii")
+
     def test_failure_consumes_claim_and_second_invocation_is_refused(self):
         with tempfile.TemporaryDirectory() as temporary:
             run, claim, result = self._run(

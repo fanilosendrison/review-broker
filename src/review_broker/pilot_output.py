@@ -65,7 +65,7 @@ def pilot_output(evidence: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         final_bytes, raw_final = b"", ""
     if not raw_final or raw_final != final_agent_message:
         errors.append("PILOT_FINAL_MESSAGE_MISMATCH")
-    response: dict[str, Any] = {}
+    response: dict[str, Any] | None = None
     try:
         candidate = json.loads(raw_final)
         if not isinstance(candidate, dict):
@@ -73,9 +73,13 @@ def pilot_output(evidence: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         response = candidate
     except (ValueError, TypeError):
         errors.append("PILOT_RESULT_JSON_INVALID")
-    if response:
+    structurally_valid = False
+    if response is not None:
         if list(Draft202012Validator(_findings_schema()).iter_errors(response)):
             errors.append("PILOT_RESULT_SCHEMA_INVALID")
+        else:
+            structurally_valid = True
+    if structurally_valid:
         if any(response.get(key) != manifest.get(key)
                for key in ("request_id", "subject_id", "packet_id")):
             errors.append("PILOT_RESULT_IDENTITY_MISMATCH")
@@ -86,23 +90,19 @@ def pilot_output(evidence: Path, manifest: dict[str, Any]) -> dict[str, Any]:
             item.get("source_id") == "S001"
             and item.get("line") == 3
             and "return age > 18" in item.get("quote", "")
-            for finding in response.get("findings", [])
-            if isinstance(finding, dict)
-            for item in finding.get("evidence", [])
-            if isinstance(item, dict)
+            for finding in response["findings"]
+            for item in finding["evidence"]
         )
         if response.get("verdict") != "NO_GO" or not expected_defect:
             errors.append("PILOT_EXPECTED_DEFECT_NOT_FOUND")
-    else:
-        errors.append("PILOT_RESULT_ABSENT")
     status = "PASS" if not errors else "FAIL"
     return {
         "pilot_functional": status,
         "pilot_execution": "COMPLETED" if sequence_valid and not failed and exit_code == "0"
                            else "INDETERMINATE",
         "schema_and_citations": "PASS" if status == "PASS" else "FAIL",
-        "verdict": response.get("verdict") if status == "PASS" else "UNDETERMINED",
-        "findings_count": len(response.get("findings", [])) if status == "PASS" else 0,
+        "verdict": response.get("verdict") if status == "PASS" and response else "UNDETERMINED",
+        "findings_count": len(response["findings"]) if status == "PASS" and response else 0,
         "validation_reasons": sorted(set(errors)),
         "events_sha256": hashlib.sha256(event_bytes).hexdigest() if event_bytes else None,
         "final_sha256": hashlib.sha256(final_bytes).hexdigest() if final_bytes else None,

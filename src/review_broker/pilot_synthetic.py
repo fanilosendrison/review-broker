@@ -7,11 +7,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import hashlib
 from importlib import resources
-import json
 import os
 from pathlib import Path
 import re
-import stat
 from typing import Any, Callable, Mapping
 
 from .codex import (
@@ -23,10 +21,11 @@ from .codex import (
 )
 from .codexfailure import build_pilot_failure_receipt, failure_artifact_manifest
 from .evidence import quarantine_contaminated_evidence, scan_for_credentials
-from .fileobservation import FileObservationError, read_regular_file_bounded
 from .identity import attempt_identity, canonical_bytes, request_identity, subject_identity
 from .packets import SourceRecord, build_packet, verify_packet
+from .pilot_claim import PilotClaimError, require_claim_available, write_claim
 from .pilot_output import pilot_output
+from .pilot_runner import PilotRunner
 from .reviewer_profile import install_reviewer_profile
 
 PILOT_SOURCE = (b"def eligible(age: int) -> bool:\n"
@@ -137,44 +136,16 @@ def _write_once(path: Path, value: dict[str, Any]) -> None:
 
 def _require_pilot_02_claim_available() -> None:
     try:
-        observed = PILOT_02_CLAIM_PATH.lstat()
-    except FileNotFoundError:
-        return
-    except OSError as exc:
-        raise PilotError("PILOT_02_CLAIM_UNAVAILABLE") from exc
-    if not stat.S_ISREG(observed.st_mode) or stat.S_IMODE(observed.st_mode) != 0o600:
-        raise PilotError("PILOT_02_CLAIM_UNAVAILABLE")
-    try:
-        claim_bytes = read_regular_file_bounded(PILOT_02_CLAIM_PATH, 4_096)
-        claim = json.loads(claim_bytes.decode("utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError, FileObservationError) as exc:
-        raise PilotError("PILOT_02_CLAIM_UNAVAILABLE") from exc
-    digest = hashlib.sha256(PILOT_SOURCE).hexdigest()
-    expected_request = request_identity({
-        "kind": "RB-PILOT-02", "fixture_sha256": digest, "ordinal": 1,
-    })
-    required = {
-        "pilot_id": "RB-PILOT-02", "request_id": expected_request,
-        "attempt_id": attempt_identity(expected_request, 1), "status": "ARMED",
-    }
-    if (not isinstance(claim, dict)
-            or any(claim.get(key) != value for key, value in required.items())
-            or not isinstance(claim.get("packet_id"), str)
-            or not claim["packet_id"]
-            or not isinstance(claim.get("armed_utc"), str)
-            or not claim["armed_utc"]):
-        raise PilotError("PILOT_02_CLAIM_UNAVAILABLE")
-    raise PilotError("PILOT_02_ALREADY_CONSUMED")
+        require_claim_available(PILOT_02_CLAIM_PATH, PILOT_SOURCE)
+    except PilotClaimError as exc:
+        raise PilotError(str(exc)) from exc
 
 
 def _write_pilot_02_claim(value: dict[str, Any]) -> None:
     try:
-        _write_once(PILOT_02_CLAIM_PATH, value)
-    except FileExistsError:
-        _require_pilot_02_claim_available()
-        raise AssertionError("claim availability check returned after an existing claim")
-    except OSError as exc:
-        raise PilotError("PILOT_02_CLAIM_WRITE_FAILED") from exc
+        write_claim(PILOT_02_CLAIM_PATH, value, PILOT_SOURCE, _write_once)
+    except PilotClaimError as exc:
+        raise PilotError(str(exc)) from exc
 
 
 def run_synthetic_pilot(
@@ -279,6 +250,7 @@ def _run_synthetic_pilot(
         "acknowledged_residual_risk": True,
         "armed_utc": armed_utc,
     })
+    process_runner = PilotRunner()
     outcome: dict[str, Any] = {
         "schema_version": 1,
         "scope": "SYNTHETIC_NONPRODUCTION_ONLY",
@@ -290,7 +262,7 @@ def _run_synthetic_pilot(
         "broker_wheel_sha256": broker_wheel_sha256,
         "model_requested": CodexPolicy().model,
         "effort_requested": CodexPolicy().reasoning_effort,
-        "inference_process_invocations": 1,
+        **process_runner.observation(),
         "pilot_security_qualified": False,
         "production_security_qualified": False,
         "production_security_gate": "UNCHANGED_UNQUALIFIED",
@@ -314,6 +286,7 @@ def _run_synthetic_pilot(
             codex_runtime_root=codex_runtime_root,
             environment=clean_env,
             armed=True,
+            runner=process_runner,
         )
     except InvocationError as exc:
         candidate = str(exc)
@@ -321,6 +294,7 @@ def _run_synthetic_pilot(
         failure_observation = exc.failure_observation
     except Exception:
         invocation_failure = "INVOKE_UNEXPECTED_ERROR"
+    outcome.update(process_runner.observation())
     post_invocation_failure = ""
     if not invocation_failure:
         try:
@@ -367,7 +341,16 @@ def _run_synthetic_pilot(
             })
         else:
             credential_screen = "PASS_NO_MATCH"
-            outcome.update(pilot_output(evidence, manifest))
+            try:
+                outcome.update(pilot_output(evidence, manifest))
+            except Exception:
+                outcome.update({
+                    "pilot_functional": "FAIL",
+                    "pilot_execution": "INDETERMINATE",
+                    "schema_and_citations": "FAIL",
+                    "verdict": "UNDETERMINED",
+                    "failure": "PILOT_OUTPUT_VALIDATION_UNAVAILABLE",
+                })
     outcome["credential_screen"] = credential_screen
     if outcome["pilot_functional"] == "FAIL":
         classification = outcome.get("failure", "PILOT_OUTPUT_VALIDATION_FAILED")
@@ -383,6 +366,7 @@ def _run_synthetic_pilot(
                 "model_requested": CodexPolicy().model,
                 "effort_requested": CodexPolicy().reasoning_effort,
                 "pilot_security_qualified": False, "production_security_qualified": False,
+                **process_runner.observation(),
             })
             failure_path = target / "pilot-failure.json"
             _write_once(failure_path, failure_receipt)
