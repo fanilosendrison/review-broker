@@ -4,7 +4,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
-import json
 import os
 from pathlib import Path
 import re
@@ -20,6 +19,7 @@ from .pilot_controller_state import (
     read_controller_claim,
     request_reservation_digest,
 )
+from .pilot_receipt_validation import validate_pilot_receipt_set
 
 RECEIPTS = ("pilot-claim.json", "pilot-armed.json", "pilot-summary.json", "pilot-failure.json")
 DIAGNOSTIC_LIMITS = {
@@ -113,19 +113,21 @@ def retain_private_pilot_artifacts(
     try:
         for name in RECEIPTS:
             entries.append(_retain_one(source, name, receipts, staging, None, True))
-        summary_path = receipts / "pilot-summary.json"
-        summary = _json_object(summary_path) if summary_path.is_file() else {}
-        identity_ok = all(summary.get(key) == value for key, value in {
-            "request_id": request_id, "attempt_id": attempt_id,
-        }.items())
-        diagnostic_gate = identity_ok and summary.get("credential_screen") == "PASS_NO_MATCH"
+        receipt_validation = validate_pilot_receipt_set(receipts, claim)
+        summary = receipt_validation.summary or {}
+        receipt_status = _receipt_aggregate(
+            entries, receipt_validation.valid, summary.get("pilot_functional"),
+        )
+        diagnostic_gate = (
+            receipt_status == "PASS"
+            and summary.get("credential_screen") == "PASS_NO_MATCH"
+        )
         for name, limit in DIAGNOSTIC_LIMITS.items():
             entries.append(_retain_one(
                 source, name, diagnostics, staging, limit, diagnostic_gate,
             ))
     finally:
         _remove_empty_staging(staging)
-    receipt_status = _receipt_aggregate(entries)
     diagnostic_status = (
         _aggregate(entries, set(DIAGNOSTIC_LIMITS), "UNDETERMINED")
         if diagnostic_gate else "SKIPPED_QUARANTINED"
@@ -141,6 +143,7 @@ def retain_private_pilot_artifacts(
         "sanitized_receipt_retention": receipt_status,
         "raw_diagnostic_retention": diagnostic_status,
         "credential_screening": summary.get("credential_screen", "UNDETERMINED"),
+        "receipt_set_validation": receipt_validation.status,
         "artifact_entries": entries,
     }
     _write_manifest(attempt_directory / "retention-manifest.json", manifest)
@@ -263,22 +266,25 @@ def _write_manifest(path: Path, value: Mapping[str, Any]) -> None:
     _fsync_directory(path.parent)
 
 
-def _json_object(path: Path) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        return {}
-    return value if isinstance(value, dict) else {}
-
-
-def _receipt_aggregate(entries: list[dict[str, Any]]) -> str:
-    statuses = {entry["relative_name"]: entry["retention_status"] for entry in entries}
-    required = ("pilot-claim.json", "pilot-armed.json", "pilot-summary.json")
-    passed = sum(statuses.get(name) == "PASS" for name in required)
-    failure_ok = statuses.get("pilot-failure.json") in {"PASS", "ABSENT"}
-    if passed == len(required) and failure_ok:
+def _receipt_aggregate(
+    entries: list[dict[str, Any]], receipt_set_valid: bool, outcome: Any,
+) -> str:
+    statuses = {
+        entry["relative_name"]: entry["retention_status"]
+        for entry in entries if entry["relative_name"] in RECEIPTS
+    }
+    required_pass = all(
+        statuses.get(name) == "PASS"
+        for name in ("pilot-claim.json", "pilot-armed.json", "pilot-summary.json")
+    )
+    failure_status = statuses.get("pilot-failure.json")
+    failure_coherent = (
+        outcome == "FAIL" and failure_status == "PASS"
+        or outcome == "PASS" and failure_status == "ABSENT"
+    )
+    if receipt_set_valid and required_pass and failure_coherent:
         return "PASS"
-    if passed:
+    if any(status == "PASS" for status in statuses.values()):
         return "PARTIAL"
     return "FAIL"
 

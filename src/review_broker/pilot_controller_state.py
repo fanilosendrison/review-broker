@@ -53,8 +53,10 @@ def arm_controller_attempt(
     reservation = root / request_reservation_digest(request_id)
     try:
         reservation.mkdir(mode=0o700)
+        _fsync_directory(root)
     except FileExistsError:
         _validate_private_directory(reservation)
+        _raise_existing_claim(reservation / "controller-claim.json", request_id)
     except OSError as exc:
         raise ControllerClaimError("CONTROLLER_CLAIM_WRITE_FAILED") from exc
     claim_path = reservation / "controller-claim.json"
@@ -156,9 +158,19 @@ def _ensure_managed_chain(home: Path, root: Path) -> None:
         raise ControllerClaimError("CONTROLLER_STATE_ROOT_UNTRUSTED") from exc
     current = home
     for part in relative.parts:
+        parent = current
         current = current / part
         try:
-            current.mkdir(mode=0o700, exist_ok=True)
+            current.mkdir(mode=0o700)
+        except FileExistsError:
+            pass
+        except OSError as exc:
+            raise ControllerClaimError("CONTROLLER_STATE_ROOT_UNTRUSTED") from exc
+        try:
+            _fsync_directory(parent)
+        except OSError as exc:
+            raise ControllerClaimError("CONTROLLER_CLAIM_WRITE_FAILED") from exc
+        try:
             metadata = current.lstat()
         except OSError as exc:
             raise ControllerClaimError("CONTROLLER_STATE_ROOT_UNTRUSTED") from exc
@@ -185,11 +197,28 @@ def _validate_managed_chain(home: Path, root: Path) -> None:
 
 
 def _ensure_private_root(root: Path) -> None:
-    try:
-        root.mkdir(mode=0o700, parents=True, exist_ok=True)
-    except OSError as exc:
-        raise ControllerClaimError("CONTROLLER_STATE_ROOT_UNTRUSTED") from exc
+    missing: list[Path] = []
+    current = root
+    while not current.exists() and not current.is_symlink():
+        missing.append(current)
+        current = current.parent
+    for directory in reversed(missing):
+        try:
+            directory.mkdir(mode=0o700)
+        except FileExistsError:
+            _validate_private_directory(directory)
+        except OSError as exc:
+            raise ControllerClaimError("CONTROLLER_CLAIM_WRITE_FAILED") from exc
+        try:
+            _fsync_directory(directory.parent)
+        except OSError as exc:
+            raise ControllerClaimError("CONTROLLER_CLAIM_WRITE_FAILED") from exc
     _validate_private_directory(root)
+    if not missing:
+        try:
+            _fsync_directory(root.parent)
+        except OSError as exc:
+            raise ControllerClaimError("CONTROLLER_CLAIM_WRITE_FAILED") from exc
 
 
 def _validate_private_directory(path: Path) -> None:
@@ -204,6 +233,15 @@ def _validate_private_directory(path: Path) -> None:
         raise ControllerClaimError("CONTROLLER_STATE_ROOT_UNTRUSTED")
 
 
+def _fsync_directory(path: Path) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
 def _write_exclusive(path: Path, data: bytes) -> None:
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(path, flags, 0o600)
@@ -211,8 +249,4 @@ def _write_exclusive(path: Path, data: bytes) -> None:
         stream.write(data)
         stream.flush()
         os.fsync(stream.fileno())
-    parent = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-    try:
-        os.fsync(parent)
-    finally:
-        os.close(parent)
+    _fsync_directory(path.parent)
