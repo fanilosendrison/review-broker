@@ -5,7 +5,7 @@ asset_type: "specification"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker v1 Specification"
-version: "0.1.0"
+version: "0.2.0"
 ---
 
 # Review Broker v1 Specification
@@ -64,13 +64,17 @@ prerequisite for bounded, authorized low-sensitivity use. Review Broker must
 instead retain its essential controls, declare actual residual risks honestly,
 and refuse any path with observed material credential disclosure.
 
-The only currently authorized authenticated exception to the production gate is
-RB-PILOT-01 (#26): one explicitly acknowledged, fixed non-secret synthetic
-fixture, no consumer PR, no repository source execution, no GitHub publication,
-and no automatic retry. A separate local validation receipt is not production
-EvidenceStatus VALID. The pilot may use the pinned native Codex executable and
-its existing OAuth session while the exhaustive internal policy attestations
-remain unavailable; no claim of comprehensive credential isolation follows.
+RB-PILOT-01 (#26) was the only authenticated exception to the production gate.
+Its identity is consumed and permanently closed. RB-PILOT-02 is prepared as a
+separate, explicitly acknowledged, fixed non-secret synthetic fixture with no
+consumer PR, repository source execution, GitHub publication, or automatic
+retry. Its executable entry point does not authorize inference:
+`RB-PILOT-02_INFERENCE_AUTHORIZED=NO`. A future mandate must authorize exactly
+one invocation after independent code-identity and operating-condition checks.
+A local validation receipt is not production EvidenceStatus VALID. The pilot
+retains the pinned native Codex executable and requested policy while exhaustive
+internal policy attestations remain unavailable; no claim of comprehensive
+credential isolation follows.
 
 After a successful pilot, ordinary authorized non-secret or low-sensitivity PR
 reviews may be admitted only by a separately versioned and tested operational

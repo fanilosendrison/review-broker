@@ -5,7 +5,7 @@ asset_type: "security-contract"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Independence Contract"
-version: "0.1.4"
+version: "0.2.0"
 ---
 
 # Reviewer Independence Contract
@@ -46,10 +46,11 @@ non-inference diagnostics are separate processes or expose only requirements;
 `codex exec --json` does not emit the required effective values before turn
 transport. The broker therefore records effective policy attestation as
 `UNAVAILABLE` rather than claiming that the requested profile became effective.
-The authenticated production reviewer path remains disabled. The narrowly
-specified, fixed-fixture synthetic pilot in the governing specification is a
-separate and explicitly authorized non-production exception. It retains all
-existing requested controls, but does not claim attested effective Codex policy.
+The authenticated production reviewer path remains disabled. The historical
+fixed-fixture RB-PILOT-01 exception is consumed. RB-PILOT-02 is a separately
+prepared non-production path that retains all existing requested controls but
+has no inference authorization and does not claim attested effective Codex
+policy.
 
 The revised profile grants only Codex's minimal system read set and the exact
 prepared packet directory. It explicitly denies the runtime home and trusted
@@ -77,11 +78,13 @@ placed in model input or evidence. A demonstrated credential disclosure or
 unexpected privileged capability blocks the affected path and requires a
 specific mitigation.
 
-Only RB-PILOT-01 (#26) is presently admitted outside the production workflow:
-fixed synthetic data, explicit one-shot consent, no privileged orchestration
-credentials, no GitHub publishing, and local evidence only. This is an
-accepted residual-risk experiment, not a certification of Codex. Subsequent
-ordinary reviews require a distinct bounded operational admission decision.
+RB-PILOT-01 (#26) is consumed and cannot be admitted again. RB-PILOT-02 is
+prepared outside the production workflow with fixed synthetic data, no
+privileged orchestration credentials, no GitHub publishing, and local evidence
+only. Preparation is not consent to inference. A separate future mandate must
+grant explicit one-shot consent. This remains a residual-risk experiment, not
+a certification of Codex. Subsequent ordinary reviews require a distinct
+bounded operational admission decision.
 
 ## Credential ownership
 
@@ -123,6 +126,5 @@ probes must demonstrate:
 An external reviewer must examine the probe design and observations. The broker
 cannot review itself into comprehensive qualification. Until the production
 gate passes, the normal GitHub Actions review workflow stops before Codespace
-startup with `SECURITY_BOUNDARY_NOT_QUALIFIED`. The explicitly authorized,
-non-production RB-PILOT-01 local path is not this workflow and cannot set the
-production gate.
+startup with `SECURITY_BOUNDARY_NOT_QUALIFIED`. The consumed RB-PILOT-01 and prepared-but-unauthorized RB-PILOT-02 local paths
+are not this workflow and cannot set the production gate.

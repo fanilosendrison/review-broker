@@ -5,13 +5,17 @@ asset_type: "qualification-procedure"
 domain: "independent-review"
 severity: "strict"
 name: "One-shot Synthetic Pilot Procedure"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # RB-PILOT-01: explicit non-production synthetic review
 
 Authority: specification, 2026-10-26 proportional security decision #27 and
 pilot issue #26. This is not a production ReviewRequest.
+
+Current status: `RB-PILOT-01=CONSUMED`. RB-PILOT-02 is documented separately in
+[`pilot-synthetic-02.md`](pilot-synthetic-02.md) as prepared but not authorized.
+Nothing in this historical procedure authorizes the new identity.
 
 The existing reviewed PR #14 remains unmerged; the code must be independently
 inspected before it is installed in the credential-bearing Codespace.
