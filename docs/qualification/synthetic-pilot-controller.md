@@ -5,7 +5,7 @@ asset_type: "qualification-procedure"
 domain: "independent-review"
 severity: "strict"
 name: "Synthetic Pilot Controller Persistence and Retention"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Synthetic pilot controller persistence and retention
@@ -27,9 +27,11 @@ request identity string. Its `controller-claim.json` binds the supplied pilot,
 request, attempt, and source identities in state `ARMED`.
 
 Write the claim after all non-model preflights and before any model-capable
-command. Treat every valid, malformed, partial, inaccessible, aliased, or
-otherwise ambiguous existing reservation as consumed. Never replace or
-automatically delete it.
+command. Synchronize each parent directory after creating a managed child,
+including the controller root after creating the request reservation. Treat
+every valid, malformed, partial, inaccessible, aliased, or otherwise ambiguous
+existing reservation as consumed. Never complete, replace, or automatically
+delete it.
 
 The controller storage guarantee applies to one designated controller and its
 persistent filesystem. It does not implement distributed consensus and does
@@ -60,10 +62,14 @@ observation and transfer outcome separately.
 
 ## Diagnostic admission
 
-Retain raw diagnostics only when the verified summary states
-`credential_screen=PASS_NO_MATCH`. Also require each remote file to be regular,
-non-aliased, singly linked, coherently observed, within its explicit size bound,
-and negative under known-pattern credential screening.
+Validate the retained claim, armed receipt, summary, and outcome-dependent
+failure receipt once as one canonical, identity-coherent set. Report sanitized
+receipt retention as `PASS` only for a valid set. Retain raw diagnostics only
+when that same validation decision passes and the validated summary states
+`credential_screen=PASS_NO_MATCH`. A valid failed pilot remains eligible when
+its summary and failure receipt agree. Also require each remote file to be
+regular, non-aliased, singly linked, coherently observed, within its explicit
+size bound, and negative under known-pattern credential screening.
 
 Apply these limits:
 
@@ -94,6 +100,12 @@ boundary. Retention failure, contamination, missing artifacts, or integrity
 failure must not leave the Codespace running and must not authorize a retry.
 
 Publish only sanitary statuses. Never publish raw diagnostics or their hashes.
+
+Manifest replay remains fail-closed when a newly generated retention timestamp
+conflicts with an existing manifest. If retention and Shutdown both fail, the
+Shutdown exception remains primary and the retention exception remains its
+context. These deferred nonblocking limitations do not weaken receipt admission
+or authorize a retry.
 
 ## Future integration boundary
 

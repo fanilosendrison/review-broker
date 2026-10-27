@@ -5,7 +5,7 @@ asset_type: "qualification-procedure"
 domain: "independent-review"
 severity: "strict"
 name: "RB-PILOT-02 Historical Synthetic Pilot Record"
-version: "0.2.0"
+version: "0.2.1"
 ---
 
 # RB-PILOT-02: consumed and permanently closed
@@ -61,9 +61,11 @@ The independent controller stores future authorized request reservations under
 `~/.local/state/review-broker/pilots/`. A reservation is keyed by the canonical
 SHA-256 of the supplied request identity and binds pilot, request, attempt, and
 source identities. It is written exclusively with private permissions and
-file/directory durability barriers before any model-capable command.
+file/directory durability barriers, including the parent of every newly created
+managed directory, before any model-capable command.
 
-A valid or ambiguous existing reservation blocks reuse. Reservations are never
+A valid or ambiguous existing reservation blocks reuse. A preexisting empty
+reservation is never completed automatically. Reservations are never
 automatically removed after success, failure, timeout, lost SSH, transfer
 failure, process restart, remote cleanup, or Codespace restart. This guarantee
 covers the designated controller and its persistent storage. It is not
@@ -77,11 +79,15 @@ emission with the durable reservation boundary.
 
 ### Private diagnostic retention
 
-Before Shutdown, the controller first retains verified sanitized receipts. Raw
-Codex events, stderr, final output, and exit state are eligible only when a valid
-summary establishes `credential_screen=PASS_NO_MATCH`, remote observation is
-regular and coherent, known-pattern screening passes, and explicit size limits
-hold.
+Before Shutdown, the controller first retains sanitized receipt copies and
+validates their canonical structure, controller binding, packet identity, and
+outcome coherence as one set. A failed outcome requires its coherent failure
+receipt; a successful outcome forbids one. Raw Codex events, stderr, final
+output, and exit state are eligible only when that single validation decision
+passes, its summary establishes `credential_screen=PASS_NO_MATCH`, remote
+observation is regular and coherent, known-pattern screening passes, and
+explicit size limits hold. A coherent `CODEX_APPLICATION_ERROR` failure remains
+eligible for diagnostic retention.
 
 Eligible files are copied through a fixed literal-path boundary without remote
 expansion. The controller rechecks type, size, digest, and credential patterns
@@ -115,7 +121,9 @@ After that command, regardless of outcome, the controller must:
 
 Partial retention remains partial. Missing files remain absent. A successful
 Shutdown does not manufacture successful retention, and retention failure does
-not authorize another inference.
+not authorize another inference. Manifest timestamp replay conflicts and the
+primary exception when retention and Shutdown both fail remain deferred
+nonblocking limitations.
 
 ## Current qualification boundary
 
