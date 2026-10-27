@@ -44,7 +44,9 @@ class SyntheticPilotTests(unittest.TestCase):
             self.assertEqual(len(manifest["sources"]), 1)
 
     def _run(self, temp, invoke):
-        root = Path(temp)
+        # macOS exposes /var through /private/var; use the canonical path so
+        # the fixture does not trip the production anti-symlink-path guard.
+        root = Path(temp).resolve()
         home = root / "home"
         workspace = root / "workspace"
         (home / ".codex").mkdir(parents=True)
