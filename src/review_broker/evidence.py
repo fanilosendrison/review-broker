@@ -7,8 +7,10 @@ import json
 from pathlib import Path
 import re
 import shutil
-from typing import Any, Mapping
+import stat
+from typing import Any, BinaryIO, Mapping
 
+from .fileobservation import FileObservationError, observed_regular_file
 from .identity import artifact_identity, canonical_bytes
 
 REQUIRED_EVIDENCE_FILES = (
@@ -48,6 +50,8 @@ _CREDENTIAL_PATTERNS = (
     re.compile(rb"\bgh[opusr]_[A-Za-z0-9]{20,}"),
     re.compile(rb"\bsk-[A-Za-z0-9_-]{20,}"),
 )
+_FILE_READ_BLOCK_BYTES = 65_536
+_CREDENTIAL_SCAN_CARRY_BYTES = 128
 
 
 def evidence_manifest(directory: Path) -> dict[str, dict[str, Any]]:
@@ -87,18 +91,41 @@ def credential_material_detected(value: Any) -> bool:
 
 def scan_for_credentials(directory: Path) -> list[str]:
     contaminated: list[str] = []
-    for path in sorted(directory.rglob("*")):
-        relative = path.relative_to(directory).as_posix()
-        if path.is_symlink():
-            contaminated.append(relative)  # Never follow an untrusted evidence alias.
-        elif path.is_file():
-            try:
-                data = path.read_bytes()
-            except OSError as exc:
-                raise EvidenceCaptureError("CREDENTIAL_SCREENING_UNDETERMINED") from exc
-            if any(pattern.search(data) for pattern in _CREDENTIAL_PATTERNS):
+    try:
+        paths = sorted(directory.rglob("*"))
+        for path in paths:
+            relative = path.relative_to(directory).as_posix()
+            metadata = path.lstat()
+            if stat.S_ISLNK(metadata.st_mode):
                 contaminated.append(relative)
+            elif stat.S_ISDIR(metadata.st_mode):
+                continue
+            elif not stat.S_ISREG(metadata.st_mode):
+                raise EvidenceCaptureError("CREDENTIAL_SCREENING_UNDETERMINED")
+            else:
+                with observed_regular_file(path) as stream:
+                    if _stream_contains_credential(stream):
+                        contaminated.append(relative)
+    except (OSError, EvidenceCaptureError, FileObservationError) as exc:
+        raise EvidenceCaptureError("CREDENTIAL_SCREENING_UNDETERMINED") from exc
     return contaminated
+
+
+def _stream_contains_credential(stream: BinaryIO) -> bool:
+    """Scan complete bytes with fixed memory, preserving cross-block matches."""
+    carry, whitespace_pending = b"", False
+    while chunk := stream.read(_FILE_READ_BLOCK_BYTES):
+        normalized = bytearray()
+        for value in chunk:
+            whitespace = value in b" \t\n\r\f\v"
+            if not whitespace or not whitespace_pending:
+                normalized.append(0x20 if whitespace else value)
+            whitespace_pending = whitespace
+        window = carry + bytes(normalized)
+        if any(pattern.search(window) for pattern in _CREDENTIAL_PATTERNS):
+            return True
+        carry = window[-_CREDENTIAL_SCAN_CARRY_BYTES:]
+    return False
 
 
 def quarantine_contaminated_evidence(

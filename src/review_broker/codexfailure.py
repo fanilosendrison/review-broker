@@ -5,15 +5,16 @@ import hashlib
 import json
 from pathlib import Path
 import re
-from typing import Any, Mapping
+from typing import Any, BinaryIO, Iterable, Mapping
 
 from .evidence import credential_material_detected
+from .fileobservation import FileObservationError, observed_regular_file
 
 UNDETERMINED = "UNDETERMINED"
 _MAX_EVENT_BYTES = 65_536
 _MAX_EVENT_COUNT = 1_024
 _MAX_FAILURE_EVENTS = 16
-_MAX_NESTED_MESSAGE_BYTES = 4_096
+_HASH_BLOCK_BYTES = 65_536
 _SAFE_FIELD = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,127}")
 _FAILURE_ARTIFACTS = (
     "attempt.json",
@@ -28,7 +29,7 @@ _FAILURE_ARTIFACTS = (
 
 
 def classify_diagnostic_text(text: str) -> str:
-    """Classify known diagnostics without treating the fallback as a crash."""
+    """Retain legacy text classification for callers, not evidence claims."""
     lowered = text.lower()
     if "model" in lowered and any(
         word in lowered for word in ("unavailable", "not available", "not found")
@@ -50,37 +51,56 @@ def observe_codex_failure(
     stderr_bytes: bytes | None,
     transport: str | None = None,
 ) -> dict[str, Any]:
-    """Return bounded structured facts, never raw provider diagnostics."""
+    """Return structured facts without promoting free diagnostic text."""
+    del stderr_bytes  # Free-form stderr is not evidence of a specific cause.
     stream_status, failure_events = _failure_events(event_bytes)
-    diagnostic = _diagnostic_text(event_bytes, stderr_bytes)
-    known = classify_diagnostic_text(diagnostic)
-    exit_code: int | str = returncode if type(returncode) is int and returncode >= 0 else UNDETERMINED
-    signal: int | str = -returncode if type(returncode) is int and returncode < 0 else UNDETERMINED
-    process_outcome = "UNDETERMINED"
+    return _observation(returncode, stream_status, failure_events, transport)
+
+
+def observe_codex_failure_files(
+    *,
+    returncode: int | None,
+    events_path: Path,
+    stderr_path: Path,
+    transport: str | None = None,
+) -> dict[str, Any]:
+    """Observe an event file incrementally; stderr never establishes cause."""
+    del stderr_path
+    stream_status, failure_events = _failure_events_file(events_path)
+    return _observation(returncode, stream_status, failure_events, transport)
+
+
+def _observation(
+    returncode: int | None,
+    stream_status: str,
+    failure_events: list[dict[str, Any]],
+    transport: str | None,
+) -> dict[str, Any]:
+    exit_code: int | str = (
+        returncode if type(returncode) is int and returncode >= 0 else UNDETERMINED
+    )
+    signal: int | str = (
+        -returncode if type(returncode) is int and returncode < 0 else UNDETERMINED
+    )
+    process_outcome = UNDETERMINED
     if transport == "TIMEOUT":
-        classification = "CODEX_TIMEOUT_INDETERMINATE"
-        process_outcome = "TIMEOUT"
+        classification, process_outcome = "CODEX_TIMEOUT_INDETERMINATE", "TIMEOUT"
     elif transport is not None:
-        classification = "CODEX_TRANSPORT_FAILURE"
-        process_outcome = "TRANSPORT_FAILURE"
+        classification, process_outcome = "CODEX_TRANSPORT_FAILURE", "TRANSPORT_FAILURE"
     elif type(returncode) is int and returncode < 0:
-        classification = "CODEX_NATIVE_CRASH"
-        process_outcome = "NATIVE_SIGNAL"
+        classification = "CODEX_SIGNAL_TERMINATION"
+        process_outcome = "SIGNAL_TERMINATION"
     elif any(item["http_status"] != UNDETERMINED for item in failure_events):
         classification = "CODEX_PROVIDER_ERROR"
-        process_outcome = "EXITED_NONZERO"
-    elif known != "CODEX_FAILURE_UNCLASSIFIED":
-        classification = known
-        process_outcome = "EXITED_NONZERO"
+        process_outcome = _exit_outcome(returncode)
     elif failure_events:
         classification = "CODEX_APPLICATION_ERROR"
-        process_outcome = "EXITED_NONZERO"
+        process_outcome = _exit_outcome(returncode)
     elif type(returncode) is int and returncode != 0:
         classification = "CODEX_NONZERO_EXIT_UNCLASSIFIED"
         process_outcome = "EXITED_NONZERO"
     else:
         classification = "CODEX_FAILURE_UNCLASSIFIED"
-
     return {
         "classification": classification,
         "process_outcome": process_outcome,
@@ -92,49 +112,43 @@ def observe_codex_failure(
     }
 
 
-def observe_codex_failure_files(
-    *,
-    returncode: int | None,
-    events_path: Path,
-    stderr_path: Path,
-    transport: str | None = None,
-) -> dict[str, Any]:
-    """Observe invocation files while preserving unreadable evidence as unknown."""
-    return observe_codex_failure(
-        returncode=returncode,
-        event_bytes=_optional_bytes(events_path),
-        stderr_bytes=_optional_bytes(stderr_path),
-        transport=transport,
-    )
+def _exit_outcome(returncode: int | None) -> str:
+    if type(returncode) is int and returncode != 0:
+        return "EXITED_NONZERO"
+    if returncode == 0:
+        return "EXITED_ZERO_WITH_FAILURE_EVENT"
+    return UNDETERMINED
 
 
 def failure_artifact_manifest(directory: Path) -> dict[str, dict[str, Any]]:
-    """Hash available bounded artifacts without following aliases."""
+    """Hash stable regular artifacts incrementally without following aliases."""
     artifacts: dict[str, dict[str, Any]] = {}
     for name in _FAILURE_ARTIFACTS:
-        path = directory / name
-        if path.is_symlink() or not path.is_file():
-            artifacts[name] = {
-                "present": False,
-                "byte_length": 0,
-                "sha256": UNDETERMINED,
-            }
-            continue
         try:
-            content = path.read_bytes()
-        except OSError:
+            length, digest = _hash_regular_file(directory / name)
+        except (OSError, FileObservationError):
             artifacts[name] = {
                 "present": False,
                 "byte_length": 0,
                 "sha256": UNDETERMINED,
             }
-            continue
-        artifacts[name] = {
-            "present": True,
-            "byte_length": len(content),
-            "sha256": hashlib.sha256(content).hexdigest(),
-        }
+        else:
+            artifacts[name] = {
+                "present": True,
+                "byte_length": length,
+                "sha256": digest,
+            }
     return artifacts
+
+
+def _hash_regular_file(path: Path) -> tuple[int, str]:
+    digest = hashlib.sha256()
+    length = 0
+    with observed_regular_file(path) as stream:
+        while chunk := stream.read(_HASH_BLOCK_BYTES):
+            digest.update(chunk)
+            length += len(chunk)
+    return length, digest.hexdigest()
 
 
 def build_pilot_failure_receipt(
@@ -234,17 +248,35 @@ def _bounded_observation(value: Mapping[str, Any] | None) -> dict[str, Any] | No
 def _failure_events(value: bytes | None) -> tuple[str, list[dict[str, Any]]]:
     if value is None:
         return "UNAVAILABLE", []
-    if not value.strip():
-        return "EMPTY", []
-    lines = value.splitlines()
-    if len(lines) > _MAX_EVENT_COUNT:
-        return "LIMIT_EXCEEDED", []
+    return _parse_failure_lines(value.splitlines())
+
+
+def _failure_events_file(path: Path) -> tuple[str, list[dict[str, Any]]]:
+    try:
+        with observed_regular_file(path) as stream:
+            return _parse_failure_lines(_bounded_lines(stream))
+    except (OSError, FileObservationError):
+        return "UNAVAILABLE", []
+
+
+def _bounded_lines(stream: BinaryIO) -> Iterable[bytes]:
+    while line := stream.readline(_MAX_EVENT_BYTES + 2):
+        if line.endswith(b"\n"):
+            line = line[:-1]
+            if line.endswith(b"\r"):
+                line = line[:-1]
+        yield line
+
+
+def _parse_failure_lines(lines: Iterable[bytes]) -> tuple[str, list[dict[str, Any]]]:
     events: list[dict[str, Any]] = []
+    content_seen = False
     for index, line in enumerate(lines):
+        if index >= _MAX_EVENT_COUNT or len(line) > _MAX_EVENT_BYTES:
+            return "LIMIT_EXCEEDED", []
         if not line.strip():
             continue
-        if len(line) > _MAX_EVENT_BYTES:
-            return "LIMIT_EXCEEDED", []
+        content_seen = True
         try:
             event = json.loads(line.decode("utf-8", errors="strict"))
         except (UnicodeError, json.JSONDecodeError):
@@ -255,6 +287,14 @@ def _failure_events(value: bytes | None) -> tuple[str, list[dict[str, Any]]]:
             if len(events) == _MAX_FAILURE_EVENTS:
                 return "LIMIT_EXCEEDED", []
             events.append(_sanitized_event(event, index))
+    if not content_seen:
+        return "EMPTY", []
+    statuses = {
+        event["http_status"] for event in events
+        if event["http_status"] != UNDETERMINED
+    }
+    if len(statuses) > 1:
+        return "CONTRADICTORY", []
     return "PARSED", events
 
 
@@ -262,51 +302,24 @@ def _sanitized_event(event: Mapping[str, Any], index: int) -> dict[str, Any]:
     observed: dict[str, Any] = {
         "event_index": index,
         "event_type": event["type"],
-        "event_id": _safe_field(event.get("id", event.get("event_id"))),
+        "event_id": UNDETERMINED,
         "category": UNDETERMINED,
         "code": UNDETERMINED,
         "http_status": UNDETERMINED,
         "parameter": UNDETERMINED,
     }
-    for candidate in _structured_candidates(event):
-        error = candidate.get("error") if isinstance(candidate.get("error"), Mapping) else candidate
-        _fill_text(observed, "category", error.get("type"))
-        _fill_text(observed, "code", error.get("code"))
-        _fill_text(observed, "parameter", error.get("param"))
-        status = candidate.get("status", error.get("status"))
-        if observed["http_status"] == UNDETERMINED and type(status) is int and 100 <= status <= 599:
-            observed["http_status"] = status
-    return observed
-
-
-def _structured_candidates(event: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    candidates: list[Mapping[str, Any]] = [event]
     error = event.get("error")
-    if isinstance(error, Mapping):
-        candidates.append(error)
-        nested = _nested_object(error.get("message"))
-        if nested is not None:
-            candidates.append(nested)
-    nested = _nested_object(event.get("message"))
-    if nested is not None:
-        candidates.append(nested)
-    return candidates
-
-
-def _nested_object(value: Any) -> Mapping[str, Any] | None:
-    if not isinstance(value, str) or len(value.encode("utf-8")) > _MAX_NESTED_MESSAGE_BYTES:
-        return None
-    decoder = json.JSONDecoder()
-    for index, character in enumerate(value):
-        if character != "{":
-            continue
-        try:
-            candidate, _ = decoder.raw_decode(value, index)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(candidate, dict):
-            return candidate
-    return None
+    structured = error if isinstance(error, Mapping) else event
+    category = structured.get("type") if structured is not event else structured.get("category")
+    _fill_text(observed, "category", category)
+    _fill_text(observed, "code", structured.get("code"))
+    _fill_text(observed, "parameter", structured.get("param"))
+    status = event.get("status")
+    if type(status) is not int and structured is not event:
+        status = structured.get("status")
+    if type(status) is int and 100 <= status <= 599:
+        observed["http_status"] = status
+    return observed
 
 
 def _fill_text(target: dict[str, Any], key: str, value: Any) -> None:
@@ -322,18 +335,3 @@ def _safe_field(value: Any) -> str:
     ):
         return UNDETERMINED
     return value
-
-
-def _diagnostic_text(events: bytes | None, stderr: bytes | None) -> str:
-    chunks = []
-    for value in (stderr, events):
-        if isinstance(value, bytes):
-            chunks.append(value[:_MAX_EVENT_BYTES].decode("utf-8", errors="replace"))
-    return "\n".join(chunks)
-
-
-def _optional_bytes(path: Path) -> bytes | None:
-    try:
-        return path.read_bytes()
-    except OSError:
-        return None
