@@ -75,6 +75,19 @@ message matching the final event, request/subject/packet identities and exact
 physical source citation identifying the age-18 boundary defect. That local
 PASS is **not** full security or production evidence qualification.
 
+## File-observation boundary
+
+Accept a file observation only when two complete bounded-memory reads through
+the same open descriptor have equal byte counts and SHA-256 digests, and a final
+path check still identifies that descriptor's regular file. Treat an incomplete,
+changed, substituted or unavailable observation as indeterminate rather than
+retaining diagnostic facts, an old digest or a negative credential-screening
+claim.
+
+This check is not an exclusive lock, proof of future immutability or absolute
+protection against adversarial concurrent ABA mutation. Do not infer those
+stronger guarantees from an accepted observation.
+
 If credential-shaped material occurs, pilot evidence is quarantined locally.
 If the first attempted transport fails, the run identity is consumed and
 must not be retried automatically.
