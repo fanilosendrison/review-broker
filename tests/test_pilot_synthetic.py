@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import tracemalloc
 import unittest
 from unittest.mock import patch
 
@@ -18,7 +19,10 @@ from review_broker.pilot_synthetic import (
 
 class SyntheticPilotTests(unittest.TestCase):
     def test_acknowledgement_required_without_side_effects(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory() as temp, patch(
+            "review_broker.pilot_synthetic._require_unconsumed_pilot_identity",
+            return_value=None,
+        ):
             run = Path(temp) / "pilot"
             with self.assertRaisesRegex(PilotError, "PILOT_EXPLICIT_ACK_REQUIRED"):
                 run_synthetic_pilot(run, acknowledge_unqualified_pilot=False,
@@ -47,7 +51,10 @@ class SyntheticPilotTests(unittest.TestCase):
         workspace.mkdir()
         env = {"HOME": str(home), "CODEX_HOME": str(home / ".codex"),
                "PATH": "/usr/bin", "LANG": "C.UTF-8"}
-        with patch("review_broker.pilot_synthetic.preflight_codex_runtime",
+        with patch(
+            "review_broker.pilot_synthetic._require_unconsumed_pilot_identity",
+            return_value=None,
+        ), patch("review_broker.pilot_synthetic.preflight_codex_runtime",
                    return_value={"cli_compatibility_verified": True}) as preflight, \
              patch("review_broker.pilot_synthetic.invoke_once", side_effect=invoke) as called:
             result = run_synthetic_pilot(
@@ -129,7 +136,7 @@ class SyntheticPilotTests(unittest.TestCase):
             self.assertEqual(result["end_to_end_pilot"], "PENDING_INDEPENDENT_SHUTDOWN_OBSERVATION")
             self.assertTrue((run / "pilot-armed.json").exists())
             self.assertEqual(json.loads((run / "pilot-summary.json").read_text()), result)
-            with self.assertRaisesRegex(PilotError, "PILOT_FRESH_ABSOLUTE_RUN_DIR_REQUIRED"):
+            with self.assertRaisesRegex(PilotError, "PILOT_IDENTITY_ALREADY_CONSUMED"):
                 run_synthetic_pilot(run, acknowledge_unqualified_pilot=True,
                                     broker_wheel_sha256="a" * 64,
                                     environment={"HOME": str(Path(temp) / "home"), "PATH": "/usr/bin"})
@@ -227,6 +234,23 @@ class SyntheticPilotTests(unittest.TestCase):
             self.assertEqual(result["pilot_functional"], "FAIL")
             self.assertEqual(result["failure"], "MODEL_UNAVAILABLE")
             self.assertTrue((run / "pilot-armed.json").exists())
+
+    def test_oversized_final_output_fails_with_bounded_memory_and_receipt(self):
+        def oversized(evidence, *_args, **_kwargs):
+            self._synthetic_completed(evidence)
+            with (evidence / "codex-final.json").open("wb") as stream:
+                stream.truncate(32 * 1024 * 1024)
+
+        with tempfile.TemporaryDirectory() as temp:
+            tracemalloc.start()
+            run, result = self._run(temp, oversized)
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            self.assertEqual(result["pilot_functional"], "FAIL")
+            self.assertIn("PILOT_FINAL_MESSAGE_MISMATCH",
+                          result["validation_reasons"])
+            self.assertTrue((run / "pilot-failure.json").is_file())
+            self.assertLess(peak, 8 * 1024 * 1024)
 
     def test_contaminated_model_output_is_quarantined(self):
         def contaminated(evidence, *_args, **_kwargs):

@@ -25,14 +25,15 @@ from .codex import (
 from .codexfailure import (
     build_pilot_failure_receipt,
     failure_artifact_manifest,
+    observe_codex_failure,
 )
 from .evidence import quarantine_contaminated_evidence, scan_for_credentials
+from .fileobservation import FileObservationError, read_regular_file_bounded
 from .identity import attempt_identity, canonical_bytes, request_identity, subject_identity
 from .packets import SourceRecord, build_packet, source_lines, verify_packet
 from .reviewer_profile import install_reviewer_profile
 from .validation import (
     _citation_errors,
-    _events,
     _findings_schema,
     _ordered_final_agent_message,
 )
@@ -58,10 +59,18 @@ PILOT_RISK = (
 )
 _FORBIDDEN_ENV_MARKERS = ("TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL",
                           "API_KEY", "DOPPLER", "AUTH", "GH_", "GITHUB_")
+_MAX_PILOT_EVENT_STREAM_BYTES = (65_536 + 1) * 1_024
+_MAX_PILOT_FINAL_BYTES = 65_536
+_MAX_PILOT_EXIT_BYTES = 32
 
 
 class PilotError(ValueError):
     """A narrow synthetic pilot precondition was not met."""
+
+
+def _require_unconsumed_pilot_identity() -> None:
+    """RB-PILOT-01 ordinal 1 is permanently closed after its consumed attempt."""
+    raise PilotError("PILOT_IDENTITY_ALREADY_CONSUMED")
 
 
 def pilot_environment(source: Mapping[str, str]) -> dict[str, str]:
@@ -128,25 +137,51 @@ def _write_once(path: Path, value: dict[str, Any]) -> None:
         os.close(parent_fd)
 
 
+def _pilot_events(value: bytes) -> tuple[list[dict[str, Any]], str | None]:
+    status = observe_codex_failure(
+        returncode=0, event_bytes=value, stderr_bytes=None,
+    )["event_stream_status"]
+    if status != "PARSED":
+        return [], "PILOT_CODEX_EVENTS_" + status
+    try:
+        events = [json.loads(line) for line in value.decode("utf-8").splitlines()
+                  if line.strip()]
+    except (UnicodeError, json.JSONDecodeError):
+        return [], "PILOT_CODEX_EVENTS_MALFORMED"
+    return events, None
+
+
 def _pilot_output(evidence: Path, manifest: dict[str, Any]) -> dict[str, Any]:
-    """Check pilot-only evidence; do not claim production EvidenceStatus.VALID."""
+    """Check bounded pilot evidence; do not claim production EvidenceStatus.VALID."""
     errors: list[str] = []
-    events, event_error = _events(evidence / "codex-events.jsonl")
+    try:
+        event_bytes = read_regular_file_bounded(
+            evidence / "codex-events.jsonl", _MAX_PILOT_EVENT_STREAM_BYTES,
+        )
+    except (OSError, FileObservationError):
+        event_bytes, events, event_error = b"", [], "PILOT_CODEX_EVENTS_UNAVAILABLE"
+    else:
+        events, event_error = _pilot_events(event_bytes)
     if event_error:
         errors.append(event_error)
     final_agent_message, sequence_valid, failed = _ordered_final_agent_message(events)
     if not sequence_valid or failed:
         errors.append("PILOT_TERMINAL_EVENTS_INVALID")
     try:
-        exit_code = (evidence / "codex-exit-code.txt").read_text(encoding="ascii").strip()
-    except (OSError, UnicodeError):
+        exit_code = read_regular_file_bounded(
+            evidence / "codex-exit-code.txt", _MAX_PILOT_EXIT_BYTES,
+        ).decode("ascii").strip()
+    except (OSError, UnicodeError, FileObservationError):
         exit_code = "MISSING"
     if exit_code != "0":
         errors.append("PILOT_CODEX_EXIT_INVALID")
     try:
-        raw_final = (evidence / "codex-final.json").read_text(encoding="utf-8").strip()
-    except (OSError, UnicodeError):
-        raw_final = ""
+        final_bytes = read_regular_file_bounded(
+            evidence / "codex-final.json", _MAX_PILOT_FINAL_BYTES,
+        )
+        raw_final = final_bytes.decode("utf-8").strip()
+    except (OSError, UnicodeError, FileObservationError):
+        final_bytes, raw_final = b"", ""
     if not raw_final or raw_final != final_agent_message:
         errors.append("PILOT_FINAL_MESSAGE_MISMATCH")
     response: dict[str, Any] = {}
@@ -188,10 +223,8 @@ def _pilot_output(evidence: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         "verdict": response.get("verdict") if status == "PASS" else "UNDETERMINED",
         "findings_count": len(response.get("findings", [])) if status == "PASS" else 0,
         "validation_reasons": sorted(set(errors)),
-        "events_sha256": hashlib.sha256((evidence / "codex-events.jsonl").read_bytes()).hexdigest()
-                         if (evidence / "codex-events.jsonl").is_file() else None,
-        "final_sha256": hashlib.sha256((evidence / "codex-final.json").read_bytes()).hexdigest()
-                        if (evidence / "codex-final.json").is_file() else None,
+        "events_sha256": hashlib.sha256(event_bytes).hexdigest() if event_bytes else None,
+        "final_sha256": hashlib.sha256(final_bytes).hexdigest() if final_bytes else None,
     }
 
 
@@ -204,7 +237,8 @@ def run_synthetic_pilot(
     codex_runtime_root: Path = CODEX_RUNTIME_ROOT,
     environment: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Spend one explicitly authorized synthetic attempt, without GitHub I/O."""
+    """Refuse the consumed synthetic identity before any observable side effect."""
+    _require_unconsumed_pilot_identity()
     if not acknowledge_unqualified_pilot:
         raise PilotError("PILOT_EXPLICIT_ACK_REQUIRED")
     if not re.fullmatch(r"[0-9a-f]{64}", broker_wheel_sha256):
@@ -348,8 +382,7 @@ def run_synthetic_pilot(
                 "failure_receipt_sha256": None,
             })
         else:
-            outcome["failure_receipt_sha256"] = hashlib.sha256(
-                failure_path.read_bytes()
-            ).hexdigest()
+            receipt_bytes = canonical_bytes(failure_receipt) + b"\n"
+            outcome["failure_receipt_sha256"] = hashlib.sha256(receipt_bytes).hexdigest()
     _write_once(target / "pilot-summary.json", outcome)
     return outcome

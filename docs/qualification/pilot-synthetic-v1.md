@@ -18,9 +18,12 @@ inspected before it is installed in the credential-bearing Codespace.
 
 RB-PILOT-01 binds its fixed request identity to fixture ordinal `1` and derives
 its attempt identity with attempt ordinal `1`. That identity was armed and
-consumed by the authorized #26 invocation on 2026-10-27. Do not invoke it again.
-Require a separately authorized pilot identity, with a distinct request and
-attempt identity, before any future model-capable attempt.
+consumed by the authorized #26 invocation on 2026-10-27. The public Python and
+CLI entry points now fail with `PILOT_IDENTITY_ALREADY_CONSUMED` before runtime
+preflight, run-directory creation or invocation. A fresh directory and explicit
+acknowledgment cannot reopen it. Require a separately authorized pilot identity,
+with a distinct request and attempt identity, before any future model-capable
+attempt; this procedure does not create one.
 
 ## Boundaries
 
@@ -38,32 +41,13 @@ attempt identity, before any future model-capable attempt.
 - No publication, issue comment, PR review, merge or automatic retry.
 - Retain historical hard-link/proc findings and OBL-02/03/04 as unqualified.
 
-## Preparation (operator, not automated by the chat)
+## Closed identity
 
-1. Verify the exact approved PR #14 candidate SHA and green CI.
-2. Build the Review Broker wheel from that SHA in a separate trusted worktree,
-   inspect the change and transfer the wheel to the existing Codespace. Verify
-   the transferred SHA-256; install it without executing any reviewed subject
-   code. Do not re-use unverified local packages.
-3. Verify that the existing root-owned Codex runtime exists at
-   /var/lib/review-broker/codex-0.164.0-linux-x64.
-4. Launch using only a scrubbed non-secret process environment. Example
-   (substitute a *fresh* run path, verified wheel SHA, and a minimal PATH that
-   resolves exactly one trusted Codex npm launcher):
-
-   env -i HOME="$HOME" CODEX_HOME="$HOME/.codex" \
-     PATH="/usr/local/bin:/usr/bin:/bin" LANG=C.UTF-8 TZ=UTC \
-     python3 -P -m review_broker.cli pilot-synthetic \
-       --run-dir /tmp/review-broker-pilot-26-unique \
-       --broker-wheel-sha256 VERIFIED_WHEEL_SHA256 \
-       --acknowledge-unqualified-pilot
-
-5. Never automatically rerun this command for the same run directory or the
-   consumed RB-PILOT-01 identity. The `pilot-armed.json` record is flushed
-   before any model-capable invocation. Treat request ordinal `1` and attempt
-   ordinal `1` as consumed. A future expressly authorized pilot must define a
-   distinct request and attempt identity; a fresh directory alone is not new
-   invocation authority.
+Do not prepare, install or launch RB-PILOT-01 again. Treat request ordinal `1`
+and attempt ordinal `1` as consumed. Its entry point is retained only to return
+the stable refusal before consulting runtime or credential state. A future
+expressly authorized pilot must define a distinct request and attempt identity;
+a fresh directory alone is not new invocation authority.
 
 ## Local evidence and interpretation
 
@@ -77,12 +61,14 @@ The pilot produces private local files under its run directory:
 - `pilot-summary.json`: sanitized local output.
 
 Treat `CODEX_FAILURE_UNCLASSIFIED` and `CODEX_NONZERO_EXIT_UNCLASSIFIED` as
-unknown causes, not native crashes. Accept `CODEX_NATIVE_CRASH` only when the
-direct child process reports a native signal. The failure receipt may retain
-only bounded structured fields actually present in `error` or `turn.failed`
-events, process outcome, identities and artifact hashes. Do not retain raw
-provider messages in that receipt. Keep absent fields `UNDETERMINED` and let
-credential quarantine take priority over diagnostic extraction.
+unknown causes. A negative direct-child return code establishes only
+`CODEX_SIGNAL_TERMINATION` and its signal number, never a native crash. The
+failure receipt may retain only bounded structured fields directly present in
+recognized `error` or `turn.failed` envelopes, process outcome, identities and
+artifact hashes. Free-form messages and stderr cannot establish a provider
+cause. Do not retain raw provider messages or opaque event identifiers in that
+receipt. Keep absent fields `UNDETERMINED` and let credential quarantine take
+priority over diagnostic extraction.
 
 A local PASS requires a single completed Codex turn, a schema-valid JSON
 message matching the final event, request/subject/packet identities and exact
@@ -94,6 +80,9 @@ If the first attempted transport fails, the run identity is consumed and
 must not be retried automatically.
 
 ## Operator cleanup (outside the pilot process)
+
+This transfer remains operationally unverified:
+`PILOT_SANITIZED_RECEIPT_RETENTION=UNVERIFIED`.
 
 Before stopping the Codespace, use the independently authenticated controller
 to recover private copies of `pilot-armed.json`, `pilot-summary.json` and, when

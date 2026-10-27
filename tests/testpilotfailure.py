@@ -13,7 +13,8 @@ from unittest.mock import patch
 from review_broker.codex import InvocationError
 from review_broker.codexfailure import observe_codex_failure
 from review_broker.identity import attempt_identity, request_identity
-from review_broker.pilot_synthetic import PILOT_SOURCE, run_synthetic_pilot
+from review_broker.cli import main
+from review_broker.pilot_synthetic import PILOT_SOURCE, PilotError, run_synthetic_pilot
 
 
 class SyntheticPilotFailureReceiptTests(unittest.TestCase):
@@ -30,6 +31,9 @@ class SyntheticPilotFailureReceiptTests(unittest.TestCase):
             "LANG": "C.UTF-8",
         }
         with patch(
+            "review_broker.pilot_synthetic._require_unconsumed_pilot_identity",
+            return_value=None,
+        ), patch(
             "review_broker.pilot_synthetic.preflight_codex_runtime",
             return_value={"cli_compatibility_verified": True},
         ), patch("review_broker.pilot_synthetic.invoke_once", side_effect=invoke) as called:
@@ -45,8 +49,9 @@ class SyntheticPilotFailureReceiptTests(unittest.TestCase):
         return root / "pilot", result
 
     def test_failure_receipt_is_private_structured_and_durable(self):
-        nested = {
-            "type": "error",
+        event = {
+            "type": "turn.failed",
+            "id": "turn-1",
             "error": {
                 "type": "invalid_request_error",
                 "code": "unsupported_value",
@@ -57,11 +62,7 @@ class SyntheticPilotFailureReceiptTests(unittest.TestCase):
         }
         observation = observe_codex_failure(
             returncode=1,
-            event_bytes=(json.dumps({
-                "type": "turn.failed",
-                "id": "turn-1",
-                "error": {"message": json.dumps(nested)},
-            }) + "\n").encode(),
+            event_bytes=(json.dumps(event) + "\n").encode(),
             stderr_bytes=b"",
         )
 
@@ -130,6 +131,53 @@ class SyntheticPilotFailureReceiptTests(unittest.TestCase):
         normalized = " ".join(procedure.split())
         self.assertIn("request ordinal `1` and attempt ordinal `1` as consumed", normalized)
         self.assertIn("distinct request and attempt identity", normalized)
+
+    def test_consumed_identity_blocks_python_and_cli_before_side_effects(self):
+        with tempfile.TemporaryDirectory(
+            dir=Path(tempfile.gettempdir()).resolve()
+        ) as temporary:
+            root = Path(temporary)
+            for ordinal, acknowledged in ((1, False), (2, True)):
+                run = root / f"fresh-{ordinal}"
+                with patch(
+                    "review_broker.pilot_synthetic.pilot_environment",
+                ) as environment, patch(
+                    "review_broker.pilot_synthetic.preflight_codex_runtime",
+                ) as preflight, patch(
+                    "review_broker.pilot_synthetic.invoke_once",
+                ) as invoked:
+                    with self.assertRaisesRegex(
+                        PilotError, "PILOT_IDENTITY_ALREADY_CONSUMED",
+                    ):
+                        run_synthetic_pilot(
+                            run,
+                            acknowledge_unqualified_pilot=acknowledged,
+                            broker_wheel_sha256="a" * 64,
+                            environment={"GH_TOKEN": "must-not-be-read"},
+                        )
+                self.assertFalse(run.exists())
+                environment.assert_not_called()
+                preflight.assert_not_called()
+                invoked.assert_not_called()
+
+            cli_run = root / "cli-fresh"
+            with patch(
+                "review_broker.pilot_synthetic.pilot_environment",
+            ) as environment, patch(
+                "review_broker.pilot_synthetic.preflight_codex_runtime",
+            ) as preflight, patch(
+                "review_broker.pilot_synthetic.invoke_once",
+            ) as invoked:
+                result = main([
+                    "pilot-synthetic", "--run-dir", str(cli_run),
+                    "--broker-wheel-sha256", "a" * 64,
+                    "--acknowledge-unqualified-pilot",
+                ])
+            self.assertEqual(result, 1)
+            self.assertFalse(cli_run.exists())
+            environment.assert_not_called()
+            preflight.assert_not_called()
+            invoked.assert_not_called()
 
     def test_fixed_request_and_attempt_ordinal_one_are_consumed(self):
         def failed(*_args, **_kwargs):
