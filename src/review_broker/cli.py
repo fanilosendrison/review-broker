@@ -25,7 +25,7 @@ from .identity import canonical_bytes
 from .orchestration import prepare_issue, publish_validated_result
 from .reconciliation import reconcile_repository
 from .packets import verify_packet
-from .pilot_synthetic import run_synthetic_pilot
+from .pilot_synthetic import run_synthetic_pilot, run_synthetic_pilot_02
 from .queue import AttemptState
 from .requester import CliError, request as _request, result as _result, status as _status
 from .reviewer_profile import install_reviewer_profile, reviewer_home_from_environment
@@ -47,6 +47,10 @@ def _parser() -> argparse.ArgumentParser:
     pilot.add_argument("--run-dir", required=True, type=Path)
     pilot.add_argument("--broker-wheel-sha256", required=True)
     pilot.add_argument("--acknowledge-unqualified-pilot", action="store_true")
+
+    pilot_02 = subcommands.add_parser("pilot-synthetic-02")
+    pilot_02.add_argument("--broker-wheel-sha256", required=True)
+    pilot_02.add_argument("--acknowledge-unqualified-pilot", action="store_true")
 
     request = subcommands.add_parser("request")
     request.add_argument("--repo", required=True)
@@ -146,12 +150,19 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     # Do not even transiently consume or suppress a privileged variable in a
     # pilot process: pilot_environment() must reject it before model transport.
-    source_token = (None if args.command == "pilot-synthetic" else
+    source_token = (None if args.command in ("pilot-synthetic", "pilot-synthetic-02") else
                     os.environ.pop("REVIEW_BROKER_SOURCE_TOKEN", None))
     try:
         if args.command == "pilot-synthetic":
             result = run_synthetic_pilot(
                 args.run_dir,
+                acknowledge_unqualified_pilot=args.acknowledge_unqualified_pilot,
+                broker_wheel_sha256=args.broker_wheel_sha256,
+            )
+            print(canonical_bytes(result).decode("utf-8"))
+            return 0 if result.get("pilot_functional") == "PASS" else 1
+        if args.command == "pilot-synthetic-02":
+            result = run_synthetic_pilot_02(
                 acknowledge_unqualified_pilot=args.acknowledge_unqualified_pilot,
                 broker_wheel_sha256=args.broker_wheel_sha256,
             )
