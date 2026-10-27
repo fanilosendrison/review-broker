@@ -5,7 +5,7 @@ asset_type: "qualification-procedure"
 domain: "independent-review"
 severity: "strict"
 name: "RB-PILOT-02 Prepared Synthetic Pilot Procedure"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # RB-PILOT-02: prepared, unauthorized synthetic review
@@ -87,9 +87,22 @@ a provider rejection, timeout, validation failure, or incomplete receipt.
 The fixed run directory retains `pilot-armed.json`, `pilot-summary.json`, and,
 on failure, `pilot-failure.json`. Receipts bind the RB-PILOT-02 request,
 attempt, and packet identities; wheel digest; requested model and effort;
-functional state; bounded failure classification when observable; and
-credential-screening or quarantine state. Raw provider messages are not receipt
-facts.
+functional state; bounded failure classification when observable; factual
+runner dispatch and process-start state; and credential-screening or quarantine
+state. Raw provider messages are not receipt facts.
+
+`runner_dispatches` records entry into the single subprocess runner.
+`process_start_status=CONFIRMED` requires a returned process result or timeout;
+an `OSError` or another exception without sufficient start evidence remains
+`UNDETERMINED`. `inference_process_invocations` is derived from that observation,
+not presumed from the Python call to `invoke_once()`. Process creation does not
+prove provider acceptance or authenticated inference.
+
+A structurally invalid result is not interpreted semantically. It produces a
+sanitized local failure and receipt closure when local writes remain available.
+An unexpected output-validation exception is reduced to
+`PILOT_OUTPUT_VALIDATION_UNAVAILABLE`; exception text, tracebacks, and raw model
+output are not copied into receipts.
 
 A local PASS requires valid terminal events, the last agent message, matching
 identities, schema-valid findings, and an exact `S001` line 3 citation containing
