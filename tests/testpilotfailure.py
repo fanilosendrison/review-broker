@@ -68,7 +68,9 @@ class SyntheticPilotFailureReceiptTests(unittest.TestCase):
         def failed(*_args, **_kwargs):
             raise InvocationError("CODEX_PROVIDER_ERROR", failure_observation=observation)
 
-        with tempfile.TemporaryDirectory(dir="/private/tmp") as temporary:
+        with tempfile.TemporaryDirectory(
+            dir=Path(tempfile.gettempdir()).resolve()
+        ) as temporary:
             run, result = self._run(temporary, failed)
             receipt_path = run / "pilot-failure.json"
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
@@ -102,7 +104,9 @@ class SyntheticPilotFailureReceiptTests(unittest.TestCase):
             (evidence / "codex-exit-code.txt").write_text("1\n", encoding="ascii")
             raise InvocationError("CODEX_PROVIDER_ERROR", failure_observation=observation)
 
-        with tempfile.TemporaryDirectory(dir="/private/tmp") as temporary:
+        with tempfile.TemporaryDirectory(
+            dir=Path(tempfile.gettempdir()).resolve()
+        ) as temporary:
             run, result = self._run(temporary, contaminated)
             receipt_text = (run / "pilot-failure.json").read_text(encoding="utf-8")
             receipt = json.loads(receipt_text)
@@ -135,7 +139,9 @@ class SyntheticPilotFailureReceiptTests(unittest.TestCase):
         expected_request = request_identity({
             "kind": "RB-PILOT-01", "fixture_sha256": digest, "ordinal": 1,
         })
-        with tempfile.TemporaryDirectory(dir="/private/tmp") as temporary:
+        with tempfile.TemporaryDirectory(
+            dir=Path(tempfile.gettempdir()).resolve()
+        ) as temporary:
             run, _ = self._run(temporary, failed)
             armed = json.loads((run / "pilot-armed.json").read_text(encoding="utf-8"))
             receipt = json.loads((run / "pilot-failure.json").read_text(encoding="utf-8"))
