@@ -69,14 +69,13 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
     events, event_error = _events(directory / "codex-events.jsonl")
     if event_error:
         reasons.append(event_error)
-    started = sum(event.get("type") == "turn.started" for event in events)
-    completed = [event for event in events if event.get("type") == "turn.completed"]
-    failures = [event for event in events if event.get("type") in {"turn.failed", "error"}]
-    if failures:
+    final_agent_message, sequence_valid, failure_event = _ordered_final_agent_message(events)
+    if failure_event:
         execution_status = "FAILED"
         reasons.append("CODEX_FAILURE_EVENT")
-    elif started != 1 or len(completed) != 1:
-        execution_status = "INDETERMINATE"
+    if not sequence_valid:
+        if execution_status == "COMPLETED":
+            execution_status = "INDETERMINATE"
         reasons.append("TERMINAL_EVENT_SEQUENCE_INVALID")
     before = _read_text(directory / "input-before.sha256").strip()
     after = _read_text(directory / "input-after.sha256").strip()
@@ -84,14 +83,7 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
     if not expected_prompt or before != expected_prompt or after != expected_prompt:
         reasons.append("PROMPT_INTEGRITY_INVALID")
     final_text = _read_text(directory / "codex-final.json").strip()
-    agent_messages = [
-        event.get("item", {}).get("text", "").strip()
-        for event in events
-        if event.get("type") == "item.completed"
-        and isinstance(event.get("item"), dict)
-        and event["item"].get("type") == "agent_message"
-    ]
-    if not final_text or final_text not in agent_messages:
+    if not final_text or final_text != final_agent_message:
         reasons.append("FINAL_MESSAGE_EVENT_MISMATCH")
         if execution_status == "COMPLETED":
             execution_status = "INDETERMINATE"
@@ -314,6 +306,34 @@ def _citation_errors(response: dict[str, Any], indexed: dict[str, tuple[str, ...
             ):
                 errors.append(f"CITATION_NOT_ANCHORED:{finding.get('id', 'UNKNOWN')}")
     return errors
+
+
+def _ordered_final_agent_message(
+    events: list[dict[str, Any]],
+) -> tuple[str | None, bool, bool]:
+    """Return the last in-turn agent message and strict sequence validity."""
+    started = [index for index, event in enumerate(events)
+               if event.get("type") == "turn.started"]
+    terminal = [index for index, event in enumerate(events)
+                if event.get("type") in {"turn.completed", "turn.failed"}]
+    failure_event = any(
+        event.get("type") in {"turn.failed", "error"} for event in events
+    )
+    if len(started) != 1 or len(terminal) != 1 or started[0] >= terminal[0]:
+        return None, False, failure_event
+    messages = [
+        (index, item["text"].strip())
+        for index, event in enumerate(events)
+        if event.get("type") == "item.completed"
+        and isinstance((item := event.get("item")), dict)
+        and item.get("type") == "agent_message"
+        and isinstance(item.get("text"), str)
+    ]
+    if not messages or any(
+        index <= started[0] or index >= terminal[0] for index, _ in messages
+    ):
+        return None, False, failure_event
+    return messages[-1][1], True, failure_event
 
 
 def _events(path: Path) -> tuple[list[dict[str, Any]], str | None]:

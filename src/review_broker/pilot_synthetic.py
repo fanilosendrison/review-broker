@@ -15,12 +15,23 @@ from typing import Any, Mapping
 
 from jsonschema import Draft202012Validator
 
-from .codex import CodexPolicy, InvocationError, invoke_once, preflight_codex_runtime
+from .codex import (
+    CodexPolicy,
+    InvocationError,
+    invoke_once,
+    preflight_codex_runtime,
+    verify_post_invocation_packet,
+)
 from .evidence import quarantine_contaminated_evidence, scan_for_credentials
 from .identity import attempt_identity, canonical_bytes, request_identity, subject_identity
 from .packets import SourceRecord, build_packet, source_lines, verify_packet
 from .reviewer_profile import install_reviewer_profile
-from .validation import _citation_errors, _events, _findings_schema
+from .validation import (
+    _citation_errors,
+    _events,
+    _findings_schema,
+    _ordered_final_agent_message,
+)
 
 PILOT_SOURCE = (
     b"def eligible(age: int) -> bool:\n"
@@ -119,10 +130,8 @@ def _pilot_output(evidence: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     events, event_error = _events(evidence / "codex-events.jsonl")
     if event_error:
         errors.append(event_error)
-    started = sum(event.get("type") == "turn.started" for event in events)
-    completed = sum(event.get("type") == "turn.completed" for event in events)
-    failed = any(event.get("type") in ("turn.failed", "error") for event in events)
-    if started != 1 or completed != 1 or failed:
+    final_agent_message, sequence_valid, failed = _ordered_final_agent_message(events)
+    if not sequence_valid or failed:
         errors.append("PILOT_TERMINAL_EVENTS_INVALID")
     try:
         exit_code = (evidence / "codex-exit-code.txt").read_text(encoding="ascii").strip()
@@ -134,15 +143,7 @@ def _pilot_output(evidence: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         raw_final = (evidence / "codex-final.json").read_text(encoding="utf-8").strip()
     except (OSError, UnicodeError):
         raw_final = ""
-    messages = [
-        event["item"]["text"].strip()
-        for event in events
-        if event.get("type") == "item.completed"
-        and isinstance(event.get("item"), dict)
-        and event["item"].get("type") == "agent_message"
-        and isinstance(event["item"].get("text"), str)
-    ]
-    if not raw_final or raw_final not in messages:
+    if not raw_final or raw_final != final_agent_message:
         errors.append("PILOT_FINAL_MESSAGE_MISMATCH")
     response: dict[str, Any] = {}
     try:
@@ -177,7 +178,7 @@ def _pilot_output(evidence: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     status = "PASS" if not errors else "FAIL"
     return {
         "pilot_functional": status,
-        "pilot_execution": "COMPLETED" if not failed and started == completed == 1 and exit_code == "0"
+        "pilot_execution": "COMPLETED" if sequence_valid and not failed and exit_code == "0"
                            else "INDETERMINATE",
         "schema_and_citations": "PASS" if status == "PASS" else "FAIL",
         "verdict": response.get("verdict") if status == "PASS" else "UNDETERMINED",
@@ -273,6 +274,12 @@ def run_synthetic_pilot(
         invocation_failure = candidate if re.fullmatch(r"[A-Z0-9_:]{3,100}", candidate) else "INVOKE_FAILED"
     except Exception:
         invocation_failure = "INVOKE_UNEXPECTED_ERROR"
+    post_invocation_failure = ""
+    if not invocation_failure:
+        try:
+            verify_post_invocation_packet(evidence, schema, manifest)
+        except InvocationError:
+            post_invocation_failure = "PILOT_POST_INVOCATION_PACKET_INVALID"
     try:
         contaminated = scan_for_credentials(evidence)
     except Exception:
@@ -297,6 +304,13 @@ def run_synthetic_pilot(
                 "pilot_functional": "FAIL",
                 "pilot_execution": "INDETERMINATE" if "TIMEOUT" in invocation_failure else "FAILED",
                 "failure": invocation_failure,
+            })
+        elif post_invocation_failure:
+            outcome.update({
+                "pilot_functional": "FAIL",
+                "pilot_execution": "INDETERMINATE",
+                "failure": post_invocation_failure,
+                "validation_reasons": [post_invocation_failure],
             })
         else:
             outcome.update(_pilot_output(evidence, manifest))

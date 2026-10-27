@@ -68,6 +68,17 @@ REMOVED_ENVIRONMENT_KEYS = (
 )
 REMOVED_ENVIRONMENT_PREFIXES = ("LD_", "DYLD_")
 
+_INVOCATION_ARTIFACTS = frozenset({
+    "attempt.json",
+    "prompt.sha256",
+    "codex-events.jsonl",
+    "codex-stderr.txt",
+    "codex-final.json",
+    "codex-exit-code.txt",
+    "input-before.sha256",
+    "input-after.sha256",
+})
+
 Runner = Callable[..., subprocess.CompletedProcess[bytes]]
 RuntimeVerifier = Callable[[Mapping[str, str], Path], VerifiedCodexRuntime]
 
@@ -196,17 +207,7 @@ def invoke_once(
     output_path = packet_directory / "codex-final.json"
     if not prompt_path.is_file() or not manifest_path.is_file() or not schema_path.is_file():
         raise InvocationError("INVOCATION_INPUT_MISSING")
-    protected = (
-        "attempt.json",
-        "prompt.sha256",
-        "codex-events.jsonl",
-        "codex-stderr.txt",
-        "codex-final.json",
-        "codex-exit-code.txt",
-        "input-before.sha256",
-        "input-after.sha256",
-        "validation.json",
-    )
+    protected = (*_INVOCATION_ARTIFACTS, "validation.json")
     if any((packet_directory / name).exists() for name in protected):
         raise InvocationError("ALREADY_ATTEMPTED")
     _assert_packet_tree(packet_directory, schema_path)
@@ -310,8 +311,34 @@ def invoke_once(
         raise InvocationError("CODEX_FINAL_MISSING")
 
 
-def _assert_packet_tree(directory: Path, schema_path: Path) -> None:
-    """Deny extra paths and aliases before a model tool receives the packet root."""
+def verify_post_invocation_packet(
+    directory: Path,
+    schema_path: Path,
+    expected_manifest: Mapping[str, object],
+) -> None:
+    """Revalidate immutable inputs and permit only bounded invocation artifacts."""
+    try:
+        if directory.is_symlink() or directory.resolve(strict=True) != directory:
+            raise InvocationError("POST_INVOCATION_PACKET_ROOT_UNTRUSTED")
+        observed_manifest = verify_packet(directory)
+    except (PacketError, OSError, KeyError) as exc:
+        raise InvocationError("POST_INVOCATION_PACKET_INVALID") from exc
+    if observed_manifest != expected_manifest:
+        raise InvocationError("POST_INVOCATION_MANIFEST_MISMATCH")
+    _assert_packet_tree(
+        directory,
+        schema_path.resolve(strict=True),
+        allowed_artifacts=_INVOCATION_ARTIFACTS,
+    )
+
+
+def _assert_packet_tree(
+    directory: Path,
+    schema_path: Path,
+    *,
+    allowed_artifacts: frozenset[str] = frozenset(),
+) -> None:
+    """Deny extra paths and aliases around the immutable packet inputs."""
     try:
         manifest = json.loads((directory / "input-manifest.json").read_bytes())
         sources = manifest["sources"]
@@ -321,7 +348,7 @@ def _assert_packet_tree(directory: Path, schema_path: Path) -> None:
     except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
         raise InvocationError("PACKET_TREE_MANIFEST_INVALID") from exc
     allowed = {"input.txt", "input-manifest.json", "resolved-request.json",
-               "broker-metadata.json"}
+               "broker-metadata.json", *allowed_artifacts}
     if "changes" in manifest:
         allowed.add("changes.patch")
     if schema_path.parent == directory:
