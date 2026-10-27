@@ -10,6 +10,7 @@ import threading
 import unittest
 from unittest.mock import patch
 
+import review_broker.pilot_controller_state as controller_state
 from review_broker.pilot_controller_state import (
     ControllerClaimError,
     arm_controller_attempt,
@@ -44,6 +45,17 @@ class ControllerClaimTests(unittest.TestCase):
             remote.mkdir(); remote.rmdir()
             with self.assertRaisesRegex(ControllerClaimError, "CONTROLLER_ATTEMPT_ALREADY_ARMED"):
                 self.arm(root)
+
+    def test_existing_empty_reservation_is_unavailable_without_new_writes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve() / "pilots"
+            root.mkdir(mode=0o700)
+            reservation = root / request_reservation_digest(REQUEST)
+            reservation.mkdir(mode=0o700)
+            before = list(reservation.iterdir())
+            with self.assertRaisesRegex(ControllerClaimError, "CONTROLLER_CLAIM_UNAVAILABLE"):
+                self.arm(root)
+            self.assertEqual(list(reservation.iterdir()), before)
 
     def test_same_request_refuses_same_or_different_attempt(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -84,27 +96,114 @@ class ControllerClaimTests(unittest.TestCase):
                 with self.assertRaisesRegex(ControllerClaimError, "CONTROLLER_CLAIM_UNAVAILABLE"):
                     self.arm(root)
 
-    def test_untrusted_root_alias_and_mode_are_rejected(self):
+    def test_untrusted_root_reservation_alias_and_mode_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
-            base = Path(temporary); real = base / "real"; real.mkdir(mode=0o700)
+            base = Path(temporary).resolve(); real = base / "real"; real.mkdir(mode=0o700)
             alias = base / "alias"; alias.symlink_to(real)
             with self.assertRaisesRegex(ControllerClaimError, "CONTROLLER_STATE_ROOT_UNTRUSTED"):
                 self.arm(alias)
             weak = base / "weak"; weak.mkdir(mode=0o755)
             with self.assertRaisesRegex(ControllerClaimError, "CONTROLLER_STATE_ROOT_UNTRUSTED"):
                 self.arm(weak)
+            root = base / "pilots"; root.mkdir(mode=0o700)
+            reservation = root / request_reservation_digest(REQUEST)
+            reservation.symlink_to(real)
+            with self.assertRaisesRegex(ControllerClaimError, "CONTROLLER_STATE_ROOT_UNTRUSTED"):
+                self.arm(root)
 
-    def test_write_and_fsync_failures_never_report_success(self):
+    def test_file_reservation_and_root_fsync_are_observed(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary) / "pilots"
-            with patch("review_broker.pilot_controller_state.os.open", side_effect=OSError("synthetic")):
-                with self.assertRaisesRegex(ControllerClaimError, "CONTROLLER_CLAIM_WRITE_FAILED"):
-                    self.arm(root)
+            root = Path(temporary).resolve() / "pilots"
+            root.mkdir(mode=0o700)
+            observed: list[tuple[int, int]] = []
+            real_fsync = os.fsync
+            def record(descriptor):
+                metadata = os.fstat(descriptor)
+                observed.append((metadata.st_dev, metadata.st_ino))
+                return real_fsync(descriptor)
+            with patch("review_broker.pilot_controller_state.os.fsync", side_effect=record):
+                self.arm(root)
+            reservation = root / request_reservation_digest(REQUEST)
+            claim = reservation / "controller-claim.json"
+            for path in (root, reservation, claim):
+                identity = (path.stat().st_dev, path.stat().st_ino)
+                self.assertIn(identity, observed)
+
+    def test_default_managed_chain_fsyncs_each_new_parent_entry(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary) / "pilots"
-            with patch("review_broker.pilot_controller_state.os.fsync", side_effect=OSError("synthetic")):
-                with self.assertRaisesRegex(ControllerClaimError, "CONTROLLER_CLAIM_WRITE_FAILED"):
+            home = Path(temporary).resolve() / "home"
+            home.mkdir(mode=0o700)
+            observed: list[tuple[int, int]] = []
+            real_fsync = os.fsync
+            def record(descriptor):
+                metadata = os.fstat(descriptor)
+                observed.append((metadata.st_dev, metadata.st_ino))
+                return real_fsync(descriptor)
+            with patch("review_broker.pilot_controller_state.Path.home", return_value=home), patch(
+                "review_broker.pilot_controller_state.os.fsync", side_effect=record,
+            ):
+                arm_controller_attempt(
+                    pilot_id="RB-PILOT-EXAMPLE", request_id=REQUEST,
+                    attempt_id=ATTEMPT, source_sha=SOURCE,
+                    _created_utc="2026-10-28T00:00:00+00:00",
+                )
+            root = home / ".local/state/review-broker/pilots"
+            reservation = root / request_reservation_digest(REQUEST)
+            claim = reservation / "controller-claim.json"
+            for path in (
+                home, root.parent.parent.parent, root.parent.parent, root.parent,
+                root, reservation, claim,
+            ):
+                self.assertIn((path.stat().st_dev, path.stat().st_ino), observed)
+
+    def test_creation_and_each_durability_failure_remain_consumed(self):
+        cases = ("reservation-create", "root-fsync", "claim-create", "claim-fsync", "reservation-fsync")
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve() / "pilots"
+                root.mkdir(mode=0o700)
+                reservation = root / request_reservation_digest(REQUEST)
+                real_mkdir = Path.mkdir
+                real_fsync = os.fsync
+                failed_target = False
+                def mkdir(path, *args, **kwargs):
+                    if case == "reservation-create" and path == reservation:
+                        raise OSError("synthetic")
+                    return real_mkdir(path, *args, **kwargs)
+                def fsync(descriptor):
+                    nonlocal failed_target
+                    metadata = os.fstat(descriptor)
+                    identity = (metadata.st_dev, metadata.st_ino)
+                    root_identity = (root.stat().st_dev, root.stat().st_ino)
+                    reservation_identity = (
+                        (reservation.stat().st_dev, reservation.stat().st_ino)
+                        if reservation.exists() else None
+                    )
+                    target = (
+                        case == "root-fsync" and identity == root_identity
+                        or case == "claim-fsync" and stat.S_ISREG(metadata.st_mode)
+                        or case == "reservation-fsync" and identity == reservation_identity
+                    )
+                    if target and not failed_target:
+                        failed_target = True
+                        raise OSError("synthetic")
+                    return real_fsync(descriptor)
+                claim_patch = patch(
+                    "review_broker.pilot_controller_state._write_exclusive",
+                    side_effect=OSError("synthetic"),
+                ) if case == "claim-create" else patch(
+                    "review_broker.pilot_controller_state._write_exclusive",
+                    wraps=controller_state._write_exclusive,
+                )
+                with patch.object(Path, "mkdir", new=mkdir), patch(
+                    "review_broker.pilot_controller_state.os.fsync", side_effect=fsync,
+                ), claim_patch, self.assertRaisesRegex(
+                    ControllerClaimError, "CONTROLLER_CLAIM_WRITE_FAILED",
+                ):
                     self.arm(root)
+                if reservation.exists():
+                    with self.assertRaises(ControllerClaimError):
+                        self.arm(root)
 
     def test_concurrent_arm_has_one_success_and_one_rejection(self):
         with tempfile.TemporaryDirectory() as temporary:
