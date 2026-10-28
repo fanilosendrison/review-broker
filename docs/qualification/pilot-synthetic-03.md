@@ -5,7 +5,7 @@ asset_type: "qualification-procedure"
 domain: "independent-review"
 severity: "strict"
 name: "RB-PILOT-03 Operational Preparation"
-version: "0.1.3"
+version: "0.1.4"
 ---
 
 # RB-PILOT-03 operational preparation
@@ -87,10 +87,20 @@ identity, and `--stdio`, separated only by spaces or horizontal tabs. Shell
 suffixes, substitutions, redirections, prefixes, quoting, escaping, and all
 additional options or arguments are refused rather than normalized.
 
-The 0.4.3 correction changes the candidate source and wheel identities, so all
-prior execution authorizations remain inapplicable. RB-PILOT-03 remains
-unconsumed, and any real execution requires a new product-owner decision bound
-to the new exact SHA and wheel.
+Review Broker 0.4.4 additionally supports the bounded native configuration
+emitted by GitHub CLI 2.37.0: an absolute executable path ending in `gh`, the
+exact `cs ssh -c` Codespace binding, `--stdio -- -i`, and an absolute identity
+path textually equal to the block's single literal `IdentityFile`. The
+executable path, Codespace identity, and identity-file path remain distinct
+values. Paths containing spaces, control characters, or shell syntax are not
+accepted; neither are missing or duplicate identity directives, alternate
+keys, extra arguments, or shell suffixes. Validation never reads the key or
+executes the proxy command.
+
+The 0.4.4 correction changes the candidate source and wheel identities, so all
+prior execution authorizations remain inapplicable. No new inference occurred,
+RB-PILOT-03 remains unconsumed, and any real execution requires a new
+product-owner decision bound to the new exact SHA and wheel.
 
 ## Remote observation and private retention
 

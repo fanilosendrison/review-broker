@@ -51,7 +51,7 @@ class Pilot03PreflightTests(unittest.TestCase):
             "  IdentityFile /tmp/synthetic-key\n"
         )
         config.chmod(0o600)
-        wheel = root / "review_broker-0.4.3-py3-none-any.whl"; wheel.write_bytes(b"wheel")
+        wheel = root / "review_broker-0.4.4-py3-none-any.whl"; wheel.write_bytes(b"wheel")
         return config, wheel, hashlib.sha256(b"wheel").hexdigest()
 
     def runner(self, final, copy_return=0):
