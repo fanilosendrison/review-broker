@@ -5,7 +5,7 @@ asset_type: "specification"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker v1 Specification"
-version: "0.4.0"
+version: "0.4.1"
 ---
 
 # Review Broker v1 Specification
@@ -64,19 +64,37 @@ prerequisite for bounded, authorized low-sensitivity use. Review Broker must
 instead retain its essential controls, declare actual residual risks honestly,
 and refuse any path with observed material credential disclosure.
 
-RB-PILOT-01 and RB-PILOT-02 (#26) were authenticated exceptions to the
-production gate. Both identities are consumed and their historical Python and
-CLI entry points are permanently closed independently of remote `/tmp` state.
+RB-PILOT-01, RB-PILOT-02, and RB-PILOT-03 (#26) were authenticated
+exceptions to the production gate. All three identities are consumed and their
+historical claims remain closed independently of remote `/tmp` state.
 RB-PILOT-02 ended with `APPLICATION_ERROR_UNCLASSIFIED`; its raw diagnostics
-were not retained before Shutdown and are unavailable. On 2026-10-28, the product owner authorized technical preparation of RB-PILOT-03, including its future deterministic identity, fixed entry points, controller, remote observation, private retention, offline tests, candidate publication, and bounded independent review. RB-PILOT-03 is implemented as an offline-qualified operational preparation, and authenticated execution is not authorized. Its controller requires a separate attempt-bound execution authorization before Codespace preparation or durable reservation. A separate product-owner decision identifying the prepared pilot and qualified implementation is required before any real invocation.
+were not retained before Shutdown. RB-PILOT-03 retained a valid failure receipt
+and private diagnostics for `CODEX_APPLICATION_ERROR`, with functional `FAIL`,
+complete retention, and observed Shutdown. That outcome does not qualify
+production use.
+
+A separate direct Codex smoke diagnostic established that the protected
+0.164.0 runtime could complete one authenticated `gpt-5.6-terra` request at
+medium reasoning effort. It did not exercise Review Broker packet, schema,
+citation, receipt, retention, or controller acceptance and therefore is not a
+functional pilot result.
+
+Review Broker 0.4.5 technically prepares RB-PILOT-04 as a new deterministic
+identity using the unchanged synthetic fixture and mission with an explicit
+immutable Terra/medium policy. Its isolated paths, durable controller claim,
+private retention, one-shot limit, and Shutdown requirement reuse the existing
+controller machinery. Preparation and green qualification do not authorize
+RB-PILOT-04 execution; a later authorization must bind the exact source, wheel,
+request, attempt, and Codespace identities.
 
 ```text
 RB_PILOT_01=CONSUMED
 RB_PILOT_02=CONSUMED
-RB_PILOT_03_PREPARATION_AUTHORIZED=YES
-RB_PILOT_03_IMPLEMENTED=YES
-RB_PILOT_03_EXECUTION_AUTHORIZED=NO
-RB_PILOT_03_AUTHENTICATED_INFERENCE=0
+RB_PILOT_03=CONSUMED
+RB_PILOT_04_PREPARATION_AUTHORIZED=YES
+RB_PILOT_04_EXECUTION_AUTHORIZED=NO
+RB_PILOT_04_AUTHENTICATED_INFERENCE=0
+DIRECT_TERRA_SMOKE=PASS_LIMITED_DIAGNOSTIC
 PRODUCTION_SECURITY_QUALIFIED=NO
 ```
 

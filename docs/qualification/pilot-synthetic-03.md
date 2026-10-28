@@ -5,7 +5,7 @@ asset_type: "qualification-procedure"
 domain: "independent-review"
 severity: "strict"
 name: "RB-PILOT-03 Operational Preparation"
-version: "0.1.4"
+version: "0.1.5"
 ---
 
 # RB-PILOT-03 operational preparation
@@ -147,6 +147,24 @@ F-01 through F-07 tests must remain green.
 
 The simulation does not qualify real Codespaces transport, production security,
 or an authenticated inference.
+
+## Consumed outcome and successor preparation
+
+RB-PILOT-03 was subsequently authorized and consumed. Its controller emitted
+one model-capable command, retained a valid coherent failure receipt and all
+eligible diagnostics, and observed Shutdown. The validated result was
+functional `FAIL` with `CODEX_APPLICATION_ERROR`; no retry is permitted.
+
+A later direct, separate `gpt-5.6-terra` smoke diagnostic completed successfully
+at medium reasoning effort. That diagnostic established bounded provider access
+only and did not validate Review Broker's packet, output, citation, receipt,
+retention, or controller protocol.
+
+Review Broker 0.4.5 prepares RB-PILOT-04 with the unchanged fixture and mission,
+a distinct deterministic identity and paths, and an explicit immutable
+Terra/medium policy. The residual-risk decision in Issue #27 remains in force,
+ordinary v1 production admission remains unchanged and unqualified, and no
+RB-PILOT-04 execution is authorized by preparation, CI, or review.
 
 ```text
 RB_PILOT_03_PREPARATION_AUTHORIZED=YES
