@@ -144,7 +144,8 @@ def _valid_claim(value: Any, request_id: str) -> bool:
     except (ControllerClaimError, AttributeError, TypeError, ValueError):
         return False
     return (
-        value["schema_version"] == 1
+        type(value["schema_version"]) is int
+        and value["schema_version"] == 1
         and value["record_type"] == "synthetic-controller-claim"
         and value["request_id"] == request_id
         and value["state"] == "ARMED"

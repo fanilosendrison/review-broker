@@ -25,6 +25,11 @@ _CONTRADICTORY_PASS_SCREEN_FAILURES = {
 }
 
 
+def _schema_v1(value: Mapping[str, Any]) -> bool:
+    version = value.get("schema_version")
+    return type(version) is int and version == 1
+
+
 @dataclass(frozen=True)
 class ReceiptSetValidation:
     """One authoritative structural and coherence decision for retained receipts."""
@@ -77,7 +82,7 @@ def _validate_remote_claim(value: Mapping[str, Any], controller: Mapping[str, An
     )):
         raise ValueError("REMOTE_CLAIM_INVALID")
     if (
-        value.get("schema_version") != 1 or value.get("status") != "ARMED"
+        not _schema_v1(value) or value.get("status") != "ARMED"
         or not _PACKET_ID.fullmatch(value.get("packet_id", ""))
         or not _timestamp(value.get("armed_utc"))
     ):
@@ -98,9 +103,9 @@ def _validate_armed(
     if any(value.get(key) != controller.get(key) for key in ("request_id", "attempt_id")):
         raise ValueError("ARMED_RECEIPT_INVALID")
     if (
-        value.get("schema_version") != 1
+        not _schema_v1(value)
         or value.get("scope") != "SYNTHETIC_NONPRODUCTION_ONLY"
-        or value.get("issue") != 26
+        or type(value.get("issue")) is not int or value["issue"] != 26
         or value.get("acknowledged_residual_risk") is not True
         or not _SHA256.fullmatch(value.get("broker_wheel_sha256", ""))
     ):
@@ -112,7 +117,7 @@ def _validate_summary(
     controller: Mapping[str, Any],
 ) -> None:
     required = {
-        "schema_version", "pilot_id", "request_id", "attempt_id", "packet_id",
+        "schema_version", "issue", "pilot_id", "request_id", "attempt_id", "packet_id",
         "broker_wheel_sha256", "model_requested", "effort_requested",
         "pilot_functional", "pilot_execution", "credential_screen",
         "pilot_security_qualified", "production_security_qualified",
@@ -125,7 +130,8 @@ def _validate_summary(
     if any(value.get(key) != controller.get(key) for key in ("pilot_id", "request_id", "attempt_id")):
         raise ValueError("SUMMARY_INVALID")
     if (
-        value.get("schema_version") != 1
+        not _schema_v1(value)
+        or type(value.get("issue")) is not int or value["issue"] != 26
         or value.get("broker_wheel_sha256") != armed.get("broker_wheel_sha256")
         or not isinstance(value.get("model_requested"), str) or not value["model_requested"]
         or not isinstance(value.get("effort_requested"), str) or not value["effort_requested"]
@@ -186,7 +192,10 @@ def _validate_failure(
     if any(value.get(key) != controller.get(key) for key in ("pilot_id", "request_id", "attempt_id")):
         raise ValueError("FAILURE_RECEIPT_INVALID")
     if (
-        value.get("schema_version") != 1
+        not _schema_v1(value)
+        or type(value.get("issue")) is not int or value["issue"] != 26
+        or type(value.get("request_ordinal")) is not int or value["request_ordinal"] != 1
+        or type(value.get("attempt_ordinal")) is not int or value["attempt_ordinal"] != 1
         or value.get("classification") != summary.get("failure")
         or value.get("credential_screen") != summary.get("credential_screen")
         or value.get("attempt_identity_consumed") is not True
