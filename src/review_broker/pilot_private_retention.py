@@ -207,6 +207,7 @@ def _retain_one(
     except Exception:
         return _status(entry, "TRANSFER_FAILED")
     try:
+        _normalize_staged_file(temporary, staging)
         length, digest = _local_identity(temporary, limit)
         if length != observed.byte_length or digest != observed.sha256:
             return _status(entry, "HASH_MISMATCH")
@@ -226,6 +227,48 @@ def _valid_remote(value: RemoteArtifact) -> bool:
         and type(value.byte_length) is int and value.byte_length >= 0
         and isinstance(value.sha256, str) and re.fullmatch(r"[0-9a-f]{64}", value.sha256)
     )
+
+
+def _normalize_staged_file(path: Path, staging: Path) -> None:
+    """Secure one freshly transferred regular file before identity checks."""
+    if path.parent != staging or path.name not in _ALLOWED_NAMES:
+        raise PilotRetentionError("PRIVATE_RETENTION_LOCAL_FILE_UNTRUSTED")
+    directory = staging.lstat()
+    if (
+        not stat.S_ISDIR(directory.st_mode)
+        or stat.S_IMODE(directory.st_mode) != 0o700
+        or directory.st_uid != os.getuid()
+    ):
+        raise PilotRetentionError("PRIVATE_RETENTION_LOCAL_FILE_UNTRUSTED")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    descriptor = os.open(path, flags)
+    try:
+        opened = os.fstat(descriptor)
+        named = path.lstat()
+        identity = (opened.st_dev, opened.st_ino)
+        if (
+            not stat.S_ISREG(opened.st_mode) or not stat.S_ISREG(named.st_mode)
+            or opened.st_nlink != 1 or named.st_nlink != 1
+            or opened.st_uid != os.getuid() or named.st_uid != os.getuid()
+            or identity != (named.st_dev, named.st_ino)
+        ):
+            raise PilotRetentionError("PRIVATE_RETENTION_LOCAL_FILE_UNTRUSTED")
+        os.fchmod(descriptor, 0o600)
+        os.fsync(descriptor)
+        verified = os.fstat(descriptor)
+        renamed = path.lstat()
+        if (
+            not stat.S_ISREG(verified.st_mode) or not stat.S_ISREG(renamed.st_mode)
+            or verified.st_nlink != 1 or renamed.st_nlink != 1
+            or verified.st_uid != os.getuid() or renamed.st_uid != os.getuid()
+            or stat.S_IMODE(verified.st_mode) != 0o600
+            or stat.S_IMODE(renamed.st_mode) != 0o600
+            or identity != (verified.st_dev, verified.st_ino)
+            or identity != (renamed.st_dev, renamed.st_ino)
+        ):
+            raise PilotRetentionError("PRIVATE_RETENTION_LOCAL_FILE_UNTRUSTED")
+    finally:
+        os.close(descriptor)
 
 
 def _local_identity(path: Path, limit: int | None) -> tuple[int, str]:
