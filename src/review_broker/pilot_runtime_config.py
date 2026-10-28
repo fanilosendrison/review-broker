@@ -62,8 +62,8 @@ RB05_RUNTIME = PilotRuntimeConfig(
     pilot_id="RB-PILOT-05",
     cli_command="pilot-synthetic-05",
     remote_root="/tmp/review-broker-pilot-26-rb05",
-    bootstrap_root="/tmp/review-broker-pilot-26-rb05-bootstrap",
-    package_version="0.4.7",
+    bootstrap_root="/tmp/review-broker-pilot-26-rb05-bootstrap-v048",
+    package_version="0.4.8",
 )
 
 

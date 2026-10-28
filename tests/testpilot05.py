@@ -120,7 +120,7 @@ class Pilot05Tests(unittest.TestCase):
     def test_runtime_configuration_is_exact_and_closed(self):
         self.assertEqual(RB05_RUNTIME.remote_root, "/tmp/review-broker-pilot-26-rb05")
         self.assertEqual(RB05_RUNTIME.remote_wheel,
-                         "/tmp/review-broker-pilot-26-rb05-bootstrap/review_broker-0.4.7-py3-none-any.whl")
+                         "/tmp/review-broker-pilot-26-rb05-bootstrap-v048/review_broker-0.4.8-py3-none-any.whl")
         self.assertIs(require_runtime_config(RB05_RUNTIME), RB05_RUNTIME)
         with self.assertRaisesRegex(ValueError, "CONFIG_UNSUPPORTED"):
             require_runtime_config(PilotRuntimeConfig(**RB05_RUNTIME.__dict__))
