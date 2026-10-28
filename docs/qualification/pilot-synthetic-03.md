@@ -5,7 +5,7 @@ asset_type: "qualification-procedure"
 domain: "independent-review"
 severity: "strict"
 name: "RB-PILOT-03 Operational Preparation"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # RB-PILOT-03 operational preparation
@@ -38,18 +38,25 @@ The controller applies these boundaries in order:
 
 1. Validate attempt-bound execution authorization.
 2. Validate source, wheel, and Codespace identities.
-3. Prepare the Codespace and complete non-model preflights.
-4. Create and synchronize the persistent controller reservation.
-5. Emit at most one fixed remote command.
-6. Observe sanitary artifact metadata.
-7. Retain and validate receipts privately.
-8. Admit clean diagnostics only after receipt and credential gates pass.
-9. Request Shutdown and independently observe its state.
-10. Produce a sanitary report with independent functional, execution,
-    retention, and Shutdown dimensions.
+3. Transfer the exact authorized wheel into the fixed private bootstrap root.
+4. Build a dedicated Python environment without resolving packages from the
+   network, then verify the remote wheel hash, package version, imports,
+   dependencies, exact entry point, Codex runtime, and non-inference login
+   status.
+5. Create and synchronize the persistent controller reservation only after all
+   preflights pass.
+6. Emit at most one fixed remote command through the verified environment.
+7. Capture either the command return code or a sanitary transport exception.
+8. Attempt bounded private retention even after an ambiguous emission.
+9. Validate receipts, admit clean diagnostics, and derive functional status
+   only from the validated receipt set.
+10. Request Shutdown and independently observe its state.
+11. Produce a sanitary acceptance decision with independent functional,
+    execution, retention, and Shutdown dimensions.
 
 An existing, partial, malformed, inaccessible, or ambiguous reservation blocks
-emission. No post-emission failure authorizes an automatic retry.
+emission. A failed or undetermined remote bootstrap blocks reservation. No
+post-emission failure authorizes an automatic retry.
 
 ## Remote observation and private retention
 
@@ -63,7 +70,10 @@ set before admitting diagnostics. A coherent `CODEX_APPLICATION_ERROR` remains
 eligible when credential screening reports `PASS_NO_MATCH`. Every transferred
 file is checked locally against its observed size and SHA-256. The private
 manifest records retained, refused, failed, and absent artifacts independently.
-Reviewer failure does not imply retention failure.
+Reviewer failure does not imply retention failure. The retention manifest
+exposes functional and execution values only when the canonical receipt-set
+validator accepts the complete retained set. Missing, partial, malformed, or
+identity-incoherent receipts leave the functional result `UNDETERMINED`.
 
 ## Shutdown and interpretation
 
@@ -72,7 +82,15 @@ preflight, emission, validation, retention, contamination, or local failures.
 A successful stop request and an observed `Shutdown` state are distinct facts.
 Shutdown does not establish functional success. Retention does not establish
 model acceptance. Process creation does not establish authenticated provider
-inference.
+inference. A remote exit code is only a process observation. Global pilot
+acceptance requires validated functional success, complete required retention,
+coherent execution observations, and observed Shutdown. The controller CLI
+returns success only for that complete acceptance state.
+
+A timeout, SSH loss, or other transport exception after emission records
+execution as `INDETERMINATE`, preserves the consumed claim, attempts private
+retention once, never retries emission, and still crosses the Shutdown
+boundary.
 
 ## Offline acceptance
 
