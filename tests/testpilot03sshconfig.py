@@ -13,13 +13,13 @@ CODESPACE = "expected-codespace"
 ALIAS = "independent-host-alias"
 
 
-def config_text(alias=ALIAS, codespace=CODESPACE, proxy_command=None):
+def config_text(
+    alias=ALIAS, codespace=CODESPACE, proxy_command=None,
+    identity_files=("/tmp/synthetic-key",),
+):
     command = proxy_command or f"gh cs ssh -c {codespace} --stdio"
-    return (
-        f"Host {alias}\n"
-        f"  ProxyCommand {command}\n"
-        "  IdentityFile /tmp/synthetic-key\n"
-    )
+    identities = "".join(f"  IdentityFile {path}\n" for path in identity_files)
+    return f"Host {alias}\n  ProxyCommand {command}\n{identities}"
 
 
 class Pilot03SshConfigTests(unittest.TestCase):
@@ -56,6 +56,53 @@ class Pilot03SshConfigTests(unittest.TestCase):
                     codespace_identity=CODESPACE, ssh_host_alias=ALIAS, ssh_config=path,
                 ), ALIAS)
 
+    def test_github_cli_native_proxycommand_is_accepted_and_bound_to_identityfile(self):
+        command = (
+            f"/opt/homebrew/bin/gh cs ssh -c {CODESPACE} --stdio "
+            "-- -i /tmp/synthetic-key"
+        )
+        for alias in (ALIAS, CODESPACE):
+            with self.subTest(alias=alias), tempfile.TemporaryDirectory() as temporary:
+                path = self.config(
+                    temporary, config_text(alias=alias, proxy_command=command),
+                )
+                self.assertEqual(validate_ssh_host_alias(
+                    codespace_identity=CODESPACE,
+                    ssh_host_alias=alias,
+                    ssh_config=path,
+                ), alias)
+
+    def test_github_cli_native_proxycommand_mismatches_are_rejected(self):
+        base = f"/opt/homebrew/bin/gh cs ssh -c {CODESPACE} --stdio -- -i"
+        cases = (
+            (f"{base} /tmp/synthetic-key ; echo extra", ("/tmp/synthetic-key",)),
+            (f"{base} /tmp/synthetic-key --debug", ("/tmp/synthetic-key",)),
+            (f"/opt/homebrew/bin/gh cs ssh -c wrong --stdio -- -i /tmp/synthetic-key", ("/tmp/synthetic-key",)),
+            (f"{base} /tmp/another-key", ("/tmp/synthetic-key",)),
+            (f"gh cs ssh -c {CODESPACE} --stdio -- -i /tmp/synthetic-key", ("/tmp/synthetic-key",)),
+            (f"{base} relative-key", ("relative-key",)),
+            (f"{base} /tmp/$(echo-key)", ("/tmp/$(echo-key)",)),
+            (f"{base}", ("/tmp/synthetic-key",)),
+            (f"{base} /tmp/synthetic-key", ()),
+            (f"{base} /tmp/synthetic-key", ("/tmp/synthetic-key", "/tmp/other-key")),
+            (f"/opt/homebrew/bin/gh;echo cs ssh -c {CODESPACE} --stdio -- -i /tmp/synthetic-key", ("/tmp/synthetic-key",)),
+            (f"/opt/homebrew/my gh cs ssh -c {CODESPACE} --stdio -- -i /tmp/synthetic-key", ("/tmp/synthetic-key",)),
+        )
+        for command, identities in cases:
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temporary:
+                path = self.config(
+                    temporary,
+                    config_text(proxy_command=command, identity_files=identities),
+                )
+                with self.assertRaisesRegex(
+                    Pilot03SshConfigError, "RB03_SSH_CODESPACE_BINDING_MISMATCH",
+                ):
+                    validate_ssh_host_alias(
+                        codespace_identity=CODESPACE,
+                        ssh_host_alias=ALIAS,
+                        ssh_config=path,
+                    )
+
     def test_shell_suffixes_and_extra_arguments_are_rejected(self):
         commands = (
             f"gh cs ssh -c {CODESPACE} --stdio ; echo extra",
@@ -86,6 +133,30 @@ class Pilot03SshConfigTests(unittest.TestCase):
                         ssh_host_alias=ALIAS,
                         ssh_config=path,
                     )
+
+    @unittest.skipUnless(shutil.which("ssh"), "OpenSSH client unavailable")
+    def test_openssh_effective_native_proxy_matches_validated_configuration(self):
+        command = (
+            f"/opt/homebrew/bin/gh cs ssh -c {CODESPACE} --stdio "
+            "-- -i /tmp/synthetic-key"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            path = self.config(temporary, config_text(proxy_command=command))
+            result = subprocess.run(
+                ["ssh", "-G", "-F", str(path), ALIAS],
+                text=True, capture_output=True, check=False, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0)
+            effective = dict(
+                line.split(" ", 1) for line in result.stdout.splitlines() if " " in line
+            )
+            self.assertEqual(effective["proxycommand"], command)
+            self.assertEqual(effective["identityfile"], "/tmp/synthetic-key")
+            self.assertEqual(validate_ssh_host_alias(
+                codespace_identity=CODESPACE,
+                ssh_host_alias=ALIAS,
+                ssh_config=path,
+            ), ALIAS)
 
     @unittest.skipUnless(shutil.which("ssh"), "OpenSSH client unavailable")
     def test_openssh_effective_proxy_preserves_suffix_but_python_rejects_it(self):

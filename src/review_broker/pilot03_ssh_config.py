@@ -80,6 +80,7 @@ def _literal_host_stanza(text: str, alias: str) -> list[str]:
 
 def _require_codespace_proxy(stanza: list[str], codespace_identity: str) -> None:
     proxy_values: list[str] = []
+    identity_values: list[str] = []
     for line in stanza:
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
@@ -87,12 +88,14 @@ def _require_codespace_proxy(stanza: list[str], codespace_identity: str) -> None
         parts = stripped.split(maxsplit=1)
         if parts[0].lower() == "proxycommand" and len(parts) == 2:
             proxy_values.append(parts[1])
+        if parts[0].lower() == "identityfile" and len(parts) == 2:
+            identity_values.append(parts[1])
         if parts[0].lower() in {"proxyjump", "include", "match"}:
             raise Pilot03SshConfigError("RB03_SSH_CODESPACE_BINDING_MISMATCH")
     if len(proxy_values) != 1:
         raise Pilot03SshConfigError("RB03_SSH_CODESPACE_BINDING_MISMATCH")
     separator = r"[ \t]+"
-    pattern = (
+    simple_pattern = (
         r"gh" + separator
         + r"(?:cs|codespace)" + separator
         + r"ssh" + separator
@@ -100,5 +103,22 @@ def _require_codespace_proxy(stanza: list[str], codespace_identity: str) -> None
         + re.escape(codespace_identity) + separator
         + r"--stdio"
     )
-    if re.fullmatch(pattern, proxy_values[0]) is None:
+    if re.fullmatch(simple_pattern, proxy_values[0]) is not None:
+        return
+    safe_component = r"[A-Za-z0-9._+@%=-]+"
+    absolute_gh = r"/(?:" + safe_component + r"/)*gh"
+    absolute_identity = r"/(?:" + safe_component + r"/)*" + safe_component
+    if (
+        len(identity_values) != 1
+        or re.fullmatch(absolute_identity, identity_values[0]) is None
+    ):
+        raise Pilot03SshConfigError("RB03_SSH_CODESPACE_BINDING_MISMATCH")
+    native_pattern = (
+        absolute_gh + separator
+        + r"cs" + separator + r"ssh" + separator
+        + r"-c" + separator + re.escape(codespace_identity) + separator
+        + r"--stdio" + separator + r"--" + separator + r"-i" + separator
+        + re.escape(identity_values[0])
+    )
+    if re.fullmatch(native_pattern, proxy_values[0]) is None:
         raise Pilot03SshConfigError("RB03_SSH_CODESPACE_BINDING_MISMATCH")
