@@ -28,7 +28,6 @@ WHEEL = "5" * 64
 PILOT = "RB-PILOT-EXAMPLE"
 ARMED_UTC = "2026-10-28T00:00:00+00:00"
 
-
 class FakeSource:
     def __init__(self, values: dict[str, bytes]):
         self.values = dict(values)
@@ -54,10 +53,8 @@ class FakeSource:
         destination.write_bytes(self.values[name])
         destination.chmod(0o600)
 
-
 def _encoded(value: dict) -> bytes:
     return canonical_bytes(value) + b"\n"
-
 
 def valid_receipts(*, outcome: str = "FAIL", screen: str = "PASS_NO_MATCH") -> dict[str, bytes]:
     remote_claim = {
@@ -134,13 +131,14 @@ def valid_receipts(*, outcome: str = "FAIL", screen: str = "PASS_NO_MATCH") -> d
     values["pilot-summary.json"] = _encoded(summary)
     return values
 
-
-def mutate_json(values: dict[str, bytes], name: str, mutation) -> None:
+def mutate_json(values: dict[str, bytes], name: str, mutation, *replacement) -> None:
     import json
     value = json.loads(values[name])
-    mutation(value)
+    if replacement:
+        value[mutation] = replacement[0]
+    else:
+        mutation(value)
     values[name] = _encoded(value)
-
 
 class PrivateRetentionTests(unittest.TestCase):
     def prepare(self, temporary: str) -> Path:

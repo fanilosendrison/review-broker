@@ -57,6 +57,23 @@ class ControllerClaimTests(unittest.TestCase):
                 self.arm(root)
             self.assertEqual(list(reservation.iterdir()), before)
 
+    def test_claim_schema_version_requires_exact_integer_one(self):
+        invalid = (True, False, None, "1", 0, 2)
+        for version in invalid:
+            with self.subTest(version=version), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve() / "pilots"
+                self.arm(root)
+                claim = root / request_reservation_digest(REQUEST) / "controller-claim.json"
+                value = json.loads(claim.read_text())
+                value["schema_version"] = version
+                claim.write_bytes(controller_state.canonical_bytes(value) + b"\n")
+                with self.assertRaisesRegex(ControllerClaimError, "CONTROLLER_CLAIM_UNAVAILABLE"):
+                    read_controller_claim(REQUEST, _state_root=root)
+                before = claim.read_bytes()
+                with self.assertRaisesRegex(ControllerClaimError, "CONTROLLER_CLAIM_UNAVAILABLE"):
+                    self.arm(root)
+                self.assertEqual(claim.read_bytes(), before)
+
     def test_same_request_refuses_same_or_different_attempt(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "pilots"; self.arm(root)
