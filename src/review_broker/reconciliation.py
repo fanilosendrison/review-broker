@@ -127,6 +127,11 @@ def reconcile_repository(
         codespace_state = codespace_state or active_controller.state()
         decision = decide_recovery(record, codespace_state=codespace_state)
         if decision.action is RecoveryAction.RESUME_PRE_MODEL:
+            if record.state is AttemptState.PREPARED:
+                decisions.append({"issue_number": issue["number"], "request_id": request_id,
+                    "state": record.state.value, "action": "AWAIT_EXPLICIT_PREPARED_RECOVERY",
+                    "reason": "Explicit dispatch required.", "outcome": "BLOCKED"})
+                continue
             dispatcher(broker_repository, default_branch, issue["number"])
             decisions.append({
                 "issue_number": issue["number"],
@@ -332,8 +337,6 @@ def _dispatch_review_workflow(
     )
 
 
-
-
 def _gh_json(endpoint: str, *, token: str | None = None) -> Any:
     child_environment = None
     if token is not None:
@@ -392,7 +395,6 @@ def workflow_context(
 
 def _csv_set(value: str) -> frozenset[str]:
     return frozenset(item.strip() for item in value.split(",") if item.strip())
-
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
