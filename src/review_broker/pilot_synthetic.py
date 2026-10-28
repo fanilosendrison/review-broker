@@ -89,9 +89,9 @@ def pilot_environment(source: Mapping[str, str]) -> dict[str, str]:
 
 
 def _pilot_fixture(run_directory: Path, *, pilot_id: str) -> dict[str, Any]:
-    """Build one of the two closed synthetic identities from the fixed fixture."""
-    if pilot_id not in ("RB-PILOT-01", "RB-PILOT-02"):
-        raise AssertionError("unsupported closed pilot identity")
+    """Build a deterministic synthetic identity from the fixed fixture."""
+    if pilot_id not in ("RB-PILOT-01", "RB-PILOT-02", "RB-PILOT-03"):
+        raise AssertionError("unsupported pilot identity")
     digest = hashlib.sha256(PILOT_SOURCE).hexdigest()
     request_id = request_identity({
         "kind": pilot_id, "fixture_sha256": digest, "ordinal": 1,
@@ -208,6 +208,8 @@ def _run_synthetic_pilot(
     trusted_workspace: Path,
     codex_runtime_root: Path,
     environment: Mapping[str, str] | None,
+    claim_available: Callable[[], None] | None = None,
+    claim_writer: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     if not acknowledge_unqualified_pilot:
         raise PilotError("PILOT_EXPLICIT_ACK_REQUIRED")
@@ -215,6 +217,8 @@ def _run_synthetic_pilot(
         raise PilotError("PILOT_WHEEL_SHA256_INVALID")
     if pilot_id == "RB-PILOT-02":
         _require_pilot_02_claim_available()
+    if claim_available is not None:
+        claim_available()
     if not target.is_absolute() or target.is_symlink() or target.exists():
         raise PilotError("PILOT_FRESH_ABSOLUTE_RUN_DIR_REQUIRED")
     clean_env = pilot_environment(os.environ if environment is None else environment)
@@ -235,16 +239,19 @@ def _run_synthetic_pilot(
     install_reviewer_profile(home, workspace, evidence)
     attempt_id = attempt_identity(manifest["request_id"], 1)
     armed_utc = datetime.now(timezone.utc).isoformat()
+    claim_value = {
+        "schema_version": 1,
+        "pilot_id": pilot_id,
+        "request_id": manifest["request_id"],
+        "attempt_id": attempt_id,
+        "packet_id": manifest["packet_id"],
+        "status": "ARMED",
+        "armed_utc": armed_utc,
+    }
     if pilot_id == "RB-PILOT-02":
-        _write_pilot_02_claim({
-            "schema_version": 1,
-            "pilot_id": "RB-PILOT-02",
-            "request_id": manifest["request_id"],
-            "attempt_id": attempt_id,
-            "packet_id": manifest["packet_id"],
-            "status": "ARMED",
-            "armed_utc": armed_utc,
-        })
+        _write_pilot_02_claim(claim_value)
+    if claim_writer is not None:
+        claim_writer(claim_value)
     _write_once(target / "pilot-armed.json", {
         "schema_version": 1,
         "scope": "SYNTHETIC_NONPRODUCTION_ONLY",
