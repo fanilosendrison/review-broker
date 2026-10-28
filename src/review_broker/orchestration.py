@@ -11,7 +11,13 @@ import subprocess
 import tempfile
 from typing import Any, Mapping
 
-from .admission import AuthorizationPolicy, authorize, resolve_request
+from .admission import (
+    BOUNDED_V1_ADMISSION,
+    AuthorizationPolicy,
+    authorize,
+    resolve_request,
+    select_operational_admission,
+)
 from .identity import artifact_identity, canonical_bytes
 from .packets import GitSourceReader, SourceSpec, build_packet
 from .github_journal import GitHubRefJournal
@@ -49,14 +55,21 @@ def prepare_issue(
         repositories=_csv_set(environment.get("REVIEW_BROKER_AUTHORIZED_REPOSITORIES", "")),
     )
     authorize(issue["user"]["login"], request, authorization)
+    admission_mode = select_operational_admission(
+        request, environment, lambda endpoint: _gh_json(endpoint)
+    )
     source_repository_name = request["subject"]["repository"]
     private_repositories = _csv_set(
         environment.get("REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES", "")
     )
-    source_environment = _source_environment_for_repository(
-        source_repository_name,
-        private_repositories,
-        source_token,
+    source_environment = (
+        None
+        if admission_mode == BOUNDED_V1_ADMISSION
+        else _source_environment_for_repository(
+            source_repository_name,
+            private_repositories,
+            source_token,
+        )
     )
 
     def source_getter(endpoint: str) -> Any:
@@ -74,7 +87,10 @@ def prepare_issue(
     admission_evidence = artifact_identity(canonical_bytes(resolved))
     preparation_action = decide_preparation_recovery(attempt, admission_evidence)
     if preparation_action is PreparationRecoveryAction.DUPLICATE_TERMINAL_OR_MODEL_CAPABLE:
-        return {"duplicate": True, "attempt": attempt.as_dict(), "resolved_request": resolved}
+        return {
+            "duplicate": True, "attempt": attempt.as_dict(),
+            "resolved_request": resolved, "admission_mode": admission_mode,
+        }
     if preparation_action is PreparationRecoveryAction.ADMIT_AND_BUILD:
         attempt = journal.transition(
             resolved["request_id"], AttemptState.ADMITTED, [admission_evidence]
@@ -178,6 +194,7 @@ def prepare_issue(
         "attempt": attempt.as_dict(),
         "resolved_request": resolved,
         "packet": manifest,
+        "admission_mode": admission_mode,
     }
 
 

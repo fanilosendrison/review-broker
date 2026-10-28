@@ -7,12 +7,7 @@ import os
 import subprocess
 from typing import Any, Mapping
 
-from .admission import (
-    AdmissionError,
-    AuthorizationPolicy,
-    authorize,
-    resolve_request,
-)
+from .admission import BOUNDED_V1_ADMISSION, AdmissionError, AuthorizationPolicy, authorize, resolve_request, select_operational_admission
 from .artifact_resume import ArtifactResumeError, resume_from_durable_artifact
 from .codespace import CodespaceController, CodespaceError
 from .evidence import build_shutdown_observation
@@ -75,7 +70,7 @@ def reconcile_repository(
         codespace_name,
         environment=codespace_environment,
     )
-    codespace_state = active_controller.state()
+    codespace_state: str | None = None
     context = workflow_context(environment, source="reconciler")
     decisions: list[dict[str, Any]] = []
     processed_requests: set[str] = set()
@@ -87,7 +82,9 @@ def reconcile_repository(
             request = parse_issue_body(issue.get("body") or "")
             authorize(issue["user"]["login"], request, authorization)
             repository = request["subject"]["repository"]
-            private_source = repository in private_repositories
+            admission_getter = getter if get_json is not None else _gh_json
+            admission_mode = select_operational_admission(request, environment, admission_getter)
+            private_source = repository in private_repositories and admission_mode != BOUNDED_V1_ADMISSION
             if private_source and not source_token:
                 raise PrivateSourceCredentialRequired
             if get_json is not None:
@@ -127,6 +124,7 @@ def reconcile_repository(
             continue
         processed_requests.add(request_id)
         record = active_journal.claim(request_id)
+        codespace_state = codespace_state or active_controller.state()
         decision = decide_recovery(record, codespace_state=codespace_state)
         if decision.action is RecoveryAction.RESUME_PRE_MODEL:
             dispatcher(broker_repository, default_branch, issue["number"])
@@ -162,6 +160,7 @@ def reconcile_repository(
             record = active_journal.get(request_id)
         except (KeyError, ValueError):
             continue
+        codespace_state = codespace_state or active_controller.state()
         decision = decide_recovery(record, codespace_state=codespace_state)
         if decision.action is RecoveryAction.RESUME_PRE_MODEL:
             decisions.append({

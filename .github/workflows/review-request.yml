@@ -34,6 +34,11 @@ jobs:
       REVIEW_BROKER_AUTHORIZED_REQUESTERS: ${{ vars.REVIEW_BROKER_AUTHORIZED_REQUESTERS }}
       REVIEW_BROKER_AUTHORIZED_REPOSITORIES: ${{ vars.REVIEW_BROKER_AUTHORIZED_REPOSITORIES }}
       REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES: ${{ vars.REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES }}
+      REVIEW_BROKER_SECURITY_QUALIFIED: ${{ vars.REVIEW_BROKER_SECURITY_QUALIFIED }}
+      REVIEW_BROKER_SECURITY_EVIDENCE_ID: ${{ vars.REVIEW_BROKER_SECURITY_EVIDENCE_ID }}
+      REVIEW_BROKER_LOW_SENSITIVITY_V1_ENABLED: ${{ vars.REVIEW_BROKER_LOW_SENSITIVITY_V1_ENABLED }}
+      REVIEW_BROKER_LOW_SENSITIVITY_V1_ADMITTED_SHA: ${{ vars.REVIEW_BROKER_LOW_SENSITIVITY_V1_ADMITTED_SHA }}
+      REVIEW_BROKER_LOW_SENSITIVITY_V1_REPOSITORIES: ${{ vars.REVIEW_BROKER_LOW_SENSITIVITY_V1_REPOSITORIES }}
       REVIEW_BROKER_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       REMOTE_ROOT: /tmp/review-broker-${{ github.run_id }}-${{ github.run_attempt }}
       CODEX_RUNTIME_ROOT: /var/lib/review-broker/codex-0.164.0-linux-x64
@@ -84,6 +89,7 @@ jobs:
           import json
           value = json.load(open("prepare-output.json", encoding="utf-8"))
           print("duplicate=" + str(value["duplicate"]).lower())
+          print("admission_mode=" + value["admission_mode"])
           if not value["duplicate"]:
               print("request_id=" + value["attempt"]["request_id"])
               print("attempt_id=" + value["attempt"]["attempt_id"])
@@ -107,15 +113,20 @@ jobs:
           path: evidence
           if-no-files-found: error
           retention-days: 30
-      - name: Enforce external security qualification
+      - name: Enforce selected operational admission
         if: steps.prepare.outputs.duplicate == 'false'
         env:
+          ADMISSION_MODE: ${{ steps.prepare.outputs.admission_mode }}
           SECURITY_QUALIFIED: ${{ vars.REVIEW_BROKER_SECURITY_QUALIFIED }}
           SECURITY_EVIDENCE: ${{ vars.REVIEW_BROKER_SECURITY_EVIDENCE_ID }}
           CODESPACE_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
         run: |
-          test "$SECURITY_QUALIFIED" = "true" || { echo "SECURITY_BOUNDARY_NOT_QUALIFIED"; exit 1; }
-          test -n "$SECURITY_EVIDENCE" || { echo "SECURITY_EVIDENCE_MISSING"; exit 1; }
+          if test "$ADMISSION_MODE" = "comprehensive-security"; then
+            test "$SECURITY_QUALIFIED" = "true" || { echo "SECURITY_BOUNDARY_NOT_QUALIFIED"; exit 1; }
+            test -n "$SECURITY_EVIDENCE" || { echo "SECURITY_EVIDENCE_MISSING"; exit 1; }
+          else
+            test "$ADMISSION_MODE" = "low-sensitivity-v1" || { echo "OPERATIONAL_ADMISSION_INVALID"; exit 1; }
+          fi
           test -n "$CODESPACE_TOKEN" || { echo "CODESPACE_CREDENTIAL_MISSING"; exit 1; }
           test -n "$CODESPACE_NAME" || { echo "CODESPACE_NAME_MISSING"; exit 1; }
       - name: Start and observe dedicated Codespace
