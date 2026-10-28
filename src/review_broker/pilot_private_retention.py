@@ -132,6 +132,16 @@ def retain_private_pilot_artifacts(
         _aggregate(entries, set(DIAGNOSTIC_LIMITS), "UNDETERMINED")
         if diagnostic_gate else "SKIPPED_QUARANTINED"
     )
+    validated_functional = (
+        summary.get("pilot_functional")
+        if receipt_validation.valid and receipt_status == "PASS"
+        else "UNDETERMINED"
+    )
+    validated_execution = (
+        summary.get("pilot_execution")
+        if receipt_validation.valid and receipt_status == "PASS"
+        else "UNDETERMINED"
+    )
     manifest = {
         "schema_version": 1,
         "record_type": "synthetic-pilot-private-retention",
@@ -144,6 +154,8 @@ def retain_private_pilot_artifacts(
         "raw_diagnostic_retention": diagnostic_status,
         "credential_screening": summary.get("credential_screen", "UNDETERMINED"),
         "receipt_set_validation": receipt_validation.status,
+        "validated_pilot_functional": validated_functional,
+        "validated_pilot_execution": validated_execution,
         "artifact_entries": entries,
     }
     _write_manifest(attempt_directory / "retention-manifest.json", manifest)

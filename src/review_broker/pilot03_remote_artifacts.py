@@ -8,6 +8,7 @@ import subprocess
 from typing import Any, Callable
 
 from .pilot_private_retention import CodespaceLiteralCopier, PilotRetentionError, RemoteArtifact
+from .pilot03_remote_preflight import REMOTE_PATH, REMOTE_PYTHON
 
 _REMOTE_ROOT = "/tmp/review-broker-pilot-26-rb03"
 ARTIFACT_PATHS = {
@@ -53,21 +54,25 @@ class Pilot03RemoteArtifacts:
 
     def __init__(
         self, codespace: str, ssh_config: Path, *,
+        remote_python: str = REMOTE_PYTHON,
         runner: Callable[..., Any] = subprocess.run,
     ) -> None:
         if not re.fullmatch(r"[A-Za-z0-9-]+", codespace):
             raise ValueError("RB03_REMOTE_SOURCE_INVALID")
         self.codespace = codespace
         self.ssh_config = Path(ssh_config)
+        if remote_python != REMOTE_PYTHON:
+            raise ValueError("RB03_REMOTE_PYTHON_INVALID")
         self.runner = runner
+        self.remote_python = remote_python
         self._copier = CodespaceLiteralCopier(codespace, ARTIFACT_PATHS, runner=runner)
 
     def observe(self, relative_name: str) -> RemoteArtifact:
         path = self._path(relative_name)
         result = self.runner(
             ["ssh", "-F", str(self.ssh_config), "-o", "BatchMode=yes", self.codespace,
-             "/usr/bin/env", "-i", "PATH=/usr/local/bin:/usr/bin:/bin",
-             "python3", "-P", "-", path],
+             "/usr/bin/env", "-i", f"PATH={REMOTE_PATH}",
+             self.remote_python, "-P", "-", path],
             input=_OBSERVE_SCRIPT, text=True, capture_output=True, check=False,
             timeout=120, shell=False,
         )

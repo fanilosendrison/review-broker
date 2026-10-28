@@ -203,7 +203,7 @@ def main(argv: list[str] | None = None) -> int:
                 transport=transport,
             )
             print(canonical_bytes(result).decode("utf-8"))
-            return 0 if "controller_error" not in result else 1
+            return 0 if result.get("pilot_acceptance") == "PASS" else 1
         if args.command == "request":
             return _request(args)
         if args.command == "status":
