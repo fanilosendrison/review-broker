@@ -179,6 +179,7 @@ jobs:
             --packet-dir "$REMOTE_ROOT/evidence" \
             --expected-packet-id '${{ steps.prepare.outputs.packet_id }}' > /dev/null
       - name: Durably arm exactly one invocation
+        id: arm
         if: steps.prepare.outputs.duplicate == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -223,7 +224,7 @@ jobs:
             --attempt '${{ steps.prepare.outputs.attempt_id }}' > runtime-quarantine.json
       - name: Establish complete terminal capture
         id: capture
-        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.start.outcome != 'skipped' && steps.runtime_quarantine.outcome == 'success'
+        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.arm.outcome == 'success' && steps.runtime_quarantine.outcome == 'success'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -271,7 +272,8 @@ jobs:
             --artifact-id '${{ steps.terminal_artifact.outputs.artifact-id }}' \
             --artifact-digest '${{ steps.terminal_artifact.outputs.artifact-digest }}'
       - name: Preserve ambiguous execution as indeterminate
-        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.capture.outcome == 'failure'
+        id: indeterminate
+        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.arm.outcome == 'success' && steps.capture.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -291,6 +293,7 @@ jobs:
             --request '${{ steps.prepare.outputs.request_id }}' \
             --state VALIDATED --evidence "$validation_id"
       - name: Publish bounded result
+        id: publish
         if: steps.prepare.outputs.duplicate == 'false' && steps.validation.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -308,7 +311,10 @@ jobs:
             --request '${{ steps.prepare.outputs.request_id }}' \
             --attempt '${{ steps.prepare.outputs.attempt_id }}'
       - name: Record stopped state from observed evidence
-        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.stop.outcome == 'success'
+        if: >-
+          steps.prepare.outputs.duplicate == 'false' && always() &&
+          steps.stop.outcome == 'success' &&
+          (steps.publish.outcome == 'success' || steps.indeterminate.outcome == 'success')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
