@@ -4,7 +4,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import re
-import shlex
 import stat
 
 from .fileobservation import FileObservationError, read_regular_file_bounded
@@ -92,16 +91,14 @@ def _require_codespace_proxy(stanza: list[str], codespace_identity: str) -> None
             raise Pilot03SshConfigError("RB03_SSH_CODESPACE_BINDING_MISMATCH")
     if len(proxy_values) != 1:
         raise Pilot03SshConfigError("RB03_SSH_CODESPACE_BINDING_MISMATCH")
-    try:
-        arguments = shlex.split(proxy_values[0])
-    except ValueError as exc:
-        raise Pilot03SshConfigError("RB03_SSH_CODESPACE_BINDING_MISMATCH") from exc
-    executable = Path(arguments[0]).name if arguments else ""
-    valid_command = (
-        executable == "gh" and len(arguments) >= 4
-        and arguments[1:3] in (["cs", "ssh"], ["codespace", "ssh"])
-        and "--stdio" in arguments
+    separator = r"[ \t]+"
+    pattern = (
+        r"gh" + separator
+        + r"(?:cs|codespace)" + separator
+        + r"ssh" + separator
+        + r"(?:-c|--codespace)" + separator
+        + re.escape(codespace_identity) + separator
+        + r"--stdio"
     )
-    bindings = [arguments[index + 1] for index, value in enumerate(arguments[:-1]) if value in {"-c", "--codespace"}]
-    if not valid_command or bindings != [codespace_identity]:
+    if re.fullmatch(pattern, proxy_values[0]) is None:
         raise Pilot03SshConfigError("RB03_SSH_CODESPACE_BINDING_MISMATCH")
