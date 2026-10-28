@@ -56,9 +56,9 @@ jobs:
           wheel_name="$(basename "$wheel_path")"
           wheel_sha256="$(sha256sum "$wheel_path" | cut -d ' ' -f 1)"
           printf '%s\n' "$wheel_sha256" > broker-dist/broker-wheel.sha256
-          cp src/review_broker/schemas/reviewer-findings-v1.schema.json \
-            broker-dist/reviewer-findings-v1.schema.json
-          schema_sha256="$(sha256sum broker-dist/reviewer-findings-v1.schema.json | cut -d ' ' -f 1)"
+          cp src/review_broker/schemas/reviewer-findings-v1.codex-wire.schema.json \
+            broker-dist/reviewer-findings-v1.codex-wire.schema.json
+          schema_sha256="$(sha256sum broker-dist/reviewer-findings-v1.codex-wire.schema.json | cut -d ' ' -f 1)"
           printf '%s\n' "$schema_sha256" > broker-dist/reviewer-schema.sha256
           echo "BROKER_WHEEL_NAME=$wheel_name" >> "$GITHUB_ENV"
           echo "BROKER_WHEEL_SHA256=$wheel_sha256" >> "$GITHUB_ENV"
@@ -145,7 +145,7 @@ jobs:
             sha256sum "$remote_wheel" | cut -d ' ' -f 1)"
           test "$observed_wheel_sha256" = "$BROKER_WHEEL_SHA256"
           observed_schema_sha256="$(gh codespace ssh -c "$CODESPACE_NAME" -- \
-            sha256sum "$REMOTE_ROOT/broker-dist/reviewer-findings-v1.schema.json" | cut -d ' ' -f 1)"
+            sha256sum "$REMOTE_ROOT/broker-dist/reviewer-findings-v1.codex-wire.schema.json" | cut -d ' ' -f 1)"
           test "$observed_schema_sha256" = "$REVIEWER_SCHEMA_SHA256"
           gh codespace ssh -c "$CODESPACE_NAME" -- \
             python3 -m pip install --user --no-deps --force-reinstall "$remote_wheel"
@@ -185,7 +185,7 @@ jobs:
           gh codespace ssh -c "$CODESPACE_NAME" -- \
             env -u PYTHONPATH python3 -P -m review_broker.cli internal-invoke \
             --packet-dir "$REMOTE_ROOT/evidence" \
-            --schema "$REMOTE_ROOT/broker-dist/reviewer-findings-v1.schema.json" \
+            --schema "$REMOTE_ROOT/broker-dist/reviewer-findings-v1.codex-wire.schema.json" \
             --attempt '${{ steps.prepare.outputs.attempt_id }}' \
             --packet-id '${{ steps.prepare.outputs.packet_id }}' \
             --broker-wheel-sha256 "$BROKER_WHEEL_SHA256" \

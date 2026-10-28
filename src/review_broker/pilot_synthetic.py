@@ -289,7 +289,7 @@ def _run_synthetic_pilot(
     invocation_failure = ""
     failure_observation: Mapping[str, Any] | None = None
     schema = Path(str(resources.files("review_broker.schemas").joinpath(
-        "reviewer-findings-v1.schema.json"
+        "reviewer-findings-v1.codex-wire.schema.json"
     ))).resolve(strict=True)
     try:
         invoke_once(
