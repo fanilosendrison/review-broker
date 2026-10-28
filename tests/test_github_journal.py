@@ -26,6 +26,25 @@ def response(command, value, returncode=0):
     return subprocess.CompletedProcess(command, returncode, json.dumps(value), "")
 
 
+def record_bytes(value=None):
+    selected = value or record(AttemptState.REQUESTED)
+    return canonical_bytes(selected.as_dict()) + b"\n"
+
+
+def content_journal(content, *, encoding="base64"):
+    def runner(command, **_kwargs):
+        endpoint = command[4]
+        if "/git/refs/heads/review-claims/" in endpoint:
+            return response(command, {"object": {"sha": COMMIT_A}})
+        if endpoint.endswith("?ref=" + COMMIT_A):
+            value = {"content": content}
+            if encoding is not None:
+                value["encoding"] = encoding
+            return response(command, value)
+        raise AssertionError(endpoint)
+    return GitHubRefJournal("sample/repo", runner=runner)
+
+
 class GitHubJournalReadTests(unittest.TestCase):
     def test_ref_advance_cannot_mix_observed_commit_with_new_branch_content(self):
         endpoints = []
@@ -75,6 +94,72 @@ class GitHubJournalReadTests(unittest.TestCase):
             "sample/repo", runner=runner
         )._read(REQUEST_ID)
         self.assertEqual((observed_sha, observed.state), (COMMIT_A, AttemptState.PREPARED))
+
+    def test_wrapped_github_base64_recovers_canonical_requested_record(self):
+        encoded = base64.b64encode(record_bytes()).decode("ascii")
+        wrapped = "\n".join(encoded[index:index + 60] for index in range(0, len(encoded), 60)) + "\n"
+        with self.assertRaises(ValueError):
+            base64.b64decode(wrapped, validate=True)
+        observed_sha, observed = content_journal(wrapped)._read(REQUEST_ID)
+        self.assertEqual(observed_sha, COMMIT_A)
+        self.assertEqual(observed.request_id, REQUEST_ID)
+        self.assertEqual(observed.attempt_id, attempt_identity(REQUEST_ID, 1))
+        self.assertEqual(observed.state, AttemptState.REQUESTED)
+        self.assertEqual(observed.invocation_count, 0)
+
+    def test_crlf_and_permitted_ascii_whitespace_are_accepted(self):
+        encoded = base64.b64encode(record_bytes()).decode("ascii")
+        variants = (
+            "\r\n".join(encoded[index:index + 60] for index in range(0, len(encoded), 60)) + "\r\n",
+            " \t\r\n" + " \t\r\n".join(encoded[index:index + 17] for index in range(0, len(encoded), 17)),
+        )
+        for value in variants:
+            with self.subTest(value=value[:12]):
+                self.assertEqual(content_journal(value)._read(REQUEST_ID)[1].state,
+                                 AttemptState.REQUESTED)
+
+    def test_invalid_alphabet_padding_and_unicode_whitespace_are_rejected(self):
+        encoded = base64.b64encode(record_bytes()).decode("ascii")
+        invalid = (encoded[:10] + "!" + encoded[11:], encoded.rstrip("="),
+                   "Zh==", encoded[:8] + "\u00a0" + encoded[8:])
+        for value in invalid:
+            with self.subTest(value=value[:12]), self.assertRaisesRegex(
+                StateTransitionError, "JOURNAL_CONTENT_RESPONSE_INVALID"
+            ):
+                content_journal(value)._read(REQUEST_ID)
+
+    def test_decoded_corruption_utf8_and_noncanonical_json_are_rejected(self):
+        values = (
+            b"{",
+            b"\xff",
+            json.dumps(record(AttemptState.REQUESTED).as_dict(), indent=2).encode() + b"\n",
+        )
+        for raw in values:
+            encoded = base64.b64encode(raw).decode("ascii")
+            with self.subTest(raw=raw[:12]), self.assertRaisesRegex(
+                StateTransitionError, "JOURNAL_CONTENT_RESPONSE_INVALID"
+            ):
+                content_journal(encoded)._read(REQUEST_ID)
+
+    def test_mismatched_request_identity_is_rejected(self):
+        other_id = "request:sha256:" + "b" * 64
+        other = AttemptRecord(
+            request_id=other_id,
+            attempt_id=attempt_identity(other_id, 1),
+            state=AttemptState.REQUESTED,
+            history=({"state": AttemptState.REQUESTED.value, "evidence_ids": []},),
+        )
+        encoded = base64.b64encode(record_bytes(other)).decode("ascii")
+        with self.assertRaisesRegex(StateTransitionError, "JOURNAL_CONTENT_RESPONSE_INVALID"):
+            content_journal(encoded)._read(REQUEST_ID)
+
+    def test_missing_or_incorrect_encoding_is_rejected(self):
+        encoded = base64.b64encode(record_bytes()).decode("ascii")
+        for encoding in (None, "Base64", "utf-8"):
+            with self.subTest(encoding=encoding), self.assertRaisesRegex(
+                StateTransitionError, "JOURNAL_CONTENT_RESPONSE_INVALID"
+            ):
+                content_journal(encoded, encoding=encoding)._read(REQUEST_ID)
 
     def test_incomplete_ref_response_fails_closed(self):
         def runner(command, **_kwargs):

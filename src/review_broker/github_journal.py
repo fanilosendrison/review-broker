@@ -24,6 +24,25 @@ from .queue import (
 )
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
+_BASE64_ALPHABET = frozenset(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
+_BASE64_WHITESPACE = frozenset(b" \t\r\n")
+
+
+def _decode_github_contents_base64(encoded: str) -> bytes:
+    """Strictly decode standard Base64 with GitHub's ASCII line formatting."""
+    if not isinstance(encoded, str):
+        raise ValueError("GITHUB_CONTENT_BASE64_INVALID")
+    try:
+        formatted = encoded.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise ValueError("GITHUB_CONTENT_BASE64_INVALID") from exc
+    compact = bytes(value for value in formatted if value not in _BASE64_WHITESPACE)
+    if any(value not in _BASE64_ALPHABET for value in compact):
+        raise ValueError("GITHUB_CONTENT_BASE64_INVALID")
+    raw = base64.b64decode(compact, validate=True)
+    if base64.b64encode(raw) != compact:
+        raise ValueError("GITHUB_CONTENT_BASE64_NONCANONICAL")
+    return raw
 
 
 class GitHubRefJournal:
@@ -299,7 +318,7 @@ class GitHubRefJournal:
             encoded = content_value["content"]
             if content_value.get("encoding") != "base64" or not isinstance(encoded, str):
                 raise ValueError
-            raw = base64.b64decode(encoded, validate=True)
+            raw = _decode_github_contents_base64(encoded)
             value = json.loads(raw.decode("utf-8"))
             if not isinstance(value, dict) or raw != canonical_bytes(value) + b"\n":
                 raise ValueError
