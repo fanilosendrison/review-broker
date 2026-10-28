@@ -7,11 +7,17 @@ import re
 import subprocess
 from typing import Any, Callable
 
-BOOTSTRAP_ROOT = "/tmp/review-broker-pilot-26-rb03-bootstrap"
-REMOTE_WHEEL = f"{BOOTSTRAP_ROOT}/review_broker-0.4.4-py3-none-any.whl"
-REMOTE_VENV = f"{BOOTSTRAP_ROOT}/venv"
-REMOTE_PYTHON = f"{REMOTE_VENV}/bin/python"
-REMOTE_REVIEWCTL = f"{REMOTE_VENV}/bin/reviewctl"
+from .pilot_runtime_config import (
+    PilotRuntimeConfig,
+    RB03_RUNTIME,
+    require_runtime_config,
+)
+
+BOOTSTRAP_ROOT = RB03_RUNTIME.bootstrap_root
+REMOTE_WHEEL = RB03_RUNTIME.remote_wheel
+REMOTE_VENV = RB03_RUNTIME.remote_venv
+REMOTE_PYTHON = RB03_RUNTIME.remote_python
+REMOTE_REVIEWCTL = RB03_RUNTIME.remote_reviewctl
 REMOTE_PATH = "/home/codespace/nvm/current/bin:/usr/local/bin:/usr/bin:/bin"
 CODEX_RUNTIME_ROOT = "/var/lib/review-broker/codex-0.164.0-linux-x64"
 
@@ -31,7 +37,7 @@ status={{"remote_python_compatible":"NO","remote_wheel_sha256_match":"NO","remot
 try:
  assert sys.version_info >= (3,11)
  status["remote_python_compatible"]="YES"
- assert importlib.metadata.version("review-broker")=="0.4.4"
+ assert importlib.metadata.version("review-broker")=="0.4.5"
  assert importlib.metadata.version("jsonschema")=="4.26.0"
  assert importlib.metadata.version("rfc8785")=="0.1.4"
  import jsonschema,rfc8785,review_broker.cli
@@ -104,24 +110,27 @@ def run_remote_preflight(
     *, codespace: str, ssh_host_alias: str, ssh_config: Path,
     wheel_path: Path, wheel_sha256: str,
     runner: Callable[..., Any] = subprocess.run,
+    runtime: PilotRuntimeConfig = RB03_RUNTIME,
 ) -> dict[str, str]:
     """Transfer and verify the exact local wheel without model inference."""
+    runtime = require_runtime_config(runtime)
+    prepare_script, preflight_script = _runtime_scripts(runtime)
     if (
         not re.fullmatch(r"[A-Za-z0-9-]+", codespace)
         or not Path(ssh_config).is_file() or not Path(wheel_path).is_file()
         or not re.fullmatch(r"[0-9a-f]{64}", wheel_sha256)
     ):
         raise Pilot03PreflightError("REMOTE_PREFLIGHT_UNDETERMINED")
-    prepared = _run_ssh(runner, ssh_host_alias, ssh_config, _PREPARE_SCRIPT, [])
+    prepared = _run_ssh(runner, ssh_host_alias, ssh_config, prepare_script, [])
     if prepared != {"status": "READY"}:
         raise Pilot03PreflightError("REMOTE_BOOTSTRAP_UNAVAILABLE")
     copied = runner(
-        ["gh", "codespace", "cp", "-c", codespace, str(wheel_path), f"remote:{REMOTE_WHEEL}"],
+        ["gh", "codespace", "cp", "-c", codespace, str(wheel_path), f"remote:{runtime.remote_wheel}"],
         capture_output=True, check=False, timeout=120, shell=False,
     )
     if copied.returncode != 0:
         raise Pilot03PreflightError("REMOTE_WHEEL_MISSING")
-    result = _run_ssh(runner, ssh_host_alias, ssh_config, _PREFLIGHT_SCRIPT, [wheel_sha256])
+    result = _run_ssh(runner, ssh_host_alias, ssh_config, preflight_script, [wheel_sha256])
     failure = result.get("failure") if isinstance(result, dict) else None
     if failure in _FAILURES:
         raise Pilot03PreflightError(failure)
@@ -129,6 +138,15 @@ def run_remote_preflight(
         missing = _classify_failed_result(result)
         raise Pilot03PreflightError(missing)
     return dict(result)
+
+
+def _runtime_scripts(runtime: PilotRuntimeConfig) -> tuple[str, str]:
+    if runtime is RB03_RUNTIME:
+        return _PREPARE_SCRIPT, _PREFLIGHT_SCRIPT
+    return (
+        _PREPARE_SCRIPT.replace(BOOTSTRAP_ROOT, runtime.bootstrap_root),
+        _PREFLIGHT_SCRIPT.replace(BOOTSTRAP_ROOT, runtime.bootstrap_root),
+    )
 
 
 def _run_ssh(runner, ssh_host_alias: str, ssh_config: Path, script: str, arguments: list[str]):

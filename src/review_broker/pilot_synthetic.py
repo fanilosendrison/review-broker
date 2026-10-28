@@ -90,7 +90,7 @@ def pilot_environment(source: Mapping[str, str]) -> dict[str, str]:
 
 def _pilot_fixture(run_directory: Path, *, pilot_id: str) -> dict[str, Any]:
     """Build a deterministic synthetic identity from the fixed fixture."""
-    if pilot_id not in ("RB-PILOT-01", "RB-PILOT-02", "RB-PILOT-03"):
+    if pilot_id not in ("RB-PILOT-01", "RB-PILOT-02", "RB-PILOT-03", "RB-PILOT-04"):
         raise AssertionError("unsupported pilot identity")
     digest = hashlib.sha256(PILOT_SOURCE).hexdigest()
     request_id = request_identity({
@@ -210,6 +210,7 @@ def _run_synthetic_pilot(
     environment: Mapping[str, str] | None,
     claim_available: Callable[[], None] | None = None,
     claim_writer: Callable[[dict[str, Any]], None] | None = None,
+    policy: CodexPolicy = CodexPolicy(),
 ) -> dict[str, Any]:
     if not acknowledge_unqualified_pilot:
         raise PilotError("PILOT_EXPLICIT_ACK_REQUIRED")
@@ -273,8 +274,8 @@ def _run_synthetic_pilot(
         "attempt_id": attempt_id,
         "packet_id": manifest["packet_id"],
         "broker_wheel_sha256": broker_wheel_sha256,
-        "model_requested": CodexPolicy().model,
-        "effort_requested": CodexPolicy().reasoning_effort,
+        "model_requested": policy.model,
+        "effort_requested": policy.reasoning_effort,
         **process_runner.observation(),
         "pilot_security_qualified": False,
         "production_security_qualified": False,
@@ -298,6 +299,7 @@ def _run_synthetic_pilot(
             trusted_workspace=workspace,
             codex_runtime_root=codex_runtime_root,
             environment=clean_env,
+            policy=policy,
             armed=True,
             runner=process_runner,
         )
@@ -376,8 +378,8 @@ def _run_synthetic_pilot(
             )
             failure_receipt.update({
                 "pilot_id": pilot_id, "broker_wheel_sha256": broker_wheel_sha256,
-                "model_requested": CodexPolicy().model,
-                "effort_requested": CodexPolicy().reasoning_effort,
+                "model_requested": policy.model,
+                "effort_requested": policy.reasoning_effort,
                 "pilot_security_qualified": False, "production_security_qualified": False,
                 **process_runner.observation(),
             })

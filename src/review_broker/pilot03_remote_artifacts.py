@@ -9,18 +9,9 @@ from typing import Any, Callable
 
 from .pilot_private_retention import CodespaceLiteralCopier, PilotRetentionError, RemoteArtifact
 from .pilot03_remote_preflight import REMOTE_PATH, REMOTE_PYTHON
+from .pilot_runtime_config import PilotRuntimeConfig, RB03_RUNTIME, require_runtime_config
 
-_REMOTE_ROOT = "/tmp/review-broker-pilot-26-rb03"
-ARTIFACT_PATHS = {
-    "pilot-claim.json": "/tmp/review-broker-pilot-26-rb03.claim.json",
-    "pilot-armed.json": f"{_REMOTE_ROOT}/pilot-armed.json",
-    "pilot-summary.json": f"{_REMOTE_ROOT}/pilot-summary.json",
-    "pilot-failure.json": f"{_REMOTE_ROOT}/pilot-failure.json",
-    "codex-events.jsonl": f"{_REMOTE_ROOT}/evidence/codex-events.jsonl",
-    "codex-stderr.txt": f"{_REMOTE_ROOT}/evidence/codex-stderr.txt",
-    "codex-final.json": f"{_REMOTE_ROOT}/evidence/codex-final.json",
-    "codex-exit-code.txt": f"{_REMOTE_ROOT}/evidence/codex-exit-code.txt",
-}
+ARTIFACT_PATHS = RB03_RUNTIME.artifact_paths
 _FIELDS = {"present", "regular", "symlink", "link_count", "byte_length", "sha256", "credential_screen"}
 _OBSERVE_SCRIPT = r'''import hashlib,json,os,stat,sys
 from review_broker.evidence import stream_contains_credential
@@ -54,8 +45,9 @@ class Pilot03RemoteArtifacts:
 
     def __init__(
         self, codespace: str, ssh_host_alias: str, ssh_config: Path, *,
-        remote_python: str = REMOTE_PYTHON,
+        remote_python: str | None = None,
         runner: Callable[..., Any] = subprocess.run,
+        runtime: PilotRuntimeConfig = RB03_RUNTIME,
     ) -> None:
         if (
             not re.fullmatch(r"[A-Za-z0-9-]+", codespace)
@@ -65,11 +57,14 @@ class Pilot03RemoteArtifacts:
         self.codespace = codespace
         self.ssh_host_alias = ssh_host_alias
         self.ssh_config = Path(ssh_config)
-        if remote_python != REMOTE_PYTHON:
+        self.runtime = require_runtime_config(runtime)
+        selected_python = self.runtime.remote_python if remote_python is None else remote_python
+        if selected_python != self.runtime.remote_python:
             raise ValueError("RB03_REMOTE_PYTHON_INVALID")
         self.runner = runner
-        self.remote_python = remote_python
-        self._copier = CodespaceLiteralCopier(codespace, ARTIFACT_PATHS, runner=runner)
+        self.remote_python = selected_python
+        self.paths = self.runtime.artifact_paths
+        self._copier = CodespaceLiteralCopier(codespace, self.paths, runner=runner)
 
     def observe(self, relative_name: str) -> RemoteArtifact:
         path = self._path(relative_name)
@@ -103,9 +98,8 @@ class Pilot03RemoteArtifacts:
         self._path(relative_name)
         self._copier.copy_literal(relative_name, destination)
 
-    @staticmethod
-    def _path(relative_name: str) -> str:
+    def _path(self, relative_name: str) -> str:
         try:
-            return ARTIFACT_PATHS[relative_name]
+            return self.paths[relative_name]
         except (KeyError, TypeError) as exc:
             raise PilotRetentionError("PRIVATE_RETENTION_PATH_NOT_ALLOWED") from exc

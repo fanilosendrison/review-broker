@@ -9,14 +9,15 @@ from .codespace import CodespaceController
 from .pilot03_remote_artifacts import Pilot03RemoteArtifacts
 from .pilot03_remote_preflight import (
     REMOTE_PATH,
-    REMOTE_PYTHON,
-    REMOTE_REVIEWCTL,
     run_remote_preflight,
 )
 from .pilot03_ssh_config import validate_ssh_host_alias
+from .pilot_runtime_config import PilotRuntimeConfig, RB03_RUNTIME, require_runtime_config
 
-_REMOTE_ENTRYPOINT = f'''import os
-os.execve("{REMOTE_REVIEWCTL}", ["{REMOTE_REVIEWCTL}", "pilot-synthetic-03", "--broker-wheel-sha256", os.environ["RB03_WHEEL_SHA256"]], {{"HOME":os.environ["HOME"],"PATH":os.environ["PATH"],"CODEX_HOME":os.environ["CODEX_HOME"],"LANG":"C.UTF-8","TZ":"UTC"}})
+
+def _remote_entrypoint(runtime: PilotRuntimeConfig) -> str:
+    return f'''import os
+os.execve("{runtime.remote_reviewctl}", ["{runtime.remote_reviewctl}", "{runtime.cli_command}", "--broker-wheel-sha256", os.environ["RB03_WHEEL_SHA256"]], {{"HOME":os.environ["HOME"],"PATH":os.environ["PATH"],"CODEX_HOME":os.environ["CODEX_HOME"],"LANG":"C.UTF-8","TZ":"UTC"}})
 '''
 
 
@@ -31,8 +32,10 @@ class Pilot03CodespaceTransport:
         *,
         runner: Callable[..., Any] = subprocess.run,
         lifecycle: CodespaceController | None = None,
+        runtime: PilotRuntimeConfig = RB03_RUNTIME,
     ) -> None:
         self.codespace = codespace
+        self.runtime = require_runtime_config(runtime)
         self.ssh_config = Path(ssh_config)
         self.ssh_host_alias = validate_ssh_host_alias(
             codespace_identity=codespace,
@@ -43,7 +46,7 @@ class Pilot03CodespaceTransport:
         self.lifecycle = lifecycle or CodespaceController(codespace, runner=runner)
         self.artifact_source = Pilot03RemoteArtifacts(
             codespace, self.ssh_host_alias, ssh_config,
-            remote_python=REMOTE_PYTHON, runner=runner,
+            remote_python=self.runtime.remote_python, runner=runner, runtime=self.runtime,
         )
         self._emitted = False
         self._shutdown_observed = False
@@ -65,6 +68,7 @@ class Pilot03CodespaceTransport:
             wheel_path=wheel_path,
             wheel_sha256=wheel_sha256,
             runner=self.runner,
+            runtime=self.runtime,
         )
 
     def emit_once(self, *, wheel_sha256: str) -> int:
@@ -75,8 +79,8 @@ class Pilot03CodespaceTransport:
             ["ssh", "-F", str(self.ssh_config), "-o", "BatchMode=yes", self.ssh_host_alias,
              "/usr/bin/env", "-i", "HOME=/home/codespace",
              "CODEX_HOME=/home/codespace/.codex", f"PATH={REMOTE_PATH}",
-             f"RB03_WHEEL_SHA256={wheel_sha256}", REMOTE_PYTHON, "-P", "-"],
-            input=_REMOTE_ENTRYPOINT, text=True, capture_output=True, check=False,
+             f"RB03_WHEEL_SHA256={wheel_sha256}", self.runtime.remote_python, "-P", "-"],
+            input=_remote_entrypoint(self.runtime), text=True, capture_output=True, check=False,
             timeout=3600, shell=False,
         )
         return result.returncode

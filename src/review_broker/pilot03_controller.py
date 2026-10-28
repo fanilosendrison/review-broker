@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 import re
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from .identity import attempt_identity
 from .pilot03_authorization import ExecutionAuthorization
@@ -27,13 +27,20 @@ class Pilot03Transport(Protocol):
     def shutdown_observed(self) -> bool: ...
 
 
-def pilot03_identities() -> tuple[str, str]:
-    """Derive request and attempt identities exclusively through packet machinery."""
+def synthetic_pilot_identities(
+    fixture_builder: Callable[[Path], dict[str, Any]],
+) -> tuple[str, str]:
+    """Derive one prepared identity exclusively through packet machinery."""
     import tempfile
     with tempfile.TemporaryDirectory() as temporary:
-        manifest = pilot_fixture_03(Path(temporary) / "fixture")
+        manifest = fixture_builder(Path(temporary) / "fixture")
     request_id = manifest["request_id"]
     return request_id, attempt_identity(request_id, 1)
+
+
+def pilot03_identities() -> tuple[str, str]:
+    """Preserve the deterministic historical RB-PILOT-03 identity."""
+    return synthetic_pilot_identities(pilot_fixture_03)
 
 
 def run_pilot03_controller(
@@ -45,18 +52,44 @@ def run_pilot03_controller(
     transport: Pilot03Transport,
     _state_root: Path | None = None,
 ) -> dict[str, Any]:
+    """Preserve the historical RB-PILOT-03 controller interface."""
+    return run_synthetic_pilot_controller(
+        authorization=authorization,
+        source_sha=source_sha,
+        wheel_path=wheel_path,
+        codespace_identity=codespace_identity,
+        transport=transport,
+        pilot_id=PILOT_ID,
+        identities=pilot03_identities,
+        _state_root=_state_root,
+    )
+
+
+def run_synthetic_pilot_controller(
+    *,
+    authorization: ExecutionAuthorization,
+    source_sha: str,
+    wheel_path: Path,
+    codespace_identity: str,
+    transport: Pilot03Transport,
+    pilot_id: str,
+    identities: Callable[[], tuple[str, str]],
+    _state_root: Path | None = None,
+) -> dict[str, Any]:
     """Preflight, arm, emit once, retain once, and always attempt Shutdown."""
-    request_id, attempt_id = pilot03_identities()
+    if pilot_id not in {"RB-PILOT-03", "RB-PILOT-04"}:
+        raise Pilot03ControllerError("PILOT_CONTROLLER_CONFIG_UNSUPPORTED")
+    request_id, attempt_id = identities()
     wheel_sha256 = _wheel_identity(wheel_path)
     authorization.require_matches(
-        pilot_id=PILOT_ID,
+        pilot_id=pilot_id,
         request_id=request_id,
         attempt_id=attempt_id,
         review_broker_source_sha=source_sha,
         broker_wheel_sha256=wheel_sha256,
         codespace_identity=codespace_identity,
     )
-    report = _initial_report(request_id, attempt_id)
+    report = _initial_report(pilot_id, request_id, attempt_id)
     responsibility_started = False
     claim_armed = False
     try:
@@ -68,7 +101,7 @@ def run_pilot03_controller(
             wheel_sha256=wheel_sha256,
         )
         arm_controller_attempt(
-            pilot_id=PILOT_ID,
+            pilot_id=pilot_id,
             request_id=request_id,
             attempt_id=attempt_id,
             source_sha=source_sha,
@@ -88,7 +121,7 @@ def run_pilot03_controller(
             report["pilot_execution"] = "COMPLETED" if return_code == 0 else "FAILED"
         _attempt_retention(
             report,
-            pilot_id=PILOT_ID,
+            pilot_id=pilot_id,
             request_id=request_id,
             attempt_id=attempt_id,
             source_sha=source_sha,
@@ -113,9 +146,9 @@ def run_pilot03_controller(
     return report
 
 
-def _initial_report(request_id: str, attempt_id: str) -> dict[str, Any]:
+def _initial_report(pilot_id: str, request_id: str, attempt_id: str) -> dict[str, Any]:
     return {
-        "pilot_id": PILOT_ID,
+        "pilot_id": pilot_id,
         "request_id": request_id,
         "attempt_id": attempt_id,
         "pilot_functional": "UNDETERMINED",
