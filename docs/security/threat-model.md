@@ -5,7 +5,7 @@ asset_type: "security-model"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Threat Model"
-version: "0.1.2"
+version: "0.1.3"
 ---
 
 # Review Broker Threat Model
@@ -142,10 +142,14 @@ records a durable attempt marker, and never retries automatically. Any detected
 credential-shaped output is quarantined locally. It does not establish general
 credential isolation or satisfy production cleanup/recovery qualification.
 
-Low-sensitivity PR review requires a later bounded operational gate; the
-normal high-assurance qualification variable remains unset in the meantime.
+Low-sensitivity PR review uses a separate default-disabled operational gate.
+It requires exact enablement and executing-SHA binding, dedicated and general
+repository allowlists, requester authorization, and authoritative public
+visibility before any claim or execution side effect. Public visibility does
+not itself classify a repository as low sensitivity. The comprehensive
+high-assurance qualification variable remains separate and unset.
 
-## Residual blocker
+## Residual risks and comprehensive blocker
 
 ChatGPT authentication is verified. The dedicated Codespaces-control transport
 passed T1–T6 in Actions run `40304872558`. The historical root-readable profile passed its limited producer canaries but
@@ -153,10 +157,14 @@ failed an outside-tree canary. A temporary minimal-read direct-sandbox probe
 observed denial of that outside canary, but did not test an authenticated
 model-tool invocation or establish parent-process, descriptor, hard-link, and
 output-channel safety. The installed historical profile is not silently
-upgraded: the revised installer fails closed on mismatch. The repository
-variable that enables authenticated execution must remain unset until
-independent qualification accepts the exact filesystem, process, environment,
-network, and output-channel observations and the profile migration is verified.
+upgraded: the revised installer fails closed on mismatch. Managed-policy overrides, filesystem aliases, inherited process capabilities,
+`/proc` and descriptor visibility, and unobserved effective tool routes remain
+real residual risks. They remain blockers for the comprehensive qualification
+claim, not silently reclassified PASS. The comprehensive security variable must
+remain unset until its independent qualification accepts the required exact
+observations. The separate low-sensitivity path may be activated only by an
+explicit operator decision satisfying its own exact-SHA and public allowlist
+gate; source preparation does not activate it.
 
 Official npm artifact provenance now binds the requested Codex release, but does
 not establish upstream-source reproducibility. Synthetic managed-requirement

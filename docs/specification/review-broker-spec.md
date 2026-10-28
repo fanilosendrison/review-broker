@@ -5,7 +5,7 @@ asset_type: "specification"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker v1 Specification"
-version: "0.4.1"
+version: "0.4.2"
 ---
 
 # Review Broker v1 Specification
@@ -54,67 +54,73 @@ subscription. The qualified target is model `gpt-5.6-sol`, reasoning effort
 `xhigh`, read-only sandbox, schema-constrained final output, and JSONL event
 capture. API-key fallback and model substitution are forbidden.
 
-## Risk-proportionate security and staged v1 admission (2026-10-26)
+## Risk-proportionate security and staged v1 admission (2026-10-28)
 
 Review Broker v1 prioritizes the original agent-to-reviewer-to-structured-report
-workflow under security assurance proportionate to the sensitivity of the
-subject. Exhaustive attestation of all Codex internal policies, model-visible
-tools, plugins, aliases and process mechanisms is NOT a universal launch
-prerequisite for bounded, authorized low-sensitivity use. Review Broker must
-instead retain its essential controls, declare actual residual risks honestly,
-and refuse any path with observed material credential disclosure.
+workflow under security assurance proportionate to subject sensitivity.
+Exhaustive attestation of every Codex policy, tool, plugin, alias and process
+route is not a universal prerequisite for explicitly authorized low-sensitivity
+use. Essential controls remain mandatory, residual risks remain disclosed, and
+a directly observed material credential disclosure or unexpected privileged
+capability blocks the affected path.
 
-RB-PILOT-01, RB-PILOT-02, and RB-PILOT-03 (#26) were authenticated
-exceptions to the production gate. All three identities are consumed and their
-historical claims remain closed independently of remote `/tmp` state.
-RB-PILOT-02 ended with `APPLICATION_ERROR_UNCLASSIFIED`; its raw diagnostics
-were not retained before Shutdown. RB-PILOT-03 retained a valid failure receipt
-and private diagnostics for `CODEX_APPLICATION_ERROR`, with functional `FAIL`,
-complete retention, and observed Shutdown. That outcome does not qualify
-production use.
+### Historical synthetic sequence
 
-A separate direct Codex smoke diagnostic established that the protected
-0.164.0 runtime could complete one authenticated `gpt-5.6-terra` request at
-medium reasoning effort. It did not exercise Review Broker packet, schema,
-citation, receipt, retention, or controller acceptance and therefore is not a
-functional pilot result.
+RB-PILOT-01 through RB-PILOT-05 are consumed and cannot be replayed. Their
+outcomes remain distinct:
 
-Review Broker 0.4.5 technically prepares RB-PILOT-04 as a new deterministic
-identity using the unchanged synthetic fixture and mission with an explicit
-immutable Terra/medium policy. Its isolated paths, durable controller claim,
-private retention, one-shot limit, and Shutdown requirement reuse the existing
-controller machinery. Preparation and green qualification do not authorize
-RB-PILOT-04 execution; a later authorization must bind the exact source, wheel,
-request, attempt, and Codespace identities.
+- RB01 was the initial fixed non-secret exception and did not qualify general
+  production security.
+- RB02 ended with `APPLICATION_ERROR_UNCLASSIFIED`; raw diagnostics were not
+  retained before observed Shutdown.
+- RB03 ended with `CODEX_APPLICATION_ERROR`, functional `FAIL`, valid failure
+  receipts, complete private retention and observed Shutdown.
+- RB04 ended with `CODEX_APPLICATION_ERROR`, functional `FAIL`, valid receipts,
+  complete retention and observed Shutdown.
+- RB05 completed the Sol/xhigh review with functional `PASS`, verdict `NO_GO`
+  and valid receipts. Its original operational acceptance remains `FAIL`
+  because raw diagnostic retention was `PARTIAL` (#26 comment `6480361923`).
+  Byte-exact supplemental recovery from retained events passed without new
+  inference and without rewriting that outcome (comment `6480916478`).
+
+Review Broker 0.4.9 corrected staged-file permission normalization (comment
+`6481195784`). A later bounded non-inference Codespaces qualification observed
+one real transfer arrive as mode 0644, then pass the actual retention path as
+mode 0600 with byte and hash identity, credential screening, cleanup and
+observed Shutdown (comment `6481554872`). This qualifies that transfer-retention
+mechanism only. It does not manufacture historical pilot acceptance or general
+production-security certification.
 
 ```text
-RB_PILOT_01=CONSUMED
-RB_PILOT_02=CONSUMED
-RB_PILOT_03=CONSUMED
-RB_PILOT_04_PREPARATION_AUTHORIZED=YES
-RB_PILOT_04_EXECUTION_AUTHORIZED=NO
-RB_PILOT_04_AUTHENTICATED_INFERENCE=0
-DIRECT_TERRA_SMOKE=PASS_LIMITED_DIAGNOSTIC
+RB_PILOT_01_THROUGH_05=CONSUMED
+RB_PILOT_05_FUNCTIONAL=PASS
+RB_PILOT_05_ORIGINAL_ACCEPTANCE=FAIL
+RB_PILOT_05_SUPPLEMENTAL_RECOVERY=PASS
+V049_TRANSFER_RETENTION=PASS
 PRODUCTION_SECURITY_QUALIFIED=NO
 ```
 
-The essential protections and risk-proportionate security decision #27 remain unchanged.
+### Bounded low-sensitivity operational admission
 
-A future separately authorized synthetic attempt must reserve its supplied
-request identity durably on the designated controller before any model-capable
-command. After execution, the controller must recover verified sanitized
-receipts and may retain bounded raw diagnostics privately only after the
-credential-screening gate passes. Controller persistence is not distributed
-consensus and does not protect against privileged deletion. A local validation
-or retention receipt is not production EvidenceStatus VALID, and no claim of
-comprehensive credential isolation follows.
+The applicable v1 subject class is an explicitly authorized, non-secret or
+low-sensitivity GitHub pull request in a repository independently verified as
+public. Public visibility is necessary but not sufficient: the operator must
+also list the repository in the dedicated low-sensitivity allowlist. The
+requester and repository must remain in their existing authorization allowlists,
+and the executing broker SHA must equal the separately admitted SHA.
 
-After a successful pilot, ordinary authorized non-secret or low-sensitivity PR
-reviews may be admitted only by a separately versioned and tested operational
-admission policy. Until that implementation exists, the real-PR production gate
-remains closed. Sensitive/high-assurance requests require their own stronger
-authorization and evidence. Review reports never carry automatic merge or
-normative decision authority. See RB-PI-SEC-01 (#27).
+This bounded path is separate from comprehensive security qualification and is
+disabled by default. Its admission decision occurs before a journal claim,
+packet preparation, Codespace lifecycle action or model-capable attempt.
+Private, ambiguous and unavailable repository visibility fails closed.
+Sensitive or high-assurance requests require a separately justified admission
+path. No configuration variable is activated merely by publishing source.
+
+All existing ReviewRequest, immutable-source, packet, credential-screening,
+one-shot, evidence-validation and publication controls remain applicable. The
+requester continues to own the variable mission and criteria. A reviewer result
+is evidence only; it never authorizes merge, publication, source modification
+or alteration of normative premises. See RB-PI-SEC-01 (#27).
 
 ## Required separations
 

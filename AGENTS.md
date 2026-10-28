@@ -5,7 +5,7 @@ asset_type: "agent-instructions"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Agent Instructions"
-version: "0.3.1"
+version: "0.3.2"
 ---
 
 # Review Broker Agent Instructions
@@ -32,11 +32,16 @@ content, evidence, logs, or Issues.
 
 Do not run authenticated reviews of actual consumer PRs through the production
 workflow until their applicable admission and qualification gates pass.
-RB-PILOT-01 and RB-PILOT-02 are permanently consumed and their operational entry points remain closed.
+RB-PILOT-01 through RB-PILOT-05 are permanently consumed and their operational
+entry points remain closed. RB05's functional PASS, original operational FAIL,
+supplemental recovery PASS and later 0.4.9 transfer-retention PASS are separate
+facts; never rewrite them into a historical pilot acceptance PASS.
 
-On 2026-10-28, the product owner explicitly authorized **technical preparation only** of RB-PILOT-03. Implementation of the new synthetic identity, controller, remote observation and private retention, offline tests, candidate publication and bounded independent review is allowed.
-
-This authorization does not permit authenticated inference, a real Codespace operation or a real controller claim. A separate product-owner decision is mandatory before RB-PILOT-03 execution.
+The bounded v1 admission source is default-disabled and does not authorize its
+own activation. This preparation task permits no consumer-PR execution,
+Codespace startup, controller operation or authenticated inference. A future
+real review requires a separate product-owner mandate plus the exact admitted
+source and operator configuration.
 
 Preserve at-most-once invocation, durable reservation, credential screening, private evidence handling and observed Shutdown. Do not reopen maximal Codex-internal attestation as a general prerequisite under decision #27.
 

@@ -5,7 +5,7 @@ asset_type: "qualification-record"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Credential-Isolation Assessment"
-version: "0.1.4"
+version: "0.1.5"
 ---
 
 # Reviewer Credential-Isolation Assessment
@@ -210,7 +210,36 @@ a blanket launch prerequisite for low-sensitivity v1. This decision does not
 refute or erase any earlier probe or independent NO-GO. OBL-02/03/04 remain
 UNDETERMINED for complete qualification; the product accepts these disclosed
 residual risks only for the fixed, non-secret RB-PILOT-01 (#26) experiment.
-The ordinary production workflow and security gate remain closed. Pilot JSON
-and event checks establish only local synthetic functional behavior, not
-production recovery or security qualification. No live pilot has been
-observed by this documentation change.
+The historical comprehensive security gate remains closed. Pilot JSON and
+event checks establish bounded synthetic functional behavior, not comprehensive
+security qualification.
+
+## Bounded v1 operational evidence and disposition (2026-10-28)
+
+The product owner accepts the documented residual risk for explicitly
+authorized low-sensitivity public pull requests. This does not change any prior
+NO-GO, PARTIAL, BLOCKED or UNDETERMINED finding to PASS. In particular, managed
+policy overrides, hard-link aliases, inherited process capabilities and the
+unobserved effective tool router remain unresolved for comprehensive assurance
+under Issues #11 and #22.
+
+RB-PILOT-04 later ended with `CODEX_APPLICATION_ERROR`, functional `FAIL`, valid
+receipts and complete retention. RB-PILOT-05 completed the pinned Sol/xhigh
+review with functional `PASS`, verdict `NO_GO` and valid receipts, while its
+original operational acceptance remained `FAIL` because raw diagnostic
+retention was partial (#26 comment `6480361923`). Supplemental byte-exact
+recovery passed without inference or historical mutation (comment `6480916478`).
+
+Review Broker 0.4.9 corrected private staged-file mode normalization (comment
+`6481195784`). Qualification `RB-V049-TRANSPORT-RETENTION-02` then exercised one
+actual Codespaces copy and the real retention implementation: copied mode 0644,
+retained mode 0600, exact byte/hash match, credential screen PASS, cleanup
+confirmed and Shutdown observed (comment `6481554872`). This is transport and
+retention evidence, not a production-security certificate.
+
+The 0.4.10 candidate adds a distinct bounded admission mode before journal
+claim or packet construction. It requires exact enablement, exact executing SHA,
+a dedicated low-sensitivity repository allowlist, both existing authorization
+allowlists, and unambiguous public GitHub visibility. The existing comprehensive
+security gate is preserved independently. Neither path is activated by this
+source preparation, and no consumer pull request is executed.

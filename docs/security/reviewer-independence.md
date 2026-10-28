@@ -5,7 +5,7 @@ asset_type: "security-contract"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Independence Contract"
-version: "0.2.0"
+version: "0.2.1"
 ---
 
 # Reviewer Independence Contract
@@ -46,11 +46,11 @@ non-inference diagnostics are separate processes or expose only requirements;
 `codex exec --json` does not emit the required effective values before turn
 transport. The broker therefore records effective policy attestation as
 `UNAVAILABLE` rather than claiming that the requested profile became effective.
-The authenticated production reviewer path remains disabled. The historical
-fixed-fixture RB-PILOT-01 exception is consumed. RB-PILOT-02 is a separately
-prepared non-production path that retains all existing requested controls but
-has no inference authorization and does not claim attested effective Codex
-policy.
+Complete effective-policy attestation remains unavailable. RB-PILOT-01 through
+RB-PILOT-05 are consumed historical exceptions and none may be replayed. RB05
+established functional Sol/xhigh behavior but retained its original operational
+`FAIL`; supplemental recovery and the later 0.4.9 transfer-retention PASS are
+additive evidence, not comprehensive policy attestation.
 
 The revised profile grants only Codex's minimal system read set and the exact
 prepared packet directory. It explicitly denies the runtime home and trusted
@@ -78,13 +78,11 @@ placed in model input or evidence. A demonstrated credential disclosure or
 unexpected privileged capability blocks the affected path and requires a
 specific mitigation.
 
-RB-PILOT-01 (#26) is consumed and cannot be admitted again. RB-PILOT-02 is
-prepared outside the production workflow with fixed synthetic data, no
-privileged orchestration credentials, no GitHub publishing, and local evidence
-only. Preparation is not consent to inference. A separate future mandate must
-grant explicit one-shot consent. This remains a residual-risk experiment, not
-a certification of Codex. Subsequent ordinary reviews require a distinct
-bounded operational admission decision.
+RB-PILOT-01 through RB-PILOT-05 (#26) are consumed and cannot be admitted
+again. The bounded operational policy for future ordinary reviews is a distinct,
+default-disabled path restricted to explicitly allowlisted public repositories,
+a separately admitted exact broker SHA, and existing requester/repository
+authorization. Preparing that path is not consent to inference or activation.
 
 ## Credential ownership
 
@@ -109,22 +107,31 @@ Effective model identity and reasoning effort are recorded as requested values.
 They remain unattested unless the provider exposes independently verifiable
 metadata. The broker never infers either from a CLI flag.
 
-## Qualification gate
+## Admission and qualification scopes
 
-Before authenticated content is exposed, independently reviewed controlled
-probes must demonstrate:
+### Comprehensive security qualification
 
-- the effective user and process tree, including accessible parent environment,
-  inherited descriptors, effective tool inventory, and actual model-tool permissions;
-- packet read access and write restrictions;
-- denial of model-tool access to ChatGPT credential files;
-- absence of GitHub and API-key credentials in the child environment;
-- bounded network behavior and failed unauthorized exfiltration attempts;
-- evidence recovery without credential material;
-- cleanup after success, failure, cancellation, and control-plane interruption.
+The comprehensive path retains its independent qualification variable and
+evidence identifier. Its controlled probes seek effective process, tool,
+filesystem, environment, network, credential, recovery and cleanup assurance.
+Historical NO-GO, PARTIAL and UNDETERMINED observations remain applicable. The
+broker cannot review itself into comprehensive qualification, and this path
+remains unavailable unless its exact existing gate is explicitly satisfied.
 
-An external reviewer must examine the probe design and observations. The broker
-cannot review itself into comprehensive qualification. Until the production
-gate passes, the normal GitHub Actions review workflow stops before Codespace
-startup with `SECURITY_BOUNDARY_NOT_QUALIFIED`. The consumed RB-PILOT-01 and prepared-but-unauthorized RB-PILOT-02 local paths
-are not this workflow and cannot set the production gate.
+### Bounded low-sensitivity v1 admission
+
+The separate bounded path accepts the documented residual risks for an
+explicitly authorized non-secret or low-sensitivity pull request. It requires a
+dedicated exact enable value, exact executing-SHA admission, a nonempty
+low-sensitivity repository allowlist, both existing authorization allowlists,
+and authoritative public repository visibility. Unknown visibility and private
+repositories fail closed. Admission occurs before journal claim, packet
+construction, Codespace startup or model-capable execution.
+
+This bounded scope does not assert effective model identity, reasoning effort,
+universal filesystem isolation, complete tool isolation or comprehensive
+security qualification. It preserves the verified runtime identity, requested
+Sol/xhigh policy, shell-disable request, packet guards, credential quarantine,
+one-shot execution and independent evidence validation as defense in depth.
+No reviewer can merge, publish its own result or elevate its findings into
+normative authority.
