@@ -194,6 +194,8 @@ class PacketTests(unittest.TestCase):
                 result = prepare_issue("sample/broker", 42, root / "packet", environment={
                     "REVIEW_BROKER_AUTHORIZED_REQUESTERS": "trusted",
                     "REVIEW_BROKER_AUTHORIZED_REPOSITORIES": "sample/repo",
+                    "REVIEW_BROKER_SECURITY_QUALIFIED": "true",
+                    "REVIEW_BROKER_SECURITY_EVIDENCE_ID": "evidence:qualified",
                 })
             packet = root / "packet"
             self.assertIn("guard_check()", (packet / "input.txt").read_text())

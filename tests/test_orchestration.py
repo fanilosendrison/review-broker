@@ -85,6 +85,8 @@ class ReconciliationTests(unittest.TestCase):
             "REVIEW_BROKER_AUTHORIZED_REQUESTERS": "trusted",
             "REVIEW_BROKER_AUTHORIZED_REPOSITORIES": "fanilosendrison/proto-scope",
             "REVIEW_BROKER_DEFAULT_BRANCH": "dev",
+            "REVIEW_BROKER_SECURITY_QUALIFIED": "true",
+            "REVIEW_BROKER_SECURITY_EVIDENCE_ID": "evidence:qualified",
         }
 
     def issue(self, number=42, actor="trusted"):
