@@ -26,6 +26,10 @@ from .orchestration import prepare_issue, publish_validated_result
 from .reconciliation import reconcile_repository
 from .packets import verify_packet
 from .pilot_synthetic import run_synthetic_pilot, run_synthetic_pilot_02
+from .pilot03_authorization import load_execution_authorization
+from .pilot03_controller import run_pilot03_controller
+from .pilot03_synthetic import run_synthetic_pilot_03
+from .pilot03_transport import Pilot03CodespaceTransport
 from .queue import AttemptState
 from .requester import CliError, request as _request, result as _result, status as _status
 from .reviewer_profile import install_reviewer_profile, reviewer_home_from_environment
@@ -51,6 +55,16 @@ def _parser() -> argparse.ArgumentParser:
     pilot_02 = subcommands.add_parser("pilot-synthetic-02")
     pilot_02.add_argument("--broker-wheel-sha256", required=True)
     pilot_02.add_argument("--acknowledge-unqualified-pilot", action="store_true")
+
+    pilot_03 = subcommands.add_parser("pilot-synthetic-03")
+    pilot_03.add_argument("--broker-wheel-sha256", required=True)
+
+    controller_03 = subcommands.add_parser("pilot-synthetic-03-controller")
+    controller_03.add_argument("--execution-authorization", type=Path)
+    controller_03.add_argument("--source-sha", required=True)
+    controller_03.add_argument("--broker-wheel", required=True, type=Path)
+    controller_03.add_argument("--codespace", required=True)
+    controller_03.add_argument("--ssh-config", required=True, type=Path)
 
     request = subcommands.add_parser("request")
     request.add_argument("--repo", required=True)
@@ -150,8 +164,12 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     # Do not even transiently consume or suppress a privileged variable in a
     # pilot process: pilot_environment() must reject it before model transport.
-    source_token = (None if args.command in ("pilot-synthetic", "pilot-synthetic-02") else
-                    os.environ.pop("REVIEW_BROKER_SOURCE_TOKEN", None))
+    source_token = (
+        None if args.command in (
+            "pilot-synthetic", "pilot-synthetic-02", "pilot-synthetic-03",
+            "pilot-synthetic-03-controller",
+        ) else os.environ.pop("REVIEW_BROKER_SOURCE_TOKEN", None)
+    )
     try:
         if args.command == "pilot-synthetic":
             result = run_synthetic_pilot(
@@ -168,6 +186,24 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(canonical_bytes(result).decode("utf-8"))
             return 0 if result.get("pilot_functional") == "PASS" else 1
+        if args.command == "pilot-synthetic-03":
+            result = run_synthetic_pilot_03(
+                broker_wheel_sha256=args.broker_wheel_sha256,
+            )
+            print(canonical_bytes(result).decode("utf-8"))
+            return 0 if result.get("pilot_functional") == "PASS" else 1
+        if args.command == "pilot-synthetic-03-controller":
+            authorization = load_execution_authorization(args.execution_authorization)
+            transport = Pilot03CodespaceTransport(args.codespace, args.ssh_config)
+            result = run_pilot03_controller(
+                authorization=authorization,
+                source_sha=args.source_sha,
+                wheel_path=args.broker_wheel,
+                codespace_identity=args.codespace,
+                transport=transport,
+            )
+            print(canonical_bytes(result).decode("utf-8"))
+            return 0 if "controller_error" not in result else 1
         if args.command == "request":
             return _request(args)
         if args.command == "status":
