@@ -1,4 +1,5 @@
 """Offline adversarial tests for the RB-PILOT-03 remote bootstrap preflight."""
+import ast
 import hashlib
 import json
 from pathlib import Path
@@ -11,7 +12,9 @@ from review_broker.pilot03_remote_preflight import (
     _PREFLIGHT_SCRIPT, _PREPARE_SCRIPT, _runtime_scripts,
     Pilot03PreflightError, run_remote_preflight,
 )
-from review_broker.pilot_runtime_config import RB03_RUNTIME, RB04_RUNTIME, RB05_RUNTIME
+from review_broker.pilot_runtime_config import (
+    PilotRuntimeConfig, RB03_RUNTIME, RB04_RUNTIME, RB05_RUNTIME,
+)
 from review_broker.pilot03_transport import Pilot03CodespaceTransport
 
 PASS = {
@@ -42,6 +45,36 @@ class Lifecycle:
     def start(self): pass
     def state(self): return "Available"
     def stop(self): pass
+
+
+def nested_verification_script(preflight):
+    for node in ast.walk(ast.parse(preflight)):
+        if not isinstance(node, ast.Call) or not node.args or not isinstance(node.args[0], ast.List):
+            continue
+        values = node.args[0].elts
+        for index, value in enumerate(values[:-1]):
+            if isinstance(value, ast.Constant) and value.value == "-c":
+                nested = values[index + 1]
+                if isinstance(nested, ast.Constant) and isinstance(nested.value, str):
+                    return nested.value
+    raise AssertionError("nested verification script missing")
+
+
+def nested_identities(preflight):
+    tree = ast.parse(nested_verification_script(preflight))
+    version = suffix = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Compare) and isinstance(node.left, ast.Call):
+            function = node.left.func
+            if (
+                isinstance(function, ast.Attribute) and function.attr == "version"
+                and node.left.args and ast.literal_eval(node.left.args[0]) == "review-broker"
+            ):
+                version = ast.literal_eval(node.comparators[0])
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            if node.func.attr == "endswith":
+                suffix = ast.literal_eval(node.args[0])
+    return version, suffix
 
 
 class Pilot03PreflightTests(unittest.TestCase):
@@ -139,9 +172,42 @@ class Pilot03PreflightTests(unittest.TestCase):
         for value in (RB05_RUNTIME.remote_wheel, RB05_RUNTIME.remote_venv,
                       RB05_RUNTIME.remote_python, RB05_RUNTIME.remote_reviewctl):
             self.assertIn(value, preflight)
-        self.assertIn('version("review-broker")=="0.4.7"', preflight)
+        self.assertIn('version("review-broker")=="0.4.8"', preflight)
         self.assertNotIn(RB03_RUNTIME.remote_wheel, preflight)
         self.assertNotIn('version("review-broker")=="0.4.5"', preflight)
+
+    def test_nested_verification_uses_each_runtime_version_and_wheel_basename(self):
+        for runtime in (RB03_RUNTIME, RB04_RUNTIME, RB05_RUNTIME):
+            with self.subTest(pilot=runtime.pilot_id):
+                prepare, preflight = _runtime_scripts(runtime)
+                version, suffix = nested_identities(preflight)
+                self.assertEqual(version, runtime.package_version)
+                self.assertEqual(suffix, "/" + Path(runtime.remote_wheel).name)
+                self.assertIn(runtime.remote_wheel, preflight)
+                self.assertIn(runtime.bootstrap_root, prepare)
+        self.assertEqual(_runtime_scripts(RB03_RUNTIME), (_PREPARE_SCRIPT, _PREFLIGHT_SCRIPT))
+        self.assertEqual(
+            _runtime_scripts(RB04_RUNTIME)[1],
+            _PREFLIGHT_SCRIPT.replace(RB03_RUNTIME.bootstrap_root, RB04_RUNTIME.bootstrap_root),
+        )
+
+    def test_baseline_rb05_generator_reproduces_basename_mismatch(self):
+        baseline = PilotRuntimeConfig(
+            pilot_id="RB-PILOT-05", cli_command="pilot-synthetic-05",
+            remote_root="/tmp/review-broker-pilot-26-rb05",
+            bootstrap_root="/tmp/review-broker-pilot-26-rb05-bootstrap",
+            package_version="0.4.7",
+        )
+        script = _PREFLIGHT_SCRIPT.replace(REMOTE_WHEEL, baseline.remote_wheel)
+        script = script.replace(RB03_RUNTIME.bootstrap_root, baseline.bootstrap_root)
+        script = script.replace(
+            'version("review-broker")=="0.4.5"',
+            'version("review-broker")=="0.4.7"',
+        )
+        version, suffix = nested_identities(script)
+        self.assertEqual(version, baseline.package_version)
+        self.assertEqual(suffix, "/review_broker-0.4.5-py3-none-any.whl")
+        self.assertNotEqual(suffix, "/" + Path(baseline.remote_wheel).name)
 
     def test_transport_uses_prepared_python_for_emission_and_observation(self):
         with tempfile.TemporaryDirectory() as temporary:

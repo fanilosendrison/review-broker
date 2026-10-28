@@ -151,9 +151,16 @@ def _runtime_scripts(runtime: PilotRuntimeConfig) -> tuple[str, str]:
     selected_assertion = (
         f'importlib.metadata.version("review-broker")=="{runtime.package_version}"'
     )
+    old_suffix = "/" + Path(REMOTE_WHEEL).name
+    new_suffix = "/" + Path(runtime.remote_wheel).name
     if preflight.count(version_assertion) != 1:
         raise ValueError("PILOT_RUNTIME_PREFLIGHT_TEMPLATE_INVALID")
-    return prepare, preflight.replace(version_assertion, selected_assertion)
+    preflight = preflight.replace(version_assertion, selected_assertion, 1)
+    if old_suffix == new_suffix:
+        return prepare, preflight
+    if preflight.count(old_suffix) != 1:
+        raise ValueError("PILOT_RUNTIME_PREFLIGHT_TEMPLATE_INVALID")
+    return prepare, preflight.replace(old_suffix, new_suffix, 1)
 
 
 def _run_ssh(runner, ssh_host_alias: str, ssh_config: Path, script: str, arguments: list[str]):
