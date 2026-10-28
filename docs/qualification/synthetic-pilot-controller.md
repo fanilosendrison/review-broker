@@ -5,14 +5,12 @@ asset_type: "qualification-procedure"
 domain: "independent-review"
 severity: "strict"
 name: "Synthetic Pilot Controller Persistence and Retention"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # Synthetic pilot controller persistence and retention
 
-This procedure defines controller-side preparation for a future, separately
-authorized synthetic pilot. It creates no pilot identity and grants no inference
-authority.
+This procedure defines controller-side preparation for RB-PILOT-03, whose technical preparation was product-authorized on 2026-10-28. It creates no pilot identity, integrates no real controller, and grants no authenticated inference authority.
 
 ## Persistent request reservation
 
@@ -116,6 +114,10 @@ reservation and retention mechanisms only.
 ```text
 RB_PILOT_01=CONSUMED
 RB_PILOT_02=CONSUMED
-RB_PILOT_03=NOT_CREATED
-NEW_AUTHENTICATED_INFERENCE_AUTHORIZED=NO
+RB_PILOT_03_PREPARATION_AUTHORIZED=YES
+RB_PILOT_03_IMPLEMENTED=NO
+RB_PILOT_03_EXECUTION_AUTHORIZED=NO
+CONTROLLER_REAL_CLAIM_ARMED=NO
+AUTHENTICATED_INFERENCE=0
+PRODUCTION_SECURITY_QUALIFIED=NO
 ```

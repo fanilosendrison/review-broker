@@ -5,7 +5,7 @@ asset_type: "agent-instructions"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Agent Instructions"
-version: "0.3.0"
+version: "0.3.1"
 ---
 
 # Review Broker Agent Instructions
@@ -32,15 +32,15 @@ content, evidence, logs, or Issues.
 
 Do not run authenticated reviews of actual consumer PRs through the production
 workflow until their applicable admission and qualification gates pass.
-RB-PILOT-01 and RB-PILOT-02 (#26) are consumed and permanently closed; their
-historical CLI entry points must refuse before side effects. RB-PILOT-03 has not
-been created or authorized. A future synthetic identity requires separate
-product authorization, a persistent controller reservation before any
-model-capable command, and private pre-Shutdown evidence retention. No pilot
-publishes, merges, or claims security qualification. The Product Intent decision
-in #27 retires maximal Codex-internal attestation as a blanket low-sensitivity
-v1 prerequisite; it does not authorize real-PR review or any new pilot inference
-by itself. Never retry an attempt that reached `ARMED`.
+RB-PILOT-01 and RB-PILOT-02 are permanently consumed and their operational entry points remain closed.
+
+On 2026-10-28, the product owner explicitly authorized **technical preparation only** of RB-PILOT-03. Implementation of the new synthetic identity, controller, remote observation and private retention, offline tests, candidate publication and bounded independent review is allowed.
+
+This authorization does not permit authenticated inference, a real Codespace operation or a real controller claim. A separate product-owner decision is mandatory before RB-PILOT-03 execution.
+
+Preserve at-most-once invocation, durable reservation, credential screening, private evidence handling and observed Shutdown. Do not reopen maximal Codex-internal attestation as a general prerequisite under decision #27.
+
+No pilot publishes, merges, or claims security qualification. Never retry an attempt that reached `ARMED`.
 
 ## Engineering Project profile
 
