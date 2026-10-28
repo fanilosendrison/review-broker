@@ -5,7 +5,7 @@ asset_type: "specification"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker v1 Specification"
-version: "0.3.1"
+version: "0.4.0"
 ---
 
 # Review Broker v1 Specification
@@ -68,13 +68,13 @@ RB-PILOT-01 and RB-PILOT-02 (#26) were authenticated exceptions to the
 production gate. Both identities are consumed and their historical Python and
 CLI entry points are permanently closed independently of remote `/tmp` state.
 RB-PILOT-02 ended with `APPLICATION_ERROR_UNCLASSIFIED`; its raw diagnostics
-were not retained before Shutdown and are unavailable. On 2026-10-28, the product owner authorized technical preparation of RB-PILOT-03, including its future deterministic identity, fixed entry points, controller, remote observation, private retention, offline tests, candidate publication, and bounded independent review. RB-PILOT-03 is not implemented, and authenticated execution is not authorized. A separate product-owner decision identifying the prepared pilot and qualified implementation is required before any real invocation.
+were not retained before Shutdown and are unavailable. On 2026-10-28, the product owner authorized technical preparation of RB-PILOT-03, including its future deterministic identity, fixed entry points, controller, remote observation, private retention, offline tests, candidate publication, and bounded independent review. RB-PILOT-03 is implemented as an offline-qualified operational preparation, and authenticated execution is not authorized. Its controller requires a separate attempt-bound execution authorization before Codespace preparation or durable reservation. A separate product-owner decision identifying the prepared pilot and qualified implementation is required before any real invocation.
 
 ```text
 RB_PILOT_01=CONSUMED
 RB_PILOT_02=CONSUMED
 RB_PILOT_03_PREPARATION_AUTHORIZED=YES
-RB_PILOT_03_IMPLEMENTED=NO
+RB_PILOT_03_IMPLEMENTED=YES
 RB_PILOT_03_EXECUTION_AUTHORIZED=NO
 RB_PILOT_03_AUTHENTICATED_INFERENCE=0
 PRODUCTION_SECURITY_QUALIFIED=NO

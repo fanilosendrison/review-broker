@@ -5,12 +5,12 @@ asset_type: "qualification-procedure"
 domain: "independent-review"
 severity: "strict"
 name: "Synthetic Pilot Controller Persistence and Retention"
-version: "0.1.2"
+version: "0.2.0"
 ---
 
 # Synthetic pilot controller persistence and retention
 
-This procedure defines controller-side preparation for RB-PILOT-03, whose technical preparation was product-authorized on 2026-10-28. It creates no pilot identity, integrates no real controller, and grants no authenticated inference authority.
+This procedure defines the implemented controller-side preparation for RB-PILOT-03, whose technical preparation was product-authorized on 2026-10-28. It integrates deterministic identity, a fail-closed execution-authorization boundary, durable reservation, bounded remote observation, private retention, and Shutdown handling. It grants no authenticated inference authority and records no real controller claim during offline qualification.
 
 ## Persistent request reservation
 
@@ -105,18 +105,25 @@ Shutdown exception remains primary and the retention exception remains its
 context. These deferred nonblocking limitations do not weaken receipt admission
 or authorize a retry.
 
-## Future integration boundary
+## Operational integration boundary
 
-A future pilot implementation must bind authorization and command emission to a
-successful durable controller claim. This package currently provides the
-reservation and retention mechanisms only.
+The prepared controller binds a structured attempt-specific authorization to
+the exact source SHA, wheel SHA-256, and Codespace identity. It validates this
+authorization before Codespace preparation, writes the existing durable
+controller claim before its single model-capable command, performs no automatic
+retry, and always crosses the Shutdown boundary after taking responsibility.
+Offline tests use only simulated lifecycle, transport, and artifact sources.
+They do not establish real Codespaces transport qualification or authenticated
+provider inference.
 
 ```text
 RB_PILOT_01=CONSUMED
 RB_PILOT_02=CONSUMED
 RB_PILOT_03_PREPARATION_AUTHORIZED=YES
-RB_PILOT_03_IMPLEMENTED=NO
+RB_PILOT_03_IMPLEMENTED=YES
 RB_PILOT_03_EXECUTION_AUTHORIZED=NO
+REMOTE_OBSERVER_IMPLEMENTED=YES
+CONTROLLER_OPERATIONAL_INTEGRATION_IMPLEMENTED=YES
 CONTROLLER_REAL_CLAIM_ARMED=NO
 AUTHENTICATED_INFERENCE=0
 PRODUCTION_SECURITY_QUALIFIED=NO

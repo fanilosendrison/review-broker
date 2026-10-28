@@ -5,7 +5,7 @@ asset_type: "qualification-procedure"
 domain: "independent-review"
 severity: "strict"
 name: "RB-PILOT-02 Historical Synthetic Pilot Record"
-version: "0.2.1"
+version: "0.2.2"
 ---
 
 # RB-PILOT-02: consumed and permanently closed
@@ -17,7 +17,7 @@ not authorize or expose an executable pilot identity.
 ```text
 RB_PILOT_01=CONSUMED
 RB_PILOT_02=CONSUMED
-RB_PILOT_03=NOT_CREATED
+RB_PILOT_03_AT_RB_PILOT_02_CLOSURE=NOT_CREATED
 NEW_AUTHENTICATED_INFERENCE_AUTHORIZED=NO
 ```
 
@@ -72,10 +72,12 @@ covers the designated controller and its persistent storage. It is not
 consensus between controllers and does not resist deliberate deletion by a
 privileged administrator.
 
-No RB-PILOT-03 request or attempt identity exists. The reservation module does
-not generate identities or authorize an invocation. A future mandate must
-separately define and authorize any new identity, then integrate command
-emission with the durable reservation boundary.
+At RB-PILOT-02 closure, no RB-PILOT-03 request or attempt identity existed.
+That historical statement is superseded by the separately authorized and
+prepared RB-PILOT-03 implementation. The reservation module itself still does
+not generate identities or authorize an invocation; the new controller binds
+its deterministic identity and separate execution authorization before using
+the existing durable reservation boundary.
 
 ### Private diagnostic retention
 
