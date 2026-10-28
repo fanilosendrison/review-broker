@@ -5,7 +5,7 @@ asset_type: "qualification-procedure"
 domain: "independent-review"
 severity: "strict"
 name: "RB-PILOT-03 Operational Preparation"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # RB-PILOT-03 operational preparation
@@ -57,6 +57,30 @@ The controller applies these boundaries in order:
 An existing, partial, malformed, inaccessible, or ambiguous reservation blocks
 emission. A failed or undetermined remote bootstrap blocks reservation. No
 post-emission failure authorizes an automatic retry.
+
+## Codespace identity and OpenSSH alias
+
+Review Broker 0.4.2 separates the GitHub Codespace identity from the controlled
+OpenSSH `Host` alias. GitHub lifecycle operations and literal copies continue
+to use the Codespace identity. Remote preparation, preflight, reviewer emission,
+and sanitary artifact observation use an operator-supplied literal alias that
+must exist exactly once in the private controlled configuration and whose
+GitHub CLI proxy command must bind the expected Codespace identity.
+
+Alias syntax, literal stanza uniqueness, private configuration metadata, and
+proxy binding are validated locally when the transport is constructed, before
+Codespace startup or controller reservation. Wildcards, multi-pattern aliases,
+external includes, ambiguous stanzas, implicit aliases, and mismatched
+Codespace bindings fail closed. Raw configuration lines are not reported.
+
+The first authorized v0.4.1 operation emitted no model-capable command and
+created no controller claim because its SSH target used the Codespace identity
+rather than the distinct configured alias. A subsequent read-only diagnostic
+proved this mismatch and observed Shutdown. That operation did not consume
+RB-PILOT-03. The 0.4.2 correction changes the candidate source and wheel
+identities, so the earlier execution authorization does not apply. Any real
+execution requires a new product-owner decision bound to the new exact SHA and
+wheel.
 
 ## Remote observation and private retention
 

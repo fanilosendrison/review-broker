@@ -13,6 +13,7 @@ from .pilot03_remote_preflight import (
     REMOTE_REVIEWCTL,
     run_remote_preflight,
 )
+from .pilot03_ssh_config import validate_ssh_host_alias
 
 _REMOTE_ENTRYPOINT = f'''import os
 os.execve("{REMOTE_REVIEWCTL}", ["{REMOTE_REVIEWCTL}", "pilot-synthetic-03", "--broker-wheel-sha256", os.environ["RB03_WHEEL_SHA256"]], {{"HOME":os.environ["HOME"],"PATH":os.environ["PATH"],"CODEX_HOME":os.environ["CODEX_HOME"],"LANG":"C.UTF-8","TZ":"UTC"}})
@@ -25,6 +26,7 @@ class Pilot03CodespaceTransport:
     def __init__(
         self,
         codespace: str,
+        ssh_host_alias: str,
         ssh_config: Path,
         *,
         runner: Callable[..., Any] = subprocess.run,
@@ -32,10 +34,16 @@ class Pilot03CodespaceTransport:
     ) -> None:
         self.codespace = codespace
         self.ssh_config = Path(ssh_config)
+        self.ssh_host_alias = validate_ssh_host_alias(
+            codespace_identity=codespace,
+            ssh_host_alias=ssh_host_alias,
+            ssh_config=self.ssh_config,
+        )
         self.runner = runner
         self.lifecycle = lifecycle or CodespaceController(codespace, runner=runner)
         self.artifact_source = Pilot03RemoteArtifacts(
-            codespace, ssh_config, remote_python=REMOTE_PYTHON, runner=runner,
+            codespace, self.ssh_host_alias, ssh_config,
+            remote_python=REMOTE_PYTHON, runner=runner,
         )
         self._emitted = False
         self._shutdown_observed = False
@@ -52,6 +60,7 @@ class Pilot03CodespaceTransport:
             raise RuntimeError("RB03_TRANSPORT_PREFLIGHT_FAILED")
         run_remote_preflight(
             codespace=self.codespace,
+            ssh_host_alias=self.ssh_host_alias,
             ssh_config=self.ssh_config,
             wheel_path=wheel_path,
             wheel_sha256=wheel_sha256,
@@ -63,7 +72,7 @@ class Pilot03CodespaceTransport:
             raise RuntimeError("RB03_REMOTE_COMMAND_ALREADY_EMITTED")
         self._emitted = True
         result = self.runner(
-            ["ssh", "-F", str(self.ssh_config), "-o", "BatchMode=yes", self.codespace,
+            ["ssh", "-F", str(self.ssh_config), "-o", "BatchMode=yes", self.ssh_host_alias,
              "/usr/bin/env", "-i", "HOME=/home/codespace",
              "CODEX_HOME=/home/codespace/.codex", f"PATH={REMOTE_PATH}",
              f"RB03_WHEEL_SHA256={wheel_sha256}", REMOTE_PYTHON, "-P", "-"],

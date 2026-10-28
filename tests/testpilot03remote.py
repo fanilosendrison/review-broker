@@ -25,7 +25,9 @@ class Pilot03RemoteTests(unittest.TestCase):
         temporary = tempfile.NamedTemporaryFile()
         self.addCleanup(temporary.close)
         runner = Runner(value)
-        return Pilot03RemoteArtifacts("expected-space", Path(temporary.name), runner=runner), runner
+        return Pilot03RemoteArtifacts(
+            "expected-space", "independent-host-alias", Path(temporary.name), runner=runner,
+        ), runner
 
     def test_sanitary_observation_uses_stdin_and_no_shell(self):
         data = b"safe"
@@ -38,6 +40,7 @@ class Pilot03RemoteTests(unittest.TestCase):
         self.assertEqual(adapter.observe("codex-final.json").sha256, value["sha256"])
         command, kwargs = runner.calls[0]
         self.assertEqual(command[0], "ssh")
+        self.assertEqual(command[5], "independent-host-alias")
         self.assertNotIn("bash", command)
         self.assertFalse(kwargs["shell"])
         self.assertIn("input", kwargs)

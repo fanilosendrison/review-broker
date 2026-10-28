@@ -53,13 +53,17 @@ class Pilot03RemoteArtifacts:
     """Expose only sanitary metadata and fixed literal RB-PILOT-03 copies."""
 
     def __init__(
-        self, codespace: str, ssh_config: Path, *,
+        self, codespace: str, ssh_host_alias: str, ssh_config: Path, *,
         remote_python: str = REMOTE_PYTHON,
         runner: Callable[..., Any] = subprocess.run,
     ) -> None:
-        if not re.fullmatch(r"[A-Za-z0-9-]+", codespace):
+        if (
+            not re.fullmatch(r"[A-Za-z0-9-]+", codespace)
+            or not re.fullmatch(r"[A-Za-z0-9._-]+", ssh_host_alias)
+        ):
             raise ValueError("RB03_REMOTE_SOURCE_INVALID")
         self.codespace = codespace
+        self.ssh_host_alias = ssh_host_alias
         self.ssh_config = Path(ssh_config)
         if remote_python != REMOTE_PYTHON:
             raise ValueError("RB03_REMOTE_PYTHON_INVALID")
@@ -70,7 +74,7 @@ class Pilot03RemoteArtifacts:
     def observe(self, relative_name: str) -> RemoteArtifact:
         path = self._path(relative_name)
         result = self.runner(
-            ["ssh", "-F", str(self.ssh_config), "-o", "BatchMode=yes", self.codespace,
+            ["ssh", "-F", str(self.ssh_config), "-o", "BatchMode=yes", self.ssh_host_alias,
              "/usr/bin/env", "-i", f"PATH={REMOTE_PATH}",
              self.remote_python, "-P", "-", path],
             input=_OBSERVE_SCRIPT, text=True, capture_output=True, check=False,

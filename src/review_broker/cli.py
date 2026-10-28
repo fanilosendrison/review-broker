@@ -65,6 +65,7 @@ def _parser() -> argparse.ArgumentParser:
     controller_03.add_argument("--broker-wheel", required=True, type=Path)
     controller_03.add_argument("--codespace", required=True)
     controller_03.add_argument("--ssh-config", required=True, type=Path)
+    controller_03.add_argument("--ssh-host-alias", required=True)
 
     request = subcommands.add_parser("request")
     request.add_argument("--repo", required=True)
@@ -194,7 +195,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if result.get("pilot_functional") == "PASS" else 1
         if args.command == "pilot-synthetic-03-controller":
             authorization = load_execution_authorization(args.execution_authorization)
-            transport = Pilot03CodespaceTransport(args.codespace, args.ssh_config)
+            transport = Pilot03CodespaceTransport(
+                args.codespace, args.ssh_host_alias, args.ssh_config,
+            )
             result = run_pilot03_controller(
                 authorization=authorization,
                 source_sha=args.source_sha,

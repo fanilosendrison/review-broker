@@ -44,8 +44,14 @@ class Lifecycle:
 
 class Pilot03PreflightTests(unittest.TestCase):
     def paths(self, temporary):
-        root = Path(temporary); config = root / "ssh.conf"; config.write_text("Host fixture\n")
-        wheel = root / "review_broker-0.4.1-py3-none-any.whl"; wheel.write_bytes(b"wheel")
+        root = Path(temporary); config = root / "ssh.conf"
+        config.write_text(
+            "Host independent-host-alias\n"
+            "  ProxyCommand gh cs ssh -c space --stdio\n"
+            "  IdentityFile /tmp/synthetic-key\n"
+        )
+        config.chmod(0o600)
+        wheel = root / "review_broker-0.4.2-py3-none-any.whl"; wheel.write_bytes(b"wheel")
         return config, wheel, hashlib.sha256(b"wheel").hexdigest()
 
     def runner(self, final, copy_return=0):
@@ -58,8 +64,10 @@ class Pilot03PreflightTests(unittest.TestCase):
     def test_complete_preflight_transfers_exact_wheel_and_uses_sanitary_scripts(self):
         with tempfile.TemporaryDirectory() as temporary:
             config, wheel, digest = self.paths(temporary); runner = self.runner(PASS)
-            receipt = run_remote_preflight(codespace="space", ssh_config=config,
-                wheel_path=wheel, wheel_sha256=digest, runner=runner)
+            receipt = run_remote_preflight(
+                codespace="space", ssh_host_alias="independent-host-alias",
+                ssh_config=config, wheel_path=wheel, wheel_sha256=digest, runner=runner,
+            )
             self.assertEqual(receipt, PASS)
             copy_command, copy_options = runner.calls[1]
             self.assertEqual(copy_command, ["gh", "codespace", "cp", "-c", "space",
@@ -67,6 +75,7 @@ class Pilot03PreflightTests(unittest.TestCase):
             self.assertFalse(copy_options["shell"])
             for command, options in (runner.calls[0], runner.calls[2]):
                 self.assertEqual(command[0], "ssh")
+                self.assertEqual(command[5], "independent-host-alias")
                 self.assertNotIn("bash", command)
                 self.assertFalse(options["shell"])
                 self.assertIn("input", options)
@@ -89,32 +98,43 @@ class Pilot03PreflightTests(unittest.TestCase):
             with self.subTest(expected=expected), tempfile.TemporaryDirectory() as temporary:
                 config, wheel, digest = self.paths(temporary)
                 with self.assertRaisesRegex(Pilot03PreflightError, expected):
-                    run_remote_preflight(codespace="space", ssh_config=config,
-                        wheel_path=wheel, wheel_sha256=digest, runner=self.runner(value))
+                    run_remote_preflight(
+                        codespace="space", ssh_host_alias="independent-host-alias",
+                        ssh_config=config, wheel_path=wheel, wheel_sha256=digest,
+                        runner=self.runner(value),
+                    )
 
     def test_missing_remote_wheel_transfer_and_malformed_result_refuse(self):
         with tempfile.TemporaryDirectory() as temporary:
             config, wheel, digest = self.paths(temporary)
             runner = Runner([completed(stdout=json.dumps({"status": "READY"})), completed(1)])
             with self.assertRaisesRegex(Pilot03PreflightError, "REMOTE_WHEEL_MISSING"):
-                run_remote_preflight(codespace="space", ssh_config=config,
-                    wheel_path=wheel, wheel_sha256=digest, runner=runner)
+                run_remote_preflight(
+                    codespace="space", ssh_host_alias="independent-host-alias",
+                    ssh_config=config, wheel_path=wheel, wheel_sha256=digest, runner=runner,
+                )
         with tempfile.TemporaryDirectory() as temporary:
             config, wheel, digest = self.paths(temporary)
             runner = Runner([completed(stdout=json.dumps({"status": "READY"})), completed(), completed(stdout="{")])
             with self.assertRaisesRegex(Pilot03PreflightError, "REMOTE_PREFLIGHT_UNDETERMINED"):
-                run_remote_preflight(codespace="space", ssh_config=config,
-                    wheel_path=wheel, wheel_sha256=digest, runner=runner)
+                run_remote_preflight(
+                    codespace="space", ssh_host_alias="independent-host-alias",
+                    ssh_config=config, wheel_path=wheel, wheel_sha256=digest, runner=runner,
+                )
 
     def test_transport_uses_prepared_python_for_emission_and_observation(self):
         with tempfile.TemporaryDirectory() as temporary:
             config, wheel, digest = self.paths(temporary)
             runner = self.runner(PASS)
-            transport = Pilot03CodespaceTransport("space", config, runner=runner, lifecycle=Lifecycle())
+            transport = Pilot03CodespaceTransport(
+                "space", "independent-host-alias", config,
+                runner=runner, lifecycle=Lifecycle(),
+            )
             transport.preflight(source_sha="a" * 40, wheel_path=wheel, wheel_sha256=digest)
             runner.results.append(completed(returncode=1))
             self.assertEqual(transport.emit_once(wheel_sha256=digest), 1)
             emission = runner.calls[-1][0]
+            self.assertEqual(emission[5], "independent-host-alias")
             self.assertIn(REMOTE_PYTHON, emission)
             self.assertNotIn("python3", emission)
             self.assertIn(REMOTE_REVIEWCTL, runner.calls[-1][1]["input"])

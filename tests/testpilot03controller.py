@@ -119,13 +119,15 @@ class Pilot03ControllerTests(unittest.TestCase):
         ), patch("review_broker.cli.run_pilot03_controller", return_value=report), contextlib.redirect_stdout(io.StringIO()):
             exit_code = main(["pilot-synthetic-03-controller", "--execution-authorization", "/fixture",
                               "--source-sha", SOURCE, "--broker-wheel", str(wheel),
-                              "--codespace", "space", "--ssh-config", "/fixture"])
+                              "--codespace", "space", "--ssh-config", "/fixture",
+                              "--ssh-host-alias", "independent-host-alias"])
         return report, exit_code
 
     def test_cli_denies_absent_authorization_before_transport(self):
         arguments = ["pilot-synthetic-03-controller", "--source-sha", SOURCE,
                      "--broker-wheel", "/missing.whl", "--codespace", "space",
-                     "--ssh-config", "/missing.conf"]
+                     "--ssh-config", "/missing.conf",
+                     "--ssh-host-alias", "independent-host-alias"]
         with patch("review_broker.cli.Pilot03CodespaceTransport") as transport:
             self.assertEqual(main(arguments), 1)
         transport.assert_not_called()

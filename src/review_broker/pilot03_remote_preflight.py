@@ -8,7 +8,7 @@ import subprocess
 from typing import Any, Callable
 
 BOOTSTRAP_ROOT = "/tmp/review-broker-pilot-26-rb03-bootstrap"
-REMOTE_WHEEL = f"{BOOTSTRAP_ROOT}/review_broker-0.4.1-py3-none-any.whl"
+REMOTE_WHEEL = f"{BOOTSTRAP_ROOT}/review_broker-0.4.2-py3-none-any.whl"
 REMOTE_VENV = f"{BOOTSTRAP_ROOT}/venv"
 REMOTE_PYTHON = f"{REMOTE_VENV}/bin/python"
 REMOTE_REVIEWCTL = f"{REMOTE_VENV}/bin/reviewctl"
@@ -31,7 +31,7 @@ status={{"remote_python_compatible":"NO","remote_wheel_sha256_match":"NO","remot
 try:
  assert sys.version_info >= (3,11)
  status["remote_python_compatible"]="YES"
- assert importlib.metadata.version("review-broker")=="0.4.1"
+ assert importlib.metadata.version("review-broker")=="0.4.2"
  assert importlib.metadata.version("jsonschema")=="4.26.0"
  assert importlib.metadata.version("rfc8785")=="0.1.4"
  import jsonschema,rfc8785,review_broker.cli
@@ -101,7 +101,8 @@ class Pilot03PreflightError(RuntimeError):
 
 
 def run_remote_preflight(
-    *, codespace: str, ssh_config: Path, wheel_path: Path, wheel_sha256: str,
+    *, codespace: str, ssh_host_alias: str, ssh_config: Path,
+    wheel_path: Path, wheel_sha256: str,
     runner: Callable[..., Any] = subprocess.run,
 ) -> dict[str, str]:
     """Transfer and verify the exact local wheel without model inference."""
@@ -111,7 +112,7 @@ def run_remote_preflight(
         or not re.fullmatch(r"[0-9a-f]{64}", wheel_sha256)
     ):
         raise Pilot03PreflightError("REMOTE_PREFLIGHT_UNDETERMINED")
-    prepared = _run_ssh(runner, codespace, ssh_config, _PREPARE_SCRIPT, [])
+    prepared = _run_ssh(runner, ssh_host_alias, ssh_config, _PREPARE_SCRIPT, [])
     if prepared != {"status": "READY"}:
         raise Pilot03PreflightError("REMOTE_BOOTSTRAP_UNAVAILABLE")
     copied = runner(
@@ -120,7 +121,7 @@ def run_remote_preflight(
     )
     if copied.returncode != 0:
         raise Pilot03PreflightError("REMOTE_WHEEL_MISSING")
-    result = _run_ssh(runner, codespace, ssh_config, _PREFLIGHT_SCRIPT, [wheel_sha256])
+    result = _run_ssh(runner, ssh_host_alias, ssh_config, _PREFLIGHT_SCRIPT, [wheel_sha256])
     failure = result.get("failure") if isinstance(result, dict) else None
     if failure in _FAILURES:
         raise Pilot03PreflightError(failure)
@@ -130,9 +131,9 @@ def run_remote_preflight(
     return dict(result)
 
 
-def _run_ssh(runner, codespace: str, ssh_config: Path, script: str, arguments: list[str]):
+def _run_ssh(runner, ssh_host_alias: str, ssh_config: Path, script: str, arguments: list[str]):
     result = runner(
-        ["ssh", "-F", str(ssh_config), "-o", "BatchMode=yes", codespace,
+        ["ssh", "-F", str(ssh_config), "-o", "BatchMode=yes", ssh_host_alias,
          "/usr/bin/env", "-i", f"PATH={REMOTE_PATH}", "python3", "-P", "-", *arguments],
         input=script, text=True, capture_output=True, check=False, timeout=180, shell=False,
     )
