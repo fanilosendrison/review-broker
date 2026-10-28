@@ -104,14 +104,14 @@ def scan_for_credentials(directory: Path) -> list[str]:
                 raise EvidenceCaptureError("CREDENTIAL_SCREENING_UNDETERMINED")
             else:
                 with observed_regular_file(path) as stream:
-                    if _stream_contains_credential(stream):
+                    if stream_contains_credential(stream):
                         contaminated.append(relative)
     except (OSError, EvidenceCaptureError, FileObservationError) as exc:
         raise EvidenceCaptureError("CREDENTIAL_SCREENING_UNDETERMINED") from exc
     return contaminated
 
 
-def _stream_contains_credential(stream: BinaryIO) -> bool:
+def stream_contains_credential(stream: BinaryIO) -> bool:
     """Scan complete bytes with fixed memory, preserving cross-block matches."""
     carry, whitespace_pending = b"", False
     detected = False
@@ -127,6 +127,10 @@ def _stream_contains_credential(stream: BinaryIO) -> bool:
             detected = True
         carry = window[-_CREDENTIAL_SCAN_CARRY_BYTES:]
     return detected
+
+
+# Preserve the historical private name for directly affected regression tests.
+_stream_contains_credential = stream_contains_credential
 
 
 def quarantine_contaminated_evidence(
