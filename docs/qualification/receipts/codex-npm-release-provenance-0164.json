@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "evidence_class": "OBSERVED_NON_INFERENCE",
+  "subject_baseline_sha": "9b5bc5630f7856100a98eefb88c8b657867d37fe",
+  "observed_utc": "2026-10-26T18:15:45Z",
+  "candidate_wheel_sha256": "8564c7c5c23496a4295d90806d688b2332ab092e3789eeedb90b0a8962148ade",
+  "registry": "https://registry.npmjs.org",
+  "packages": [
+    {
+      "installation_name": "@openai/codex",
+      "published_name": "@openai/codex",
+      "version": "0.164.0",
+      "metadata_url": "https://registry.npmjs.org/@openai%2fcodex/0.164.0",
+      "tarball_url": "https://registry.npmjs.org/@openai/codex/-/codex-0.164.0.tgz",
+      "dist_integrity": "sha512-TWj7UGyPRe3Pj/A3ddNAxs1te3a/W/xAd+J0LHrrFTmsSfahGMOLF/vn88D3QCIgAT3B1rm1y/Z3NYE0rx6cZQ==",
+      "archive_sha256": "afb117ec0d382744583dd13154ba0ca6b0f1980f8ed6a23bffb3aaadb6226e30",
+      "integrity_verified": true,
+      "payload": {
+        "package/bin/codex.js": {
+          "byte_length": 8790,
+          "sha256": "61b0194f3bb6534439c8d26a3ed57d0805f84b884588b761795323eeb92fcf70"
+        },
+        "package/package.json": {
+          "byte_length": 1082,
+          "sha256": "a7dec242d54cde5569fb242ddc632cf12be875b274f09116ac8a33d921547114"
+        }
+      }
+    },
+    {
+      "installation_name": "@openai/codex-linux-x64",
+      "npm_alias_spec": "npm:@openai/codex@0.164.0-linux-x64",
+      "published_name": "@openai/codex",
+      "version": "0.164.0-linux-x64",
+      "os": ["linux"],
+      "cpu": ["x64"],
+      "metadata_url": "https://registry.npmjs.org/@openai%2fcodex/0.164.0-linux-x64",
+      "tarball_url": "https://registry.npmjs.org/@openai/codex/-/codex-0.164.0-linux-x64.tgz",
+      "dist_integrity": "sha512-XLAoaWsGOT2khzl+P4FYDPTkzAr9W0VFXFaVkqlFdkM0soa1gH/4S0wSD57Ek3HHwkirAEGz2/Mwehseh+l5Mg==",
+      "archive_sha256": "62659fefd9a8efa21a496402fde3c11c025bbeee735a582968f8ffd14cb5f79c",
+      "integrity_verified": true,
+      "payload": {
+        "package/package.json": {
+          "byte_length": 511,
+          "sha256": "1fa590124f40808551bef9115b3757166c4673ddfbfbbab2887d7b4db5267f45"
+        },
+        "package/vendor/x86_64-unknown-linux-musl/codex-package.json": {
+          "byte_length": 205,
+          "sha256": "328cc6b7d776fed066a3b475766ec01bd8b8f31d91e4955a5588f37ff9ddb51b"
+        },
+        "package/vendor/x86_64-unknown-linux-musl/bin/codex": {
+          "byte_length": 308139304,
+          "sha256": "b93f6811d3f653f0fb83be4050d857fb9abbb111dfa2ce160563327daff7f306"
+        }
+      }
+    }
+  ],
+  "installed_runtime": {
+    "launcher_sha256": "61b0194f3bb6534439c8d26a3ed57d0805f84b884588b761795323eeb92fcf70",
+    "native_sha256": "b93f6811d3f653f0fb83be4050d857fb9abbb111dfa2ce160563327daff7f306",
+    "official_payload_match": true,
+    "node_version": "v24.21.0",
+    "node_sha256": "7fde7b8afa198da66257f42ee2001d874c7355631e6d1579a5fb5ef1f246df4c",
+    "node_used_by_candidate_execution": false,
+    "source_installation_runtime_user_writable": true
+  },
+  "protected_runtime": {
+    "root": "/var/lib/review-broker/codex-0.164.0-linux-x64",
+    "owner_uid": 0,
+    "runtime_user_writable": false,
+    "runtime_user_native_write_denied_errno": 13,
+    "runtime_user_root_rename_denied_errno": 13,
+    "native_sha256": "b93f6811d3f653f0fb83be4050d857fb9abbb111dfa2ce160563327daff7f306",
+    "target_manifest_sha256": "328cc6b7d776fed066a3b475766ec01bd8b8f31d91e4955a5588f37ff9ddb51b",
+    "package_layout_preserved": true,
+    "direct_version_result": "codex-cli 0.164.0"
+  },
+  "bundled_metadata_discrepancy": {
+    "official_npm_native_observation": "unified_exec",
+    "pinned_upstream_models_json": "shell_command",
+    "resolved_by_artifact_provenance": false
+  },
+  "official_npm_artifact_identity": "VERIFIED",
+  "upstream_source_equivalence": "UNDETERMINED",
+  "limits": [
+    "Registry integrity establishes identity under the official npm registry trust model, not a reproducible build from the pinned Git commit.",
+    "The trust record and producer observation still require independent review before acceptance.",
+    "No credential contents were accessed and no authenticated model inference occurred."
+  ]
+}

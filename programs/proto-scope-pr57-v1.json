@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "program_id": "proto-scope-pr57-v1",
+  "qualification_status": "BLOCKED_PENDING_SECURITY_AND_AUTHENTICATION",
+  "request": {
+    "schema_version": 1,
+    "subject": {
+      "kind": "github_pr",
+      "repository": "fanilosendrison/proto-scope",
+      "pull_request": 57
+    },
+    "mission": {
+      "id": "proto-scope-pr57-publication",
+      "objective": "Independently review the DT-04.A documentary publication candidate.",
+      "instructions": "Actively seek falsifiers. Re-examine prior producer evidence independently and report unsupported claims, contradictions, missing prerequisites, and material uncertainty.",
+      "criteria": [
+        "Verify exact source and Git commit identity.",
+        "Verify the complete five-file scope.",
+        "Verify the four declared source-file SHA-256 identities.",
+        "Verify JSON and CSV correspondence.",
+        "Verify preservation of 37 approach and 14 implementation records.",
+        "Verify README append-only preservation.",
+        "Qualify known CRLF and Markdown whitespace exceptions.",
+        "Assess accurate handling of git diff --check.",
+        "Challenge unsupported documentary or scientific claims.",
+        "Identify conflicting bibliographical identity claims.",
+        "Identify missing or inconsistent uncertainty disclosures.",
+        "Identify accidental normative promotion or unauthorized comparison with DT-M0.",
+        "Identify unjustified mechanism selection.",
+        "Identify missing publication prerequisites."
+      ]
+    },
+    "policy": {
+      "profile": "publication",
+      "version": 1
+    },
+    "reviewer": {
+      "backend": "codex-cli",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "xhigh"
+    }
+  },
+  "expected_resolution": {
+    "head_commit": "06da37a80c49cd33c6a50c7b6edd256395873a8c",
+    "base_commit": "f9b53f07a27fb4489314786066951970bff50327",
+    "merge_base": "a1a9dbdf40c3b1d674d93f4b3eebbc28fa139af6",
+    "draft_required": true
+  },
+  "sources": [
+    {
+      "path": "docs/research/derivtrace/state-of-art/README.md",
+      "git_blob_oid": "f918fbfb62afaa36c967e5d90318641dcc9200fc",
+      "sha256": "7a12d840d540549398e8d55a6fe80d3fdbd9e179dc4b73096eea7a3eec1fbad9",
+      "bytes": 2980
+    },
+    {
+      "path": "docs/research/derivtrace/state-of-art/dt-04-a-approaches.csv",
+      "git_blob_oid": "2921d2466b8c3d0adb25d4a2f5a40cc76fdb1d0d",
+      "sha256": "8853b931b0bf6816f8e03676f4245547d742f19bd803cc9efd96a90e4c4d64f9",
+      "bytes": 20523
+    },
+    {
+      "path": "docs/research/derivtrace/state-of-art/dt-04-a-implementations.csv",
+      "git_blob_oid": "eb7c330fc138c87499992932b9ec3d074da73197",
+      "sha256": "7baaaa56b5d9093d91012a080e19b29d3b0af0ab7f972a7dd265c5e241e09846",
+      "bytes": 5311
+    },
+    {
+      "path": "docs/research/derivtrace/state-of-art/dt-04-a-register.json",
+      "git_blob_oid": "5c991f368fd2d8c337bd771d0e4ae62a621f37b4",
+      "sha256": "968490abd2769751c9b7b2f90bdcd7639fc827f8d37871ce6dfc9033837c7a4d",
+      "bytes": 41555
+    },
+    {
+      "path": "docs/research/derivtrace/state-of-art/dt-04-a-register.md",
+      "git_blob_oid": "d1a1677f8418f2c2773c7286ede2305374702af2",
+      "sha256": "6f41ec843c9bbdc027acea63089c90f7b35cbc2b8e53ebff7e388fff2d6f1672",
+      "bytes": 44786
+    }
+  ],
+  "producer_evidence_to_reexamine": {
+    "GLOBAL_GIT_DIFF_CHECK": "FAIL_EXPECTED_SOURCE_FORMATTING",
+    "SOURCE_WHITESPACE_EXCEPTIONS": "QUALIFIED",
+    "UNEXPECTED_WHITESPACE_DIAGNOSTICS": 0,
+    "SOURCE_SHA256": "PASS",
+    "JSON_CSV_PARITY": "PASS"
+  }
+}

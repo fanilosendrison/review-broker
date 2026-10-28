@@ -1,0 +1,106 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "subject_id",
+    "packet_id",
+    "verdict",
+    "sources_examined",
+    "findings",
+    "remaining_uncertainties"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "enum": [1]
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "subject_id": {
+      "type": "string"
+    },
+    "packet_id": {
+      "type": "string"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["GO", "NO_GO", "UNDETERMINED"]
+    },
+    "sources_examined": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "category",
+          "claim",
+          "consequence",
+          "evidence"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "authority-gap",
+              "contradiction",
+              "unsupported-claim",
+              "uncertainty-gap",
+              "dependency-gap",
+              "evidence-gap",
+              "security",
+              "other"
+            ]
+          },
+          "claim": {
+            "type": "string"
+          },
+          "consequence": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_id",
+                "line",
+                "quote"
+              ],
+              "properties": {
+                "source_id": {
+                  "type": "string"
+                },
+                "line": {
+                  "type": "integer"
+                },
+                "quote": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "remaining_uncertainties": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

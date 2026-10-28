@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fanilosendrison/review-broker/schemas/review-result-v1.schema.json",
+  "title": "ReviewResult v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "subject_id", "policy_id", "packet_id", "attempt_id", "execution_status", "evidence_status", "review_verdict", "reviewer", "sources_examined", "findings", "remaining_uncertainties", "validation", "applicability"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "request_id": {"type": "string"},
+    "subject_id": {"type": "string"},
+    "policy_id": {"type": "string"},
+    "packet_id": {"type": "string"},
+    "attempt_id": {"type": "string"},
+    "execution_status": {"enum": ["COMPLETED", "FAILED", "INDETERMINATE"]},
+    "evidence_status": {"enum": ["VALID", "INVALID", "UNDETERMINED"]},
+    "review_verdict": {"enum": ["GO", "NO_GO", "UNDETERMINED"]},
+    "resolved_request": {"type": "object"},
+    "reviewer": {
+      "type": "object",
+      "required": ["backend", "model_requested", "reasoning_effort_requested", "effective_model_identity_verified", "effective_reasoning_effort_verified"],
+      "properties": {
+        "backend": {"const": "codex-cli"},
+        "model_requested": {"type": "string"},
+        "reasoning_effort_requested": {"type": "string"},
+        "effective_model_identity_verified": {"type": "boolean"},
+        "effective_reasoning_effort_verified": {"type": "boolean"}
+      }
+    },
+    "sources_examined": {"type": "array"},
+    "findings": {"type": "array"},
+    "remaining_uncertainties": {"type": "array"},
+    "validation": {"type": "object"},
+    "applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "checked_head_commit"],
+      "properties": {
+        "status": {"enum": ["CURRENT", "SUPERSEDED", "UNDETERMINED"]},
+        "checked_head_commit": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

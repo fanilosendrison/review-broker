@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "subject_baseline_sha": "9b5bc5630f7856100a98eefb88c8b657867d37fe",
+  "codex_version": "0.164.0",
+  "codex_upstream_sha": "6aaac694803004a63c6f393d153c96d22521a6b9",
+  "native_sha256": "b93f6811d3f653f0fb83be4050d857fb9abbb111dfa2ce160563327daff7f306",
+  "observed_utc": "2026-10-26T18:15:45Z",
+  "method": {
+    "evidence_class": "OBSERVED_NON_INFERENCE",
+    "authentication_home": "fresh temporary empty home",
+    "requirements_source": "synthetic read-only bind mount at /etc/codex/requirements.toml",
+    "network": "separate bubblewrap network namespace",
+    "model_inference": false,
+    "real_credential_access": false,
+    "diagnostics": [
+      "codex features list",
+      "codex doctor --json",
+      "codex app-server --print-startup-config"
+    ],
+    "diagnostic_limit": "Each diagnostic was a separate process and is not same-process attestation for codex exec."
+  },
+  "requested": {
+    "shell_tool": false,
+    "permission_profile": "review-broker-test",
+    "approval_policy": "never",
+    "filesystem": "minimal system reads plus exact packet; home denied; writes denied",
+    "network": "restricted"
+  },
+  "scenarios": {
+    "E1_NORMAL": {
+      "requirements": "none",
+      "effective_shell_tool": false,
+      "effective_approval_policy": "never",
+      "effective_filesystem_summary": "restricted; one deny-read rule",
+      "effective_network_summary": "restricted",
+      "startup_warnings": [],
+      "result": "REQUESTED_VALUES_RETAINED_BY_SEPARATE_DIAGNOSTICS"
+    },
+    "E2_MANAGED_SHELL_CONFLICT": {
+      "requirements": {"features.shell_tool": true},
+      "effective_shell_tool": true,
+      "cli_override_reported": "none",
+      "configuration_error": false,
+      "inference_could_begin_if_codex_exec_continued": "SOURCE_DERIVED_YES",
+      "baseline_broker_refusal": false,
+      "result": "MANAGED_PIN_OVERRIDES_REQUESTED_FALSE"
+    },
+    "E3_DISALLOWED_PROFILE": {
+      "requirements": {
+        "default_permissions": ":read-only",
+        "allowed_permission_profiles": {
+          ":read-only": true,
+          "review-broker-test": false
+        }
+      },
+      "startup_warning": "Configured value for `permission_profile` is disallowed by requirements; falling back from `review-broker-test` to required value `:read-only`.",
+      "effective_profile_source_derived": ":read-only",
+      "active_profile_id_exposed_by_diagnostic": false,
+      "effective_filesystem_summary": "restricted; zero deny-read rules",
+      "configuration_error": false,
+      "baseline_broker_refusal": false,
+      "result": "SILENT_CONTINUATION_AFTER_WARNING_WITH_PROFILE_FALLBACK"
+    },
+    "E4_APPROVAL_POLICY_MISMATCH": {
+      "requirements": {"allowed_approval_policies": ["on-request"]},
+      "startup_warning": "Configured value for `approval_policy` is disallowed by requirements; falling back to required value OnRequest.",
+      "effective_approval_policy": "on-request",
+      "configuration_error": false,
+      "baseline_broker_refusal": false,
+      "result": "SILENT_CONTINUATION_AFTER_WARNING_WITH_APPROVAL_FALLBACK"
+    },
+    "E5_NETWORK_POLICY_MISMATCH": {
+      "requirements": {
+        "default_permissions": "managed-network",
+        "allowed_permission_profiles": {
+          "managed-network": true,
+          "review-broker-test": false
+        },
+        "managed_network_enabled": true
+      },
+      "startup_warning": "Configured value for `permission_profile` is disallowed by requirements; falling back from `review-broker-test` to required value `managed-network`.",
+      "effective_network_summary": "enabled",
+      "configuration_error": false,
+      "baseline_broker_refusal": false,
+      "result": "MANAGED_PROFILE_FALLBACK_ENABLES_NETWORK"
+    },
+    "E6_MISSING_EFFECTIVE_POLICY_EVIDENCE": {
+      "startup_config": "requirements only",
+      "doctor": "separate process; active thread overrides not inspected; no exact active profile identity or complete filesystem policy",
+      "features": "separate process feature resolution",
+      "codex_exec_jsonl": "thread.started contains only thread_id",
+      "codex_exec_human_summary": "emitted after thread start; omits shell feature, active profile identity and complete policy",
+      "result": "NO_SUPPORTED_COMPLETE_SAME_PROCESS_PRETRANSPORT_ATTESTATION"
+    },
+    "E7_CONFIGURATION_MUTATION": {
+      "separate_process_drift": "System and cloud requirements can differ between a diagnostic process and the later codex exec load.",
+      "session_refresh": "Pinned source refreshes selected MCP features and servers while retaining session-static shell and permission configuration.",
+      "result": "PRIOR_DIAGNOSTIC_CANNOT_BIND_LATER_EXEC_PROCESS"
+    }
+  },
+  "source_derived_paths": [
+    "codex-rs/core/src/config/managed_features.rs",
+    "codex-rs/core/src/config/mod.rs",
+    "codex-rs/config/src/loader/mod.rs",
+    "codex-rs/config/src/loader/managed_requirements.rs",
+    "codex-rs/core/src/config/runtime_refresh.rs",
+    "codex-rs/exec/src/lib.rs",
+    "codex-rs/exec/src/event_processor_with_jsonl_output.rs",
+    "codex-rs/app-server/src/startup_config.rs"
+  ],
+  "same_process_preinference_attestation": "UNAVAILABLE",
+  "obl02_status": "BLOCKED",
+  "limits": [
+    "No authenticated account, live cloud policy, model turn or model-visible tool router was observed.",
+    "The diagnostics demonstrate pinned configuration semantics but cannot attest a later separate codex exec process.",
+    "No producer observation is independent security acceptance."
+  ]
+}
