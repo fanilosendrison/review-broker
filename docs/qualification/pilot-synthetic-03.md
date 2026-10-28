@@ -5,7 +5,7 @@ asset_type: "qualification-procedure"
 domain: "independent-review"
 severity: "strict"
 name: "RB-PILOT-03 Operational Preparation"
-version: "0.1.2"
+version: "0.1.3"
 ---
 
 # RB-PILOT-03 operational preparation
@@ -77,10 +77,20 @@ The first authorized v0.4.1 operation emitted no model-capable command and
 created no controller claim because its SSH target used the Codespace identity
 rather than the distinct configured alias. A subsequent read-only diagnostic
 proved this mismatch and observed Shutdown. That operation did not consume
-RB-PILOT-03. The 0.4.2 correction changes the candidate source and wheel
-identities, so the earlier execution authorization does not apply. Any real
-execution requires a new product-owner decision bound to the new exact SHA and
-wheel.
+RB-PILOT-03.
+
+Independent review of v0.4.2 established that its partial `ProxyCommand`
+validation accepted a valid Codespaces command followed by shell content. In
+v0.4.3 the complete literal value must match exactly `gh`, either `cs` or
+`codespace`, `ssh`, either `-c` or `--codespace`, the expected Codespace
+identity, and `--stdio`, separated only by spaces or horizontal tabs. Shell
+suffixes, substitutions, redirections, prefixes, quoting, escaping, and all
+additional options or arguments are refused rather than normalized.
+
+The 0.4.3 correction changes the candidate source and wheel identities, so all
+prior execution authorizations remain inapplicable. RB-PILOT-03 remains
+unconsumed, and any real execution requires a new product-owner decision bound
+to the new exact SHA and wheel.
 
 ## Remote observation and private retention
 

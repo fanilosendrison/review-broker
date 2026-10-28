@@ -8,7 +8,7 @@ import subprocess
 from typing import Any, Callable
 
 BOOTSTRAP_ROOT = "/tmp/review-broker-pilot-26-rb03-bootstrap"
-REMOTE_WHEEL = f"{BOOTSTRAP_ROOT}/review_broker-0.4.2-py3-none-any.whl"
+REMOTE_WHEEL = f"{BOOTSTRAP_ROOT}/review_broker-0.4.3-py3-none-any.whl"
 REMOTE_VENV = f"{BOOTSTRAP_ROOT}/venv"
 REMOTE_PYTHON = f"{REMOTE_VENV}/bin/python"
 REMOTE_REVIEWCTL = f"{REMOTE_VENV}/bin/reviewctl"
@@ -31,7 +31,7 @@ status={{"remote_python_compatible":"NO","remote_wheel_sha256_match":"NO","remot
 try:
  assert sys.version_info >= (3,11)
  status["remote_python_compatible"]="YES"
- assert importlib.metadata.version("review-broker")=="0.4.2"
+ assert importlib.metadata.version("review-broker")=="0.4.3"
  assert importlib.metadata.version("jsonschema")=="4.26.0"
  assert importlib.metadata.version("rfc8785")=="0.1.4"
  import jsonschema,rfc8785,review_broker.cli
