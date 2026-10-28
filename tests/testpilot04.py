@@ -119,8 +119,10 @@ class Pilot04Tests(unittest.TestCase):
             root = Path(temporary).resolve(); home = root / "home"; workspace = root / "workspace"
             (home / ".codex").mkdir(parents=True); workspace.mkdir(); claim = root / "claim"
             observed = []
-            def invoke(*_args, **kwargs):
-                observed.append((claim.exists(), kwargs["policy"], kwargs["armed"]))
+            def invoke(*args, **kwargs):
+                observed.append((
+                    claim.exists(), kwargs["policy"], kwargs["armed"], args[1].name,
+                ))
                 raise InvocationError("CODEX_APPLICATION_ERROR")
             env = {"HOME": str(home), "CODEX_HOME": str(home / ".codex"), "PATH": "/usr/bin"}
             with patch("review_broker.pilot_synthetic.preflight_codex_runtime", return_value={}), patch(
@@ -131,7 +133,10 @@ class Pilot04Tests(unittest.TestCase):
                     codex_runtime_root=root / "runtime", environment=env,
                     _run_directory=root / "run", _claim_path=claim,
                 )
-            self.assertEqual(observed, [(True, PILOT_POLICY, True)])
+            self.assertEqual(observed, [(
+                True, PILOT_POLICY, True,
+                "reviewer-findings-v1.codex-wire.schema.json",
+            )])
             self.assertEqual((result["model_requested"], result["effort_requested"]),
                              ("gpt-5.6-terra", "medium"))
             failure = json.loads((root / "run/pilot-failure.json").read_text())
