@@ -90,7 +90,9 @@ def pilot_environment(source: Mapping[str, str]) -> dict[str, str]:
 
 def _pilot_fixture(run_directory: Path, *, pilot_id: str) -> dict[str, Any]:
     """Build a deterministic synthetic identity from the fixed fixture."""
-    if pilot_id not in ("RB-PILOT-01", "RB-PILOT-02", "RB-PILOT-03", "RB-PILOT-04"):
+    if pilot_id not in (
+        "RB-PILOT-01", "RB-PILOT-02", "RB-PILOT-03", "RB-PILOT-04", "RB-PILOT-05",
+    ):
         raise AssertionError("unsupported pilot identity")
     digest = hashlib.sha256(PILOT_SOURCE).hexdigest()
     request_id = request_identity({

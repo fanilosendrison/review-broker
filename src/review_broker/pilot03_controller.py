@@ -77,7 +77,7 @@ def run_synthetic_pilot_controller(
     _state_root: Path | None = None,
 ) -> dict[str, Any]:
     """Preflight, arm, emit once, retain once, and always attempt Shutdown."""
-    if pilot_id not in {"RB-PILOT-03", "RB-PILOT-04"}:
+    if pilot_id not in {"RB-PILOT-03", "RB-PILOT-04", "RB-PILOT-05"}:
         raise Pilot03ControllerError("PILOT_CONTROLLER_CONFIG_UNSUPPORTED")
     request_id, attempt_id = identities()
     wheel_sha256 = _wheel_identity(wheel_path)

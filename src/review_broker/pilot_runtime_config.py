@@ -58,10 +58,20 @@ RB04_RUNTIME = PilotRuntimeConfig(
     bootstrap_root="/tmp/review-broker-pilot-26-rb04-bootstrap",
     package_version="0.4.5",
 )
+RB05_RUNTIME = PilotRuntimeConfig(
+    pilot_id="RB-PILOT-05",
+    cli_command="pilot-synthetic-05",
+    remote_root="/tmp/review-broker-pilot-26-rb05",
+    bootstrap_root="/tmp/review-broker-pilot-26-rb05-bootstrap",
+    package_version="0.4.7",
+)
+
+
+_ALLOWED_RUNTIMES = (RB03_RUNTIME, RB04_RUNTIME, RB05_RUNTIME)
 
 
 def require_runtime_config(value: PilotRuntimeConfig) -> PilotRuntimeConfig:
     """Reject caller-constructed and arbitrary pilot configurations."""
-    if value is not RB03_RUNTIME and value is not RB04_RUNTIME:
+    if all(value is not runtime for runtime in _ALLOWED_RUNTIMES):
         raise ValueError("PILOT_RUNTIME_CONFIG_UNSUPPORTED")
     return value

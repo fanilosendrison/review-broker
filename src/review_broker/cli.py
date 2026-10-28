@@ -32,7 +32,9 @@ from .pilot03_synthetic import run_synthetic_pilot_03
 from .pilot03_transport import Pilot03CodespaceTransport
 from .pilot04_controller import run_pilot04_controller
 from .pilot04_synthetic import run_synthetic_pilot_04
-from .pilot_runtime_config import RB03_RUNTIME, RB04_RUNTIME
+from .pilot05_controller import run_pilot05_controller
+from .pilot05_synthetic import run_synthetic_pilot_05
+from .pilot_runtime_config import RB03_RUNTIME, RB04_RUNTIME, RB05_RUNTIME
 from .queue import AttemptState
 from .requester import CliError, request as _request, result as _result, status as _status
 from .reviewer_profile import install_reviewer_profile, reviewer_home_from_environment
@@ -50,7 +52,6 @@ def _add_pilot_controller(subcommands, name: str):
     controller.add_argument("--codespace", required=True)
     controller.add_argument("--ssh-config", required=True, type=Path)
     controller.add_argument("--ssh-host-alias", required=True)
-
 def _run_prepared_controller(args, runtime, controller):
     authorization = load_execution_authorization(args.execution_authorization)
     transport = Pilot03CodespaceTransport(
@@ -63,7 +64,10 @@ def _run_prepared_controller(args, runtime, controller):
     )
     print(canonical_bytes(result).decode("utf-8"))
     return 0 if result.get("pilot_acceptance") == "PASS" else 1
-
+def _run_remote_pilot(args, runner):
+    result = runner(broker_wheel_sha256=args.broker_wheel_sha256)
+    print(canonical_bytes(result).decode("utf-8"))
+    return 0 if result.get("pilot_functional") == "PASS" else 1
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="reviewctl")
     parser.add_argument(
@@ -85,6 +89,9 @@ def _parser() -> argparse.ArgumentParser:
     pilot_04 = subcommands.add_parser("pilot-synthetic-04")
     pilot_04.add_argument("--broker-wheel-sha256", required=True)
     _add_pilot_controller(subcommands, "pilot-synthetic-04-controller")
+    pilot_05 = subcommands.add_parser("pilot-synthetic-05")
+    pilot_05.add_argument("--broker-wheel-sha256", required=True)
+    _add_pilot_controller(subcommands, "pilot-synthetic-05-controller")
     request = subcommands.add_parser("request")
     request.add_argument("--repo", required=True)
     request.add_argument("--pr", required=True, type=int)
@@ -92,15 +99,12 @@ def _parser() -> argparse.ArgumentParser:
     request.add_argument("--mission-file", required=True, type=Path)
     status = subcommands.add_parser("status")
     status.add_argument("--request", required=True)
-
     result = subcommands.add_parser("result")
     result.add_argument("--request", required=True)
     result.add_argument("--json", action="store_true")
-
     prepare = subcommands.add_parser("internal-prepare")
     prepare.add_argument("--issue", required=True, type=int)
     prepare.add_argument("--output", required=True, type=Path)
-
     verify = subcommands.add_parser("internal-verify-packet")
     verify.add_argument("--packet-dir", required=True, type=Path)
     verify.add_argument("--expected-packet-id", required=True)
@@ -108,7 +112,6 @@ def _parser() -> argparse.ArgumentParser:
     arm = subcommands.add_parser("internal-arm")
     arm.add_argument("--request", required=True)
     arm.add_argument("--packet-id", required=True)
-
     install_profile = subcommands.add_parser("internal-install-reviewer-profile")
     install_profile.add_argument("--trusted-workspace", required=True, type=Path)
     install_profile.add_argument("--packet-dir", required=True, type=Path)
@@ -186,7 +189,8 @@ def main(argv: list[str] | None = None) -> int:
         None if args.command in (
             "pilot-synthetic", "pilot-synthetic-02", "pilot-synthetic-03",
             "pilot-synthetic-03-controller", "pilot-synthetic-04",
-            "pilot-synthetic-04-controller",
+            "pilot-synthetic-04-controller", "pilot-synthetic-05",
+            "pilot-synthetic-05-controller",
         ) else os.environ.pop("REVIEW_BROKER_SOURCE_TOKEN", None)
     )
     try:
@@ -206,21 +210,17 @@ def main(argv: list[str] | None = None) -> int:
             print(canonical_bytes(result).decode("utf-8"))
             return 0 if result.get("pilot_functional") == "PASS" else 1
         if args.command == "pilot-synthetic-03":
-            result = run_synthetic_pilot_03(
-                broker_wheel_sha256=args.broker_wheel_sha256,
-            )
-            print(canonical_bytes(result).decode("utf-8"))
-            return 0 if result.get("pilot_functional") == "PASS" else 1
+            return _run_remote_pilot(args, run_synthetic_pilot_03)
         if args.command == "pilot-synthetic-03-controller":
             return _run_prepared_controller(args, RB03_RUNTIME, run_pilot03_controller)
         if args.command == "pilot-synthetic-04":
-            result = run_synthetic_pilot_04(
-                broker_wheel_sha256=args.broker_wheel_sha256,
-            )
-            print(canonical_bytes(result).decode("utf-8"))
-            return 0 if result.get("pilot_functional") == "PASS" else 1
+            return _run_remote_pilot(args, run_synthetic_pilot_04)
         if args.command == "pilot-synthetic-04-controller":
             return _run_prepared_controller(args, RB04_RUNTIME, run_pilot04_controller)
+        if args.command == "pilot-synthetic-05":
+            return _run_remote_pilot(args, run_synthetic_pilot_05)
+        if args.command == "pilot-synthetic-05-controller":
+            return _run_prepared_controller(args, RB05_RUNTIME, run_pilot05_controller)
         if args.command == "request":
             return _request(args)
         if args.command == "status":

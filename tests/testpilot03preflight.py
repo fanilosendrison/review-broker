@@ -8,8 +8,10 @@ import unittest
 
 from review_broker.pilot03_remote_preflight import (
     REMOTE_PYTHON, REMOTE_REVIEWCTL, REMOTE_WHEEL,
+    _PREFLIGHT_SCRIPT, _PREPARE_SCRIPT, _runtime_scripts,
     Pilot03PreflightError, run_remote_preflight,
 )
+from review_broker.pilot_runtime_config import RB03_RUNTIME, RB04_RUNTIME, RB05_RUNTIME
 from review_broker.pilot03_transport import Pilot03CodespaceTransport
 
 PASS = {
@@ -121,6 +123,25 @@ class Pilot03PreflightTests(unittest.TestCase):
                     codespace="space", ssh_host_alias="independent-host-alias",
                     ssh_config=config, wheel_path=wheel, wheel_sha256=digest, runner=runner,
                 )
+
+    def test_runtime_scripts_bind_exact_version_wheel_and_bootstrap(self):
+        rb03 = _runtime_scripts(RB03_RUNTIME)
+        self.assertEqual(rb03, (_PREPARE_SCRIPT, _PREFLIGHT_SCRIPT))
+        rb04 = _runtime_scripts(RB04_RUNTIME)
+        self.assertEqual(rb04, (
+            _PREPARE_SCRIPT.replace(RB03_RUNTIME.bootstrap_root, RB04_RUNTIME.bootstrap_root),
+            _PREFLIGHT_SCRIPT.replace(
+                RB03_RUNTIME.bootstrap_root, RB04_RUNTIME.bootstrap_root,
+            ),
+        ))
+        prepare, preflight = _runtime_scripts(RB05_RUNTIME)
+        self.assertIn(RB05_RUNTIME.bootstrap_root, prepare)
+        for value in (RB05_RUNTIME.remote_wheel, RB05_RUNTIME.remote_venv,
+                      RB05_RUNTIME.remote_python, RB05_RUNTIME.remote_reviewctl):
+            self.assertIn(value, preflight)
+        self.assertIn('version("review-broker")=="0.4.7"', preflight)
+        self.assertNotIn(RB03_RUNTIME.remote_wheel, preflight)
+        self.assertNotIn('version("review-broker")=="0.4.5"', preflight)
 
     def test_transport_uses_prepared_python_for_emission_and_observation(self):
         with tempfile.TemporaryDirectory() as temporary:

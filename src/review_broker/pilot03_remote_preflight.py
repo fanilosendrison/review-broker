@@ -141,12 +141,19 @@ def run_remote_preflight(
 
 
 def _runtime_scripts(runtime: PilotRuntimeConfig) -> tuple[str, str]:
+    """Bind every embedded path and package identity to the selected singleton."""
     if runtime is RB03_RUNTIME:
         return _PREPARE_SCRIPT, _PREFLIGHT_SCRIPT
-    return (
-        _PREPARE_SCRIPT.replace(BOOTSTRAP_ROOT, runtime.bootstrap_root),
-        _PREFLIGHT_SCRIPT.replace(BOOTSTRAP_ROOT, runtime.bootstrap_root),
+    prepare = _PREPARE_SCRIPT.replace(BOOTSTRAP_ROOT, runtime.bootstrap_root)
+    preflight = _PREFLIGHT_SCRIPT.replace(REMOTE_WHEEL, runtime.remote_wheel)
+    preflight = preflight.replace(BOOTSTRAP_ROOT, runtime.bootstrap_root)
+    version_assertion = 'importlib.metadata.version("review-broker")=="0.4.5"'
+    selected_assertion = (
+        f'importlib.metadata.version("review-broker")=="{runtime.package_version}"'
     )
+    if preflight.count(version_assertion) != 1:
+        raise ValueError("PILOT_RUNTIME_PREFLIGHT_TEMPLATE_INVALID")
+    return prepare, preflight.replace(version_assertion, selected_assertion)
 
 
 def _run_ssh(runner, ssh_host_alias: str, ssh_config: Path, script: str, arguments: list[str]):

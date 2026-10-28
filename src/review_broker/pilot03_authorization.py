@@ -41,7 +41,7 @@ class ExecutionAuthorization:
             raise ExecutionAuthorizationError("RB03_EXECUTION_AUTHORIZATION_INVALID")
         authorization = cls(**{key: value[key] for key in required - {"schema_version"}})
         if (
-            authorization.pilot_id not in {"RB-PILOT-03", "RB-PILOT-04"}
+            authorization.pilot_id not in {"RB-PILOT-03", "RB-PILOT-04", "RB-PILOT-05"}
             or not _REQUEST.fullmatch(authorization.request_id)
             or not _ATTEMPT.fullmatch(authorization.attempt_id)
             or not _SHA40.fullmatch(authorization.review_broker_source_sha)
