@@ -5,7 +5,7 @@ asset_type: "security-contract"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Independence Contract"
-version: "0.2.2"
+version: "0.3.0"
 ---
 
 # Reviewer Independence Contract
@@ -146,3 +146,19 @@ requested Sol/xhigh policy, shell-disable request, packet guards, credential
 quarantine, one-shot execution and independent evidence validation remain
 defense in depth. No reviewer can merge, publish its own result or elevate its
 findings into normative authority.
+
+### Bounded private-source v1 admission
+
+A separate default-disabled mode may admit one exact low-sensitivity private PR
+only when trusted configuration binds the requester, repository, PR, expected
+head, and executing broker SHA. It requires ReviewRequest v2 and a dedicated
+source-App installation token whose observed repository scope is exactly the
+admitted private repository. Public visibility evidence is false in this mode.
+
+The source token is not a reviewer credential. It is supplied only to trusted
+source metadata and Git acquisition subprocesses, is absent from packet content
+and reviewer environment, and cannot be replaced by publication or Codespaces
+credentials. A private-mode preflight has distinct mode, scope, evidence type,
+and admission checks; public and private receipts are not interchangeable.
+This mode accepts the same documented low-sensitivity reviewer residual risks
+without claiming comprehensive isolation or authorizing model execution.

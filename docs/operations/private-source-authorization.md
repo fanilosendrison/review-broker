@@ -5,7 +5,7 @@ asset_type: "operations"
 domain: "independent-review"
 severity: "strict"
 name: "Private Source Authorization"
-version: "0.1.0"
+version: "0.2.0"
 ---
 
 # Private Source Authorization
@@ -36,8 +36,17 @@ repository-write permission.
 The workflow uses the pinned official `actions/create-github-app-token` action
 to mint one short-lived installation token. Broker code removes the token from
 its parent environment before any subprocess and supplies it only to exact
-source-resolution, file-enumeration, clone, and fetch operations. Journal,
-publication, and Codespaces subprocesses do not receive it.
+source-resolution, file-enumeration, clone, fetch, and publication-applicability
+operations. Journal, publication, Codespaces, and reviewer subprocesses do not
+receive it.
+
+Bounded private admission additionally verifies that the token can observe the
+configured repository as private and that its installation repository listing
+contains exactly that repository. It binds one configured requester, repository,
+PR, expected head, and broker SHA. The mode requires ReviewRequest v2 and remains
+disabled unless `REVIEW_BROKER_BOUNDED_PRIVATE_V1_ENABLED` is exactly `true`.
+Its private preflight evidence is distinct from public low-sensitivity evidence
+and records `public_repository_verified` as false.
 
 ## Bounded owner setup action
 
