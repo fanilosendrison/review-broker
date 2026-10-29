@@ -41,6 +41,12 @@ jobs:
       REVIEW_BROKER_LOW_SENSITIVITY_V1_ENABLED: ${{ vars.REVIEW_BROKER_LOW_SENSITIVITY_V1_ENABLED }}
       REVIEW_BROKER_LOW_SENSITIVITY_V1_ADMITTED_SHA: ${{ vars.REVIEW_BROKER_LOW_SENSITIVITY_V1_ADMITTED_SHA }}
       REVIEW_BROKER_LOW_SENSITIVITY_V1_REPOSITORIES: ${{ vars.REVIEW_BROKER_LOW_SENSITIVITY_V1_REPOSITORIES }}
+      REVIEW_BROKER_BOUNDED_PRIVATE_V1_ENABLED: ${{ vars.REVIEW_BROKER_BOUNDED_PRIVATE_V1_ENABLED }}
+      REVIEW_BROKER_BOUNDED_PRIVATE_V1_ADMITTED_SHA: ${{ vars.REVIEW_BROKER_BOUNDED_PRIVATE_V1_ADMITTED_SHA }}
+      REVIEW_BROKER_BOUNDED_PRIVATE_V1_REQUESTER: ${{ vars.REVIEW_BROKER_BOUNDED_PRIVATE_V1_REQUESTER }}
+      REVIEW_BROKER_BOUNDED_PRIVATE_V1_REPOSITORY: ${{ vars.REVIEW_BROKER_BOUNDED_PRIVATE_V1_REPOSITORY }}
+      REVIEW_BROKER_BOUNDED_PRIVATE_V1_PULL_REQUEST: ${{ vars.REVIEW_BROKER_BOUNDED_PRIVATE_V1_PULL_REQUEST }}
+      REVIEW_BROKER_BOUNDED_PRIVATE_V1_EXPECTED_HEAD: ${{ vars.REVIEW_BROKER_BOUNDED_PRIVATE_V1_EXPECTED_HEAD }}
       REVIEW_BROKER_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       REMOTE_ROOT: /tmp/review-broker-${{ github.run_id }}-${{ github.run_attempt }}
       CODEX_RUNTIME_ROOT: /var/lib/review-broker/codex-0.164.0-linux-x64
@@ -127,7 +133,10 @@ jobs:
             test "$SECURITY_QUALIFIED" = "true" || { echo "SECURITY_BOUNDARY_NOT_QUALIFIED"; exit 1; }
             test -n "$SECURITY_EVIDENCE" || { echo "SECURITY_EVIDENCE_MISSING"; exit 1; }
           else
-            test "$ADMISSION_MODE" = "low-sensitivity-v1" || { echo "OPERATIONAL_ADMISSION_INVALID"; exit 1; }
+            test "$ADMISSION_MODE" = "low-sensitivity-v1" -o \
+              "$ADMISSION_MODE" = "bounded-private-v1" || {
+                echo "OPERATIONAL_ADMISSION_INVALID"; exit 1;
+              }
           fi
           test -n "$CODESPACE_TOKEN" || { echo "CODESPACE_CREDENTIAL_MISSING"; exit 1; }
           test -n "$CODESPACE_NAME" || { echo "CODESPACE_NAME_MISSING"; exit 1; }
@@ -177,7 +186,8 @@ jobs:
       - name: Verify bounded low-sensitivity pre-arm evidence
         if: >-
           steps.prepare.outputs.duplicate == 'false' &&
-          steps.prepare.outputs.admission_mode == 'low-sensitivity-v1'
+          (steps.prepare.outputs.admission_mode == 'low-sensitivity-v1' ||
+          steps.prepare.outputs.admission_mode == 'bounded-private-v1')
         env:
           GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
         run: |

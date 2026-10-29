@@ -12,14 +12,14 @@ from review_broker.bounded_preflight import (
 from review_broker.codex import InvocationError
 from review_broker.identity import canonical_bytes
 from review_broker.packets import PacketError, SourceRecord, build_packet
-from review_broker.reviewer_profile import install_reviewer_profile, profile_name
+from review_broker.reviewer_profile import install_reviewer_profile
 from review_broker.validation import validate_evidence
 from tests.test_codex import verified_runtime
 from tests.test_evidence import EvidenceValidationTests
 
 
 class BoundedPreflightTests(unittest.TestCase):
-    def preflight_fixture(self, root: Path):
+    def preflight_fixture(self, root: Path, admission_mode="low-sensitivity-v1"):
         root = root.resolve()
         home, workspace, packet = root / "home", root / "workspace", root / "packet"
         (home / ".codex").mkdir(parents=True)
@@ -41,17 +41,29 @@ class BoundedPreflightTests(unittest.TestCase):
             "schema_version": 1,
             "request_id": manifest["request_id"],
             "attempt_id": attempt_id,
-            "admission_mode": "low-sensitivity-v1",
+            "admission_mode": admission_mode,
             "executing_broker_sha": broker_sha,
             "requester": "trusted",
             "subject_repository": "sample/repo",
-            "admission_checks": {
-                "requester_authorized": True,
-                "repository_authorized": True,
-                "low_sensitivity_repository_admitted": True,
-                "public_repository_verified": True,
-                "executing_sha_admitted": True,
-            },
+            "admission_checks": (
+                {
+                    "requester_authorized": True,
+                    "repository_authorized": True,
+                    "bounded_private_request_admitted": True,
+                    "private_repository_verified": True,
+                    "private_source_credential_scope_verified": True,
+                    "public_repository_verified": False,
+                    "executing_sha_admitted": True,
+                }
+                if admission_mode == "bounded-private-v1" else
+                {
+                    "requester_authorized": True,
+                    "repository_authorized": True,
+                    "low_sensitivity_repository_admitted": True,
+                    "public_repository_verified": True,
+                    "executing_sha_admitted": True,
+                }
+            ),
         }
         resolved = {
             "schema_version": 1,
@@ -87,6 +99,30 @@ class BoundedPreflightTests(unittest.TestCase):
             self.assertFalse(receipt["comprehensive_isolation_qualified"])
             self.assertEqual(receipt["effective_codex_policy_attestation"], "UNAVAILABLE")
             self.assertIn("OPENAI_API_KEY", receipt["environment_keys_removed"])
+
+    def test_private_receipt_is_mode_distinguished_and_never_claims_public(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            _, _, receipt = self.preflight_fixture(
+                Path(temporary), admission_mode="bounded-private-v1"
+            )
+            self.assertEqual(receipt["evidence_type"], "bounded-private-v1-preflight")
+            self.assertEqual(receipt["assurance_scope"], "BOUNDED_PRIVATE_V1")
+            self.assertFalse(receipt["admission_checks"]["public_repository_verified"])
+            forged = dict(receipt)
+            forged["admission_mode"] = "low-sensitivity-v1"
+            from review_broker.bounded_preflight import validate_bounded_preflight_receipt
+            errors = validate_bounded_preflight_receipt(
+                forged,
+                request_id=receipt["request_id"], attempt_id=receipt["attempt_id"],
+                packet_id=receipt["packet_id"], subject_id=receipt["subject_id"],
+                executing_broker_sha=receipt["executing_broker_sha"],
+                permission_profile=receipt["permission_profile"],
+                permission_profile_sha256=receipt["permission_profile_sha256"],
+                broker_wheel_sha256=receipt["broker_wheel_sha256"],
+                runtime_evidence={key: receipt[key] for key in RUNTIME_EVIDENCE_KEYS},
+                admission_mode="bounded-private-v1",
+            )
+            self.assertIn("BOUNDED_PREFLIGHT_FIELD_INVALID:admission_mode", errors)
 
     def test_packet_aliases_and_tampering_fail_before_preflight(self):
         for defect in ("symlink", "hardlink", "tamper"):
@@ -139,6 +175,7 @@ class BoundedEvidenceValidationTests(unittest.TestCase):
             "schema_version": 1,
             "evidence_type": "bounded-low-sensitivity-v1-preflight",
             "assurance_scope": "LOW_SENSITIVITY_V1",
+            "admission_mode": "low-sensitivity-v1",
             "direct_sandbox_probe_executed": False,
             "comprehensive_isolation_qualified": False,
             "runtime_identity": "VERIFIED",
@@ -181,6 +218,18 @@ class BoundedEvidenceValidationTests(unittest.TestCase):
             self.assertEqual(result["evidence_status"], "VALID")
             self.assertEqual(result["assurance_scope"], "LOW_SENSITIVITY_V1")
             self.assertFalse(result["comprehensive_isolation_qualified"])
+
+    def test_historical_public_receipt_without_admission_mode_remains_valid(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest, receipt = self.fixture(root)
+            receipt.pop("admission_mode")
+            (root / "bounded-v1-preflight.json").write_bytes(
+                canonical_bytes(receipt) + b"\n"
+            )
+            result = validate_evidence(root, setup=manifest)
+            self.assertEqual(result["evidence_status"], "VALID")
+            self.assertEqual(result["assurance_scope"], "LOW_SENSITIVITY_V1")
 
     def test_comprehensive_mode_still_requires_original_probe(self):
         with tempfile.TemporaryDirectory() as temporary:

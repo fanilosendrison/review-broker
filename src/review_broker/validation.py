@@ -10,7 +10,9 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from .admission import BOUNDED_V1_ADMISSION, COMPREHENSIVE_ADMISSION
+from .admission import (
+    BOUNDED_PRIVATE_V1_ADMISSION, BOUNDED_V1_ADMISSION, COMPREHENSIVE_ADMISSION,
+)
 from .assurance_validation import admission_mode as read_admission_mode, assurance_errors
 from .evidence import (
     EvidenceCaptureError,
@@ -46,6 +48,7 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
     admission_mode = read_admission_mode(directory)
     inactive_assurance = {
         BOUNDED_V1_ADMISSION: "reviewer-security-probe.json",
+        BOUNDED_PRIVATE_V1_ADMISSION: "reviewer-security-probe.json",
         COMPREHENSIVE_ADMISSION: "bounded-v1-preflight.json",
     }.get(admission_mode)
     missing = [
@@ -162,6 +165,7 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
         "remaining_uncertainties": response.get("remaining_uncertainties", []),
         "assurance_scope": (
             "LOW_SENSITIVITY_V1" if admission_mode == BOUNDED_V1_ADMISSION
+            else "BOUNDED_PRIVATE_V1" if admission_mode == BOUNDED_PRIVATE_V1_ADMISSION
             else "COMPREHENSIVE_SECURITY" if admission_mode == COMPREHENSIVE_ADMISSION
             else "UNDETERMINED"
         ),

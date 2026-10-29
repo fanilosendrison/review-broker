@@ -5,7 +5,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .admission import BOUNDED_V1_ADMISSION, COMPREHENSIVE_ADMISSION
+from .admission import (
+    BOUNDED_PRIVATE_V1_ADMISSION, BOUNDED_V1_ADMISSION, COMPREHENSIVE_ADMISSION,
+)
 from .bounded_preflight import RUNTIME_EVIDENCE_KEYS, validate_bounded_preflight_receipt
 from .codex_runtime_identity import load_codex_release_trust
 from .identity import canonical_bytes
@@ -66,7 +68,7 @@ def assurance_errors(
         return errors + _comprehensive_errors(
             directory, profile_sha256, expected_profile
         )
-    if mode == BOUNDED_V1_ADMISSION:
+    if mode in {BOUNDED_V1_ADMISSION, BOUNDED_PRIVATE_V1_ADMISSION}:
         return errors + _bounded_errors(
             directory,
             manifest,
@@ -146,6 +148,7 @@ def _bounded_errors(
         permission_profile_sha256=profile_sha256,
         broker_wheel_sha256=broker_wheel_sha256,
         runtime_evidence=runtime_evidence,
+        admission_mode=metadata.get("admission_mode"),
     )
 
 

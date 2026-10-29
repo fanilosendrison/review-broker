@@ -5,7 +5,7 @@ asset_type: "security-model"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Threat Model"
-version: "0.1.4"
+version: "0.2.0"
 ---
 
 # Review Broker Threat Model
@@ -145,15 +145,25 @@ records a durable attempt marker, and never retries automatically. Any detected
 credential-shaped output is quarantined locally. It does not establish general
 credential isolation or satisfy production cleanup/recovery qualification.
 
-Low-sensitivity PR review uses a separate default-disabled operational gate.
-It requires exact enablement and executing-SHA binding, dedicated and general
-repository allowlists, requester authorization, and authoritative public
-visibility before any claim or execution side effect. Public visibility does
-not itself classify a repository as low sensitivity. Before armament, trusted
-workflow code must produce a mode-specific bounded preflight receipt tied to the
-exact immutable packet and installed runtime/profile identities. Reviewed
-content cannot select the mode. The comprehensive high-assurance qualification
-variable remains separate and unset.
+Low-sensitivity public PR review uses a separate default-disabled operational
+gate. It requires exact enablement and executing-SHA binding, dedicated and
+general repository allowlists, requester authorization, and authoritative
+public visibility before any claim or execution side effect. Public visibility
+does not itself classify a repository as low sensitivity.
+
+Bounded private-source review is a distinct default-disabled gate. It requires
+ReviewRequest v2 plus exact requester, private repository, PR, expected head,
+and executing-SHA bindings. Trusted code verifies private identity and exact
+installation-repository scope with the dedicated read-only source-App token.
+The publication and Codespaces tokens cannot satisfy this check. The source
+token is never transferred to the reviewer environment. A false public proof,
+wrong token scope, missing token, or public/private receipt substitution fails
+before armament.
+
+Before armament, trusted workflow code must produce a mode-specific bounded
+preflight receipt tied to the exact immutable packet and installed
+runtime/profile identities. Reviewed content cannot select either mode. The
+comprehensive high-assurance qualification variable remains separate and unset.
 
 ## Residual risks and comprehensive blocker
 

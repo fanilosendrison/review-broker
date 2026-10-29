@@ -27,12 +27,15 @@ class AuthorizationPolicy:
 JsonGetter = Callable[[str], dict[str, Any]]
 COMPREHENSIVE_ADMISSION = "comprehensive-security"
 BOUNDED_V1_ADMISSION = "low-sensitivity-v1"
+BOUNDED_PRIVATE_V1_ADMISSION = "bounded-private-v1"
 
 
 def select_operational_admission(
     request: dict[str, Any],
     environment: Mapping[str, str],
     get_json: JsonGetter,
+    *,
+    requester: str | None = None,
 ) -> str:
     """Select one explicit pre-claim operational admission path."""
     if (
@@ -44,6 +47,8 @@ def select_operational_admission(
         if not environment.get("REVIEW_BROKER_SECURITY_EVIDENCE_ID", "").strip():
             raise AdmissionError("SECURITY_EVIDENCE_MISSING")
         return COMPREHENSIVE_ADMISSION
+    if environment.get("REVIEW_BROKER_BOUNDED_PRIVATE_V1_ENABLED") == "true":
+        return _select_bounded_private(request, environment, get_json, requester)
     if environment.get("REVIEW_BROKER_LOW_SENSITIVITY_V1_ENABLED") != "true":
         raise AdmissionError("OPERATIONAL_ADMISSION_DISABLED")
     executing_sha = environment.get("GITHUB_SHA", "")
@@ -68,6 +73,57 @@ def select_operational_admission(
     ):
         raise AdmissionError("PUBLIC_REPOSITORY_NOT_VERIFIED")
     return BOUNDED_V1_ADMISSION
+
+
+def _select_bounded_private(
+    request: dict[str, Any],
+    environment: Mapping[str, str],
+    get_json: JsonGetter,
+    requester: str | None,
+) -> str:
+    subject = request.get("subject", {})
+    executing_sha = environment.get("GITHUB_SHA", "")
+    expected = {
+        "requester": environment.get("REVIEW_BROKER_BOUNDED_PRIVATE_V1_REQUESTER"),
+        "repository": environment.get("REVIEW_BROKER_BOUNDED_PRIVATE_V1_REPOSITORY"),
+        "pull_request": environment.get("REVIEW_BROKER_BOUNDED_PRIVATE_V1_PULL_REQUEST"),
+        "head": environment.get("REVIEW_BROKER_BOUNDED_PRIVATE_V1_EXPECTED_HEAD"),
+    }
+    if request.get("schema_version") != 2:
+        raise AdmissionError("BOUNDED_PRIVATE_V2_REQUIRED")
+    if requester != expected["requester"]:
+        raise AdmissionError("BOUNDED_PRIVATE_REQUESTER_NOT_ADMITTED")
+    if subject.get("repository") != expected["repository"]:
+        raise AdmissionError("BOUNDED_PRIVATE_REPOSITORY_NOT_ADMITTED")
+    if str(subject.get("pull_request")) != expected["pull_request"]:
+        raise AdmissionError("BOUNDED_PRIVATE_PULL_REQUEST_NOT_ADMITTED")
+    if not _sha(expected["head"]) or subject.get("expected_head_commit") != expected["head"]:
+        raise AdmissionError("BOUNDED_PRIVATE_HEAD_NOT_ADMITTED")
+    if (
+        not _sha(executing_sha)
+        or environment.get("REVIEW_BROKER_BOUNDED_PRIVATE_V1_ADMITTED_SHA") != executing_sha
+    ):
+        raise AdmissionError("BOUNDED_PRIVATE_SHA_NOT_ADMITTED")
+    repository = subject["repository"]
+    metadata = get_json(f"repos/{repository}")
+    if (
+        not isinstance(metadata, dict)
+        or metadata.get("visibility") != "private"
+        or metadata.get("private") is not True
+        or metadata.get("full_name") != repository
+    ):
+        raise AdmissionError("PRIVATE_REPOSITORY_NOT_VERIFIED")
+    installation = get_json("installation/repositories?per_page=100")
+    repositories = installation.get("repositories") if isinstance(installation, dict) else None
+    total_count = installation.get("total_count") if isinstance(installation, dict) else None
+    if (
+        total_count != 1
+        or not isinstance(repositories, list)
+        or len(repositories) != 1
+        or repositories[0].get("full_name") != repository
+    ):
+        raise AdmissionError("PRIVATE_SOURCE_CREDENTIAL_SCOPE_NOT_VERIFIED")
+    return BOUNDED_PRIVATE_V1_ADMISSION
 
 
 def authorize(actor: str, request: dict[str, Any], policy: AuthorizationPolicy) -> None:

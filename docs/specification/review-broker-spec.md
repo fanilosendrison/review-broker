@@ -5,7 +5,7 @@ asset_type: "specification"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker v1 Specification"
-version: "0.5.0"
+version: "0.6.0"
 ---
 
 # Review Broker v1 Specification
@@ -150,6 +150,29 @@ original oracle. Historical hard-link readability, managed-policy overrides,
 unchanged. A successful bounded preflight does not qualify comprehensive
 isolation, while demonstrated credential exposure or unexpected privilege still
 blocks the affected path.
+
+### Bounded private-source operational admission
+
+A distinct default-disabled path may admit one explicitly configured,
+low-sensitivity private-repository pull request. It requires exact requester,
+repository, pull-request number, expected head, and executing broker SHA
+bindings. It is available only for ReviewRequest v2, whose canonical request
+already binds the expected head.
+
+Repository identity must be verified as private using the dedicated read-only
+source-App credential. That credential's installation repository scope must be
+verified as the exact admitted repository. Publication and Codespaces-control
+credentials cannot substitute for source-read authority. Public-mode evidence
+cannot satisfy this path, and private-mode evidence records
+`public_repository_verified` as false.
+
+The source token is limited to repository metadata, pull-request resolution,
+file enumeration, clone, fetch, and publication applicability lookup. It is
+removed before reviewer execution and is never transferred to the reviewer
+runtime. This path preserves all canonical v1/v2 bytes, identities, one-attempt
+semantics, packet integrity, publication, recovery, and uncertainty rules. Its
+configuration does not authorize inference; exact operational activation and
+model execution remain separate decisions.
 
 The requester continues to own the variable mission and criteria. A reviewer
 result is evidence only; it never authorizes merge, publication, source

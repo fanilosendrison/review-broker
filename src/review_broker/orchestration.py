@@ -12,6 +12,7 @@ import tempfile
 from typing import Any, Mapping
 
 from .admission import (
+    BOUNDED_PRIVATE_V1_ADMISSION,
     BOUNDED_V1_ADMISSION,
     AuthorizationPolicy,
     authorize,
@@ -35,10 +36,11 @@ from .recovery import (
     verify_rebuilt_packet,
 )
 from .request import parse_issue_body
-
-
-class OrchestrationError(RuntimeError):
-    pass
+from .source_authorization import (
+    SourceAuthorizationError as OrchestrationError,
+    _source_environment_for_repository,
+    require_private_source_environment,
+)
 
 
 def prepare_issue(
@@ -55,26 +57,34 @@ def prepare_issue(
         requesters=_csv_set(environment.get("REVIEW_BROKER_AUTHORIZED_REQUESTERS", "")),
         repositories=_csv_set(environment.get("REVIEW_BROKER_AUTHORIZED_REPOSITORIES", "")),
     )
-    authorize(issue["user"]["login"], request, authorization)
-    admission_mode = select_operational_admission(
-        request, environment, lambda endpoint: _gh_json(endpoint)
-    )
+    requester = issue["user"]["login"]
+    authorize(requester, request, authorization)
     source_repository_name = request["subject"]["repository"]
     private_repositories = _csv_set(
         environment.get("REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES", "")
     )
+    private_mode_requested = (
+        environment.get("REVIEW_BROKER_BOUNDED_PRIVATE_V1_ENABLED") == "true"
+    )
     source_environment = (
-        None
-        if admission_mode == BOUNDED_V1_ADMISSION
-        else _source_environment_for_repository(
+        require_private_source_environment(
             source_repository_name,
             private_repositories,
             source_token,
         )
+        if private_mode_requested else None
     )
 
     def source_getter(endpoint: str) -> Any:
         return _gh_json(endpoint, environment=source_environment)
+
+    admission_mode = select_operational_admission(
+        request, environment, source_getter, requester=requester
+    )
+    if admission_mode not in {BOUNDED_V1_ADMISSION, BOUNDED_PRIVATE_V1_ADMISSION}:
+        source_environment = _source_environment_for_repository(
+            source_repository_name, private_repositories, source_token
+        )
     resolved = resolve_request(
         request,
         source_getter,
@@ -188,15 +198,9 @@ def prepare_issue(
         "request_id": resolved["request_id"],
         "admission_mode": admission_mode,
         "executing_broker_sha": environment.get("GITHUB_SHA", ""),
-        "requester": issue["user"]["login"],
+        "requester": requester,
         "subject_repository": source_repository_name,
-        "admission_checks": {
-            "requester_authorized": True,
-            "repository_authorized": True,
-            "low_sensitivity_repository_admitted": admission_mode == BOUNDED_V1_ADMISSION,
-            "public_repository_verified": admission_mode == BOUNDED_V1_ADMISSION,
-            "executing_sha_admitted": admission_mode == BOUNDED_V1_ADMISSION,
-        },
+        "admission_checks": _admission_checks(admission_mode),
     }
     (output_directory / "resolved-request.json").write_bytes(canonical_bytes(resolved) + b"\n")
     (output_directory / "broker-metadata.json").write_bytes(canonical_bytes(metadata) + b"\n")
@@ -352,28 +356,23 @@ def _gh_json(
         raise OrchestrationError("GITHUB_RESPONSE_INVALID") from exc
 
 
-def _source_environment_for_repository(
-    repository: str,
-    private_repositories: frozenset[str],
-    source_token: str | None,
-) -> dict[str, str] | None:
-    if repository not in private_repositories:
-        return None
-    if not source_token:
-        raise OrchestrationError("PRIVATE_SOURCE_CREDENTIAL_REQUIRED")
-    return _source_environment(source_token)
-
-
-def _source_environment(source_token: str | None) -> dict[str, str] | None:
-    if source_token is None:
-        return None
-    environment = {
-        key: value
-        for key, value in os.environ.items()
-        if key in {"HOME", "PATH", "XDG_CONFIG_HOME", "SSL_CERT_FILE", "SSL_CERT_DIR"}
+def _admission_checks(mode: str) -> dict[str, bool]:
+    common = {
+        "requester_authorized": True,
+        "repository_authorized": True,
+        "executing_sha_admitted": mode in {
+            BOUNDED_V1_ADMISSION, BOUNDED_PRIVATE_V1_ADMISSION,
+        },
     }
-    environment["GH_TOKEN"] = source_token
-    return environment
+    if mode == BOUNDED_V1_ADMISSION:
+        return {**common, "low_sensitivity_repository_admitted": True,
+                "public_repository_verified": True}
+    if mode == BOUNDED_PRIVATE_V1_ADMISSION:
+        return {**common, "bounded_private_request_admitted": True,
+                "private_repository_verified": True,
+                "private_source_credential_scope_verified": True,
+                "public_repository_verified": False}
+    return common
 
 
 def _csv_set(value: str) -> frozenset[str]:

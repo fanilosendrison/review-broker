@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from .admission import BOUNDED_V1_ADMISSION
+from .admission import BOUNDED_PRIVATE_V1_ADMISSION, BOUNDED_V1_ADMISSION
 from .codex import (
     CodexPolicy,
     build_command,
@@ -60,15 +60,10 @@ def build_bounded_preflight(
     expected_profile = profile_name(packet_directory)
     home = reviewer_home_from_environment(child_environment)
     profile = verify_reviewer_profile(home, trusted_workspace, packet_directory)
-    if metadata.get("admission_mode") != BOUNDED_V1_ADMISSION:
+    admission_mode = metadata.get("admission_mode")
+    if admission_mode not in {BOUNDED_V1_ADMISSION, BOUNDED_PRIVATE_V1_ADMISSION}:
         raise BoundedPreflightError("PREFLIGHT_ADMISSION_MODE_INVALID")
-    admission_checks = {
-        "requester_authorized": True,
-        "repository_authorized": True,
-        "low_sensitivity_repository_admitted": True,
-        "public_repository_verified": True,
-        "executing_sha_admitted": True,
-    }
+    admission_checks = _admission_checks(admission_mode)
     if metadata.get("admission_checks") != admission_checks:
         raise BoundedPreflightError("PREFLIGHT_ADMISSION_EVIDENCE_INVALID")
     identities = {
@@ -99,8 +94,9 @@ def build_bounded_preflight(
         raise BoundedPreflightError("PREFLIGHT_SHELL_DISABLE_INVALID")
     receipt = {
         "schema_version": 1,
-        "evidence_type": "bounded-low-sensitivity-v1-preflight",
-        "assurance_scope": "LOW_SENSITIVITY_V1",
+        "evidence_type": _evidence_type(admission_mode),
+        "assurance_scope": _assurance_scope(admission_mode),
+        "admission_mode": admission_mode,
         "direct_sandbox_probe_executed": False,
         "comprehensive_isolation_qualified": False,
         "runtime_identity": "VERIFIED",
@@ -134,6 +130,7 @@ def build_bounded_preflight(
         permission_profile_sha256=receipt["permission_profile_sha256"],
         broker_wheel_sha256=broker_wheel_sha256,
         runtime_evidence=runtime.evidence(),
+        admission_mode=admission_mode,
     )
     if errors:
         raise BoundedPreflightError(errors[0])
@@ -152,10 +149,11 @@ def validate_bounded_preflight_receipt(
     permission_profile_sha256: str,
     broker_wheel_sha256: str,
     runtime_evidence: Mapping[str, Any],
+    admission_mode: str = BOUNDED_V1_ADMISSION,
 ) -> list[str]:
     required = {
-        "evidence_type": "bounded-low-sensitivity-v1-preflight",
-        "assurance_scope": "LOW_SENSITIVITY_V1",
+        "evidence_type": _evidence_type(admission_mode),
+        "assurance_scope": _assurance_scope(admission_mode),
         "direct_sandbox_probe_executed": False,
         "comprehensive_isolation_qualified": False,
         "runtime_identity": "VERIFIED",
@@ -177,18 +175,18 @@ def validate_bounded_preflight_receipt(
         "model_substitution_forbidden": True,
         "reviewer_publication_authority": False,
         "trusted_admission": "VERIFIED_PRE_CLAIM",
-        "admission_checks": {
-            "requester_authorized": True,
-            "repository_authorized": True,
-            "low_sensitivity_repository_admitted": True,
-            "public_repository_verified": True,
-            "executing_sha_admitted": True,
-        },
+        "admission_checks": _admission_checks(admission_mode),
     }
     errors = [
         "BOUNDED_PREFLIGHT_FIELD_INVALID:" + key
         for key, value in required.items() if receipt.get(key) != value
     ]
+    receipt_mode = receipt.get("admission_mode")
+    if admission_mode == BOUNDED_PRIVATE_V1_ADMISSION:
+        if receipt_mode != admission_mode:
+            errors.append("BOUNDED_PREFLIGHT_FIELD_INVALID:admission_mode")
+    elif receipt_mode not in {None, BOUNDED_V1_ADMISSION}:
+        errors.append("BOUNDED_PREFLIGHT_FIELD_INVALID:admission_mode")
     if receipt.get("schema_version") != 1:
         errors.append("BOUNDED_PREFLIGHT_SCHEMA_INVALID")
     if any(receipt.get(key) != runtime_evidence.get(key) for key in RUNTIME_EVIDENCE_KEYS):
@@ -197,6 +195,27 @@ def validate_bounded_preflight_receipt(
     if not isinstance(removed, list) or any(not isinstance(item, str) for item in removed):
         errors.append("BOUNDED_PREFLIGHT_ENVIRONMENT_EVIDENCE_INVALID")
     return errors
+
+
+def _evidence_type(mode: str) -> str:
+    return ("bounded-private-v1-preflight" if mode == BOUNDED_PRIVATE_V1_ADMISSION
+            else "bounded-low-sensitivity-v1-preflight")
+
+
+def _assurance_scope(mode: str) -> str:
+    return "BOUNDED_PRIVATE_V1" if mode == BOUNDED_PRIVATE_V1_ADMISSION else "LOW_SENSITIVITY_V1"
+
+
+def _admission_checks(mode: str) -> dict[str, bool]:
+    common = {"requester_authorized": True, "repository_authorized": True,
+              "executing_sha_admitted": True}
+    if mode == BOUNDED_PRIVATE_V1_ADMISSION:
+        return {**common, "bounded_private_request_admitted": True,
+                "private_repository_verified": True,
+                "private_source_credential_scope_verified": True,
+                "public_repository_verified": False}
+    return {**common, "low_sensitivity_repository_admitted": True,
+            "public_repository_verified": True}
 
 
 def add_bounded_preflight_arguments(subcommands: Any) -> None:
