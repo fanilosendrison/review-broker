@@ -10,7 +10,7 @@ version: "0.1.0"
 
 # Requester-Owned Review Mission Decision Proposal
 
-**NON-NORMATIVE DESIGN PROPOSAL — NOT YET ACCEPTED**
+**PRODUCT-OWNER ACCEPTED DESIGN DIRECTION — NON-NORMATIVE; IMPLEMENTATION NOT AUTHORIZED**
 
 ## Status and scope
 
@@ -19,10 +19,15 @@ Intent recorded by #43. It encodes the established decision that the requester
 owns the substantive review mission and that Review Broker must not impose a
 mandatory semantic review profile.
 
-This proposal is independently reviewable but is not an accepted contract. It
-does not supersede the governing specification, `review-request.md`,
-`review-request-v2.md`, or any executable schema. It changes no implemented or
-qualified capability.
+The D1–D9 design direction was independently reviewed and accepted by the
+product owner on 2026-10-29. Acceptance is recorded in Issue #44, comment
+6506352077, following the independent review of PR #45 at
+ac0cb9c30856b24119b8ab0e5692546f514b23de.
+
+This design decision remains non-normative and is not an accepted versioned
+or executable ReviewRequest contract. It does not supersede the governing
+specification, `review-request.md`, `review-request-v2.md`, or any executable
+schema. It changes no implemented or qualified capability.
 
 ## D1 — Substantive mission ownership
 
@@ -175,10 +180,11 @@ This proposal is not an accepted contract. It does not supersede
 `review-request.md`, `review-request-v2.md`, the governing specification, or
 executable schemas.
 
-After independent review and product-owner acceptance, a separate implementation
-mandate must define the necessary versioned schema and migration. Publication
-of this proposal does not establish implementation readiness, authorize
-implementation, or qualify production functionality.
+Independent review and product-owner acceptance of D1–D9 have been completed.
+A separate implementation mandate must define the necessary versioned schema
+and migration before implementation is authorized. Publication of this design
+decision does not establish implementation readiness, authorize implementation,
+or qualify production functionality.
 
 ## Conceptual examples
 
