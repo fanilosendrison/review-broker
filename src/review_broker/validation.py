@@ -82,10 +82,21 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
         if execution_status == "COMPLETED":
             execution_status = "INDETERMINATE"
         reasons.append("TERMINAL_EVENT_SEQUENCE_INVALID")
-    before = _read_text(directory / "input-before.sha256").strip()
-    after = _read_text(directory / "input-after.sha256").strip()
     expected_prompt = manifest.get("prompt_sha256")
-    if not expected_prompt or before != expected_prompt or after != expected_prompt:
+    input_digest = _file_hash(directory / "input.txt")
+    prompt_digest = _read_canonical_digest(directory / "prompt.sha256")
+    before = _read_canonical_digest(directory / "input-before.sha256")
+    after = _read_canonical_digest(directory / "input-after.sha256")
+    if inventory["prompt.sha256"]["present"] and (
+        prompt_digest != expected_prompt or input_digest != expected_prompt
+    ):
+        reasons.append("PROMPT_DIGEST_MISMATCH")
+    if (
+        not isinstance(expected_prompt, str)
+        or input_digest != expected_prompt
+        or before != expected_prompt
+        or after != expected_prompt
+    ):
         reasons.append("PROMPT_INTEGRITY_INVALID")
     final_text = _read_text(directory / "codex-final.json").strip()
     if not final_text or final_text != final_agent_message:
@@ -299,6 +310,20 @@ def _read_text(path: Path) -> str:
         return path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return ""
+
+
+def _read_canonical_digest(path: Path) -> str | None:
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        return None
+    if (
+        len(raw) != 65
+        or raw[-1:] != b"\n"
+        or any(value not in b"0123456789abcdef" for value in raw[:-1])
+    ):
+        return None
+    return raw[:-1].decode("ascii")
 
 
 def _file_hash(path: Path) -> str | None:
