@@ -2,7 +2,9 @@
 import copy
 import json
 from pathlib import Path
+import tempfile
 import unittest
+from unittest import mock
 
 from review_broker.admission import (
     BOUNDED_PRIVATE_V1_ADMISSION,
@@ -10,6 +12,9 @@ from review_broker.admission import (
     AdmissionError,
     select_operational_admission,
 )
+from review_broker.orchestration import prepare_issue
+from review_broker.request import build_issue_body
+from review_broker.source_authorization import SourceAuthorizationError
 
 
 REQUEST = json.loads((Path(__file__).parent / "fixtures" / "sample-request.json").read_text())
@@ -59,6 +64,48 @@ class BoundedPrivateAdmissionTests(unittest.TestCase):
 
     def test_exact_private_request_is_admitted(self):
         self.assertEqual(self.admit(), BOUNDED_PRIVATE_V1_ADMISSION)
+
+    def test_prepare_rejects_before_source_access_or_claim_without_dedicated_authority(self):
+        endpoints = []
+
+        def getter(endpoint, **_kwargs):
+            endpoints.append(endpoint)
+            if endpoint == "repos/sample/broker/issues/46":
+                return {"body": build_issue_body(self.request),
+                        "user": {"login": REQUESTER}}
+            raise AssertionError("source metadata access forbidden")
+
+        class Journal:
+            def __init__(self, *_args, **_kwargs):
+                raise AssertionError("journal construction forbidden")
+
+        base_environment = {
+            **self.environment,
+            "REVIEW_BROKER_AUTHORIZED_REQUESTERS": REQUESTER,
+            "REVIEW_BROKER_AUTHORIZED_REPOSITORIES": REPOSITORY,
+        }
+        cases = (
+            ({}, "dedicated-source-token", "PRIVATE_SOURCE_REPOSITORY_NOT_AUTHORIZED"),
+            ({"REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES": REPOSITORY}, None,
+             "PRIVATE_SOURCE_CREDENTIAL_REQUIRED"),
+        )
+        for additions, source_token, error in cases:
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as temporary, \
+                 mock.patch.dict(
+                     "os.environ", {"GH_TOKEN": "privileged-workflow-token"}, clear=True
+                 ), \
+                 mock.patch("review_broker.orchestration._gh_json", side_effect=getter), \
+                 mock.patch("review_broker.orchestration.GitHubRefJournal", Journal), \
+                 self.assertRaisesRegex(SourceAuthorizationError, error):
+                prepare_issue(
+                    "sample/broker", 46, Path(temporary) / "packet",
+                    environment={**base_environment, **additions},
+                    source_token=source_token,
+                )
+        self.assertEqual(
+            endpoints,
+            ["repos/sample/broker/issues/46", "repos/sample/broker/issues/46"],
+        )
 
     def test_private_mode_is_disabled_by_default(self):
         environment = dict(self.environment)

@@ -39,6 +39,7 @@ from .request import parse_issue_body
 from .source_authorization import (
     SourceAuthorizationError as OrchestrationError,
     _source_environment_for_repository,
+    require_private_source_environment,
 )
 
 
@@ -66,7 +67,7 @@ def prepare_issue(
         environment.get("REVIEW_BROKER_BOUNDED_PRIVATE_V1_ENABLED") == "true"
     )
     source_environment = (
-        _source_environment_for_repository(
+        require_private_source_environment(
             source_repository_name,
             private_repositories,
             source_token,

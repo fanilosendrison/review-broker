@@ -8,13 +8,13 @@ class SourceAuthorizationError(RuntimeError):
     """Dedicated private-source authority is missing or unusable."""
 
 
-def _source_environment_for_repository(
+def require_private_source_environment(
     repository: str,
     private_repositories: frozenset[str],
     source_token: str | None,
-) -> dict[str, str] | None:
+) -> dict[str, str]:
     if repository not in private_repositories:
-        return None
+        raise SourceAuthorizationError("PRIVATE_SOURCE_REPOSITORY_NOT_AUTHORIZED")
     if not source_token:
         raise SourceAuthorizationError("PRIVATE_SOURCE_CREDENTIAL_REQUIRED")
     environment = {
@@ -24,3 +24,15 @@ def _source_environment_for_repository(
     }
     environment["GH_TOKEN"] = source_token
     return environment
+
+
+def _source_environment_for_repository(
+    repository: str,
+    private_repositories: frozenset[str],
+    source_token: str | None,
+) -> dict[str, str] | None:
+    if repository not in private_repositories:
+        return None
+    return require_private_source_environment(
+        repository, private_repositories, source_token
+    )
