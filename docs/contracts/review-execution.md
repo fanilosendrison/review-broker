@@ -5,7 +5,7 @@ asset_type: "contract"
 domain: "independent-review"
 severity: "strict"
 name: "Review Execution v1 Contract"
-version: "0.1.0"
+version: "0.2.0"
 ---
 
 # Review Execution v1 Contract
@@ -66,8 +66,39 @@ The adapter refuses a packet containing any prior attempt artifact. No retry is
 allowed after `ARMED` without conclusive terminal evidence. A lost response is
 `INDETERMINATE`.
 
+Each v1 request retains its existing ordinal-1 attempt. Every future v2 request
+also permits exactly one attempt, with ordinal `1` and the existing
+`attempt_identity(request_id, 1)` computation. V2 never allocates a greater
+ordinal. Completed, failed, and indeterminate attempts are never reset, reused,
+or incremented for another model invocation.
+
 This contract limits broker CLI invocations to one per attempt. It does not
 claim that provider transport implements exactly-once inference.
+
+## Versioned duplicate and re-review execution
+
+Canonical byte-identical requests share one deterministic request identity and
+claim even when delivered through repeated events, workflows, reconciliation,
+transport retries, or multiple Issues. Duplicate delivery cannot allocate an
+attempt or invoke Codex again.
+
+A v2 `changed_head` request creates a distinct claim only after admission
+verifies its exact expected head, stable Review Intent, and trustworthy
+predecessor with a different head. A v2 `repeat_same_head` request creates a
+distinct claim only after admission verifies the same expected head and intent,
+trustworthy predecessor, fresh nonce, authenticated requester authorization,
+and separately authorized operational admission. Contradictory, unavailable,
+or incomplete evidence fails before claim creation.
+
+No head change, reconciliation, workflow replay, timeout, lost response, or
+infrastructure recovery automatically creates a review. Recovery preserves the
+existing request and attempt. A later same-head review after any model-capable
+indeterminate attempt requires a separately authorized `repeat_same_head`
+request. Every predecessor request, attempt, journal, artifact, publication
+record, and result remains immutable.
+
+These v2 rules are normative but unimplemented. Existing executable journal and
+recovery behavior remains v1-only until separately implemented and qualified.
 
 ## Recovery
 
