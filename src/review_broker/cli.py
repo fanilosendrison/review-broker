@@ -23,6 +23,7 @@ from .execution_recovery import (
 from .github_journal import GitHubRefJournal
 from .identity import canonical_bytes
 from .orchestration import prepare_issue, publish_validated_result
+from .publication_recovery_cli import add_publication_recovery_command, run_publication_recovery
 from .reconciliation import reconcile_repository
 from .packets import verify_packet
 from .pilot_synthetic import run_synthetic_pilot, run_synthetic_pilot_02
@@ -108,7 +109,6 @@ def _parser() -> argparse.ArgumentParser:
     verify = subcommands.add_parser("internal-verify-packet")
     verify.add_argument("--packet-dir", required=True, type=Path)
     verify.add_argument("--expected-packet-id", required=True)
-
     arm = subcommands.add_parser("internal-arm")
     arm.add_argument("--request", required=True)
     arm.add_argument("--packet-id", required=True)
@@ -176,7 +176,7 @@ def _parser() -> argparse.ArgumentParser:
     transition.add_argument("--evidence", required=True)
     publish = subcommands.add_parser("internal-publish")
     publish.add_argument("--packet-dir", required=True, type=Path)
-
+    add_publication_recovery_command(subcommands)
     reconcile = subcommands.add_parser("internal-reconcile")
     reconcile.add_argument("--codespace", required=True)
     return parser
@@ -368,6 +368,8 @@ def main(argv: list[str] | None = None) -> int:
                 source_token=source_token,
             )).decode("utf-8"))
             return 0
+        if args.command == "internal-recover-publication":
+            return run_publication_recovery(args, source_token)
         if args.command == "internal-reconcile":
             codespace_token = os.environ.get("REVIEW_BROKER_CODESPACE_TOKEN")
             if not codespace_token:

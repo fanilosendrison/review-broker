@@ -1,6 +1,7 @@
 """Resume validation and publication from exact durable evidence artifacts."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 from pathlib import Path
 import tempfile
@@ -23,6 +24,42 @@ class ArtifactResumeError(RuntimeError):
     """Durable evidence cannot safely resume the journal attempt."""
 
 
+@dataclass(frozen=True)
+class PublicationRecoveryBinding:
+    """Exact authority for one publication-only recovery."""
+
+    issue_number: int
+    request_id: str
+    attempt_id: str
+    packet_id: str
+    artifact_id: int
+    artifact_digest: str
+    subject_repository: str
+    subject_pull_request: int
+    subject_head: str
+
+
+def recover_validated_publication(
+    broker_repository: str,
+    binding: PublicationRecoveryBinding,
+    *,
+    source_token: str | None = None,
+    journal: Any | None = None,
+    store: Any | None = None,
+) -> dict[str, Any]:
+    """Recover publication for one exact already-consumed validated attempt."""
+    active_journal = journal or GitHubRefJournal(broker_repository)
+    record = active_journal.get(binding.request_id)
+    return resume_from_durable_artifact(
+        broker_repository,
+        record,
+        source_token=source_token,
+        journal=active_journal,
+        store=store,
+        binding=binding,
+    )
+
+
 def resume_from_durable_artifact(
     broker_repository: str,
     record: AttemptRecord,
@@ -30,11 +67,14 @@ def resume_from_durable_artifact(
     source_token: str | None = None,
     journal: Any | None = None,
     store: Any | None = None,
+    binding: PublicationRecoveryBinding | None = None,
 ) -> dict[str, Any]:
     active_journal = journal or GitHubRefJournal(broker_repository)
     active_store = store or GitHubActionsArtifactStore(broker_repository)
     locator = record.evidence_locator
     locator_created = False
+    if binding is not None:
+        _verify_recovery_record(record, binding)
     if locator is None:
         if record.evidence_locator_plan is None:
             raise ArtifactResumeError("EVIDENCE_LOCATOR_UNAVAILABLE")
@@ -58,7 +98,7 @@ def resume_from_durable_artifact(
             active_store.download(locator, evidence)
         except ArtifactLocatorError as exc:
             raise ArtifactResumeError(str(exc)) from exc
-        _verify_downloaded_identity(evidence, locator)
+        _verify_downloaded_identity(evidence, locator, binding=binding)
         validation = validate_evidence(evidence)
         validation_id = artifact_identity((evidence / "validation.json").read_bytes())
         if record.state is AttemptState.TERMINAL_CAPTURED:
@@ -94,10 +134,13 @@ def resume_from_durable_artifact(
 def _verify_downloaded_identity(
     evidence: Path,
     locator: dict[str, Any],
+    *,
+    binding: PublicationRecoveryBinding | None,
 ) -> None:
     resolved = _read_object(evidence / "resolved-request.json")
     manifest = _read_object(evidence / "input-manifest.json")
     attempt = _read_object(evidence / "attempt.json")
+    metadata = _read_object(evidence / "broker-metadata.json")
     if (
         resolved.get("request_id") != locator["request_id"]
         or resolved.get("subject_id") != locator["subject_id"]
@@ -107,6 +150,38 @@ def _verify_downloaded_identity(
         or attempt.get("attempt_id") != locator["attempt_id"]
     ):
         raise ArtifactResumeError("DOWNLOADED_EVIDENCE_IDENTITY_MISMATCH")
+    if binding is not None:
+        subject = resolved.get("subject")
+        if (
+            metadata.get("issue_number") != binding.issue_number
+            or not isinstance(subject, dict)
+            or subject.get("repository") != binding.subject_repository
+            or subject.get("pull_request") != binding.subject_pull_request
+            or subject.get("head_commit") != binding.subject_head
+        ):
+            raise ArtifactResumeError("RECOVERY_SUBJECT_IDENTITY_MISMATCH")
+
+
+def _verify_recovery_record(
+    record: AttemptRecord,
+    binding: PublicationRecoveryBinding,
+) -> None:
+    locator = record.evidence_locator
+    if (
+        record.request_id != binding.request_id
+        or record.attempt_id != binding.attempt_id
+        or record.state is not AttemptState.VALIDATED
+        or record.invocation_count != 1
+        or record.publication_intent is not None
+        or record.publication_receipt is not None
+        or locator is None
+        or locator.get("request_id") != binding.request_id
+        or locator.get("attempt_id") != binding.attempt_id
+        or locator.get("packet_id") != binding.packet_id
+        or locator.get("artifact_id") != binding.artifact_id
+        or locator.get("artifact_digest") != binding.artifact_digest
+    ):
+        raise ArtifactResumeError("PUBLICATION_RECOVERY_BINDING_MISMATCH")
 
 
 def _read_object(path: Path) -> dict[str, Any]:
