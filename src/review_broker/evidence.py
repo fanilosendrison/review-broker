@@ -31,7 +31,7 @@ REQUIRED_EVIDENCE_FILES = (
 )
 
 TERMINAL_CAPTURE_FILES = (
-    "attempt.json",
+    "attempt.json", "prompt.sha256",
     "codex-events.jsonl",
     "codex-stderr.txt",
     "codex-final.json",

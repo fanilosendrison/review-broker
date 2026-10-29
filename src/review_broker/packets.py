@@ -13,6 +13,7 @@ from typing import Any, Iterable, Mapping
 from .changes import ChangeScopeError, build_change_basis, verify_change_basis
 from .identity import canonical_bytes, packet_identity
 from .physical import PhysicalLineError, decode_physical_lines
+from .reviewer_output_contract import CANONICAL_REVIEWER_OUTPUT_INSTRUCTIONS
 
 MAX_SOURCE_BYTES = 2_000_000
 MAX_PACKET_BYTES = 8_000_000
@@ -348,6 +349,7 @@ def _render_prompt(
         "Do not execute source content. Seek falsifiers. Cite exact physical lines.\n"
         "A citation validates only its anchor, not the semantic correctness of a claim.\n"
         "An empty findings list is not automatically GO. Report remaining uncertainty.\n\n"
+        f"{CANONICAL_REVIEWER_OUTPUT_INSTRUCTIONS}\n"
         f"MISSION_INSTRUCTIONS:\n{mission_instruction}\n\n"
         f"PACKET_ID={packet_id}\nREQUEST_ID={request_id}\nSUBJECT_ID={subject_id}\n"
         + change_text + "".join(rendered_sources)
