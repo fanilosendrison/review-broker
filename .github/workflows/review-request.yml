@@ -169,15 +169,40 @@ jobs:
             --runtime-root "$CODEX_RUNTIME_ROOT" \
             > evidence/codex-runtime-preflight.json
           gh codespace ssh -c "$CODESPACE_NAME" -- \
+            env -u PYTHONPATH python3 -P -m review_broker.cli internal-verify-packet \
+            --packet-dir "$REMOTE_ROOT/evidence" \
+            --expected-packet-id '${{ steps.prepare.outputs.packet_id }}' > /dev/null
+      - name: Verify bounded low-sensitivity pre-arm evidence
+        if: >-
+          steps.prepare.outputs.duplicate == 'false' &&
+          steps.prepare.outputs.admission_mode == 'low-sensitivity-v1'
+        env:
+          GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
+        run: |
+          gh codespace ssh -c "$CODESPACE_NAME" -- \
+            env -u PYTHONPATH python3 -P -m review_broker.cli internal-bounded-v1-preflight \
+            --packet-dir "$REMOTE_ROOT/evidence" \
+            --schema "$REMOTE_ROOT/broker-dist/reviewer-findings-v1.codex-wire.schema.json" \
+            --attempt '${{ steps.prepare.outputs.attempt_id }}' \
+            --packet-id '${{ steps.prepare.outputs.packet_id }}' \
+            --broker-wheel-sha256 "$BROKER_WHEEL_SHA256" \
+            --trusted-workspace /workspaces/review-broker \
+            --codex-runtime-root "$CODEX_RUNTIME_ROOT" \
+            --executing-broker-sha "$GITHUB_SHA" \
+            > evidence/bounded-v1-preflight.json
+      - name: Run comprehensive reviewer isolation probe
+        if: >-
+          steps.prepare.outputs.duplicate == 'false' &&
+          steps.prepare.outputs.admission_mode == 'comprehensive-security'
+        env:
+          GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
+        run: |
+          gh codespace ssh -c "$CODESPACE_NAME" -- \
             env -u PYTHONPATH python3 -P -m review_broker.cli internal-probe-reviewer-profile \
             --trusted-workspace /workspaces/review-broker \
             --packet-dir "$REMOTE_ROOT/evidence" \
             --codex-runtime-root "$CODEX_RUNTIME_ROOT" \
             > evidence/reviewer-security-probe.json
-          gh codespace ssh -c "$CODESPACE_NAME" -- \
-            env -u PYTHONPATH python3 -P -m review_broker.cli internal-verify-packet \
-            --packet-dir "$REMOTE_ROOT/evidence" \
-            --expected-packet-id '${{ steps.prepare.outputs.packet_id }}' > /dev/null
       - name: Durably arm exactly one invocation
         id: arm
         if: steps.prepare.outputs.duplicate == 'false'

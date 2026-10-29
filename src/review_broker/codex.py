@@ -212,7 +212,7 @@ def invoke_once(
     protected = (*_INVOCATION_ARTIFACTS, "validation.json")
     if any((packet_directory / name).exists() for name in protected):
         raise InvocationError("ALREADY_ATTEMPTED")
-    _assert_packet_tree(packet_directory, schema_path)
+    verify_packet_tree(packet_directory, schema_path)
     prompt_before = _digest(prompt_path.read_bytes())
     permission_profile = profile_name(packet_directory)
     child_environment, removed = sanitized_environment(environment or os.environ)
@@ -340,14 +340,14 @@ def verify_post_invocation_packet(
         raise InvocationError("POST_INVOCATION_PACKET_INVALID") from exc
     if observed_manifest != expected_manifest:
         raise InvocationError("POST_INVOCATION_MANIFEST_MISMATCH")
-    _assert_packet_tree(
+    verify_packet_tree(
         directory,
         schema_path.resolve(strict=True),
         allowed_artifacts=_INVOCATION_ARTIFACTS,
     )
 
 
-def _assert_packet_tree(
+def verify_packet_tree(
     directory: Path,
     schema_path: Path,
     *,

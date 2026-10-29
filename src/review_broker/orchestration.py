@@ -179,6 +179,17 @@ def prepare_issue(
         "issue_number": issue_number,
         "attempt_id": attempt.attempt_id,
         "request_id": resolved["request_id"],
+        "admission_mode": admission_mode,
+        "executing_broker_sha": environment.get("GITHUB_SHA", ""),
+        "requester": issue["user"]["login"],
+        "subject_repository": source_repository_name,
+        "admission_checks": {
+            "requester_authorized": True,
+            "repository_authorized": True,
+            "low_sensitivity_repository_admitted": admission_mode == BOUNDED_V1_ADMISSION,
+            "public_repository_verified": admission_mode == BOUNDED_V1_ADMISSION,
+            "executing_sha_admitted": admission_mode == BOUNDED_V1_ADMISSION,
+        },
     }
     (output_directory / "resolved-request.json").write_bytes(canonical_bytes(resolved) + b"\n")
     (output_directory / "broker-metadata.json").write_bytes(canonical_bytes(metadata) + b"\n")

@@ -10,7 +10,8 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from .codex_runtime_identity import load_codex_release_trust
+from .admission import BOUNDED_V1_ADMISSION, COMPREHENSIVE_ADMISSION
+from .assurance_validation import admission_mode as read_admission_mode, assurance_errors
 from .evidence import (
     EvidenceCaptureError,
     REQUIRED_EVIDENCE_FILES,
@@ -22,8 +23,6 @@ from .evidence import (
 )
 from .identity import artifact_identity, canonical_bytes
 from .packets import PacketError, source_lines, verify_packet
-from .security_probe import validate_probe_receipt
-from .reviewer_profile import PROFILE_NAME
 
 
 def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -44,9 +43,15 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
     except (PacketError, OSError, KeyError, json.JSONDecodeError) as exc:
         reasons.append(f"PACKET_INVALID:{type(exc).__name__}")
     inventory = evidence_manifest(directory)
+    admission_mode = read_admission_mode(directory)
+    inactive_assurance = {
+        BOUNDED_V1_ADMISSION: "reviewer-security-probe.json",
+        COMPREHENSIVE_ADMISSION: "bounded-v1-preflight.json",
+    }.get(admission_mode)
     missing = [
         name for name in REQUIRED_EVIDENCE_FILES
-        if name != "validation.json" and not inventory[name]["present"]
+        if name not in {"validation.json", inactive_assurance}
+        and not inventory[name]["present"]
     ]
     if missing:
         reasons.append("MISSING_EVIDENCE:" + ",".join(missing))
@@ -60,7 +65,7 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
         reasons.append("CREDENTIAL_MATERIAL_DETECTED_QUARANTINED")
     if contaminated:
         reasons.append("CREDENTIAL_MATERIAL_DETECTED")
-    reasons.extend(_security_profile_errors(directory))
+    reasons.extend(assurance_errors(directory, manifest, admission_mode))
     reasons.extend(_terminal_capture_errors(directory, manifest, inventory))
     exit_value = _read_text(directory / "codex-exit-code.txt").strip()
     if exit_value and exit_value != "0":
@@ -144,6 +149,12 @@ def validate_evidence(directory: Path, *, setup: dict[str, Any] | None = None) -
         "sources_examined": response.get("sources_examined", []),
         "findings": response.get("findings", []),
         "remaining_uncertainties": response.get("remaining_uncertainties", []),
+        "assurance_scope": (
+            "LOW_SENSITIVITY_V1" if admission_mode == BOUNDED_V1_ADMISSION
+            else "COMPREHENSIVE_SECURITY" if admission_mode == COMPREHENSIVE_ADMISSION
+            else "UNDETERMINED"
+        ),
+        "comprehensive_isolation_qualified": False,
         "semantic_correctness_validated": False,
         "effective_model_identity_verified": False,
         "effective_reasoning_effort_verified": False,
@@ -211,81 +222,6 @@ def _terminal_capture_errors(
         ):
             errors.append(f"RECOVERY_ARTIFACT_MISMATCH:{name}")
     return errors
-
-
-def _security_profile_errors(directory: Path) -> list[str]:
-    try:
-        attempt = json.loads((directory / "attempt.json").read_text(encoding="utf-8"))
-        receipt = json.loads(
-            (directory / "reviewer-security-probe.json").read_text(encoding="utf-8")
-        )
-    except (OSError, json.JSONDecodeError):
-        return ["SECURITY_PROFILE_EVIDENCE_INVALID"]
-    if not isinstance(attempt, dict) or not isinstance(receipt, dict):
-        return ["SECURITY_PROFILE_EVIDENCE_INVALID"]
-    errors: list[str] = []
-    errors.extend(_runtime_identity_errors(attempt))
-    expected_profile = attempt.get("permission_profile")
-    if (not isinstance(expected_profile, str) or
-        not expected_profile.startswith(PROFILE_NAME + "-") or
-        len(expected_profile) != len(PROFILE_NAME) + 1 + 64 or
-        any(character not in "0123456789abcdef"
-            for character in expected_profile[len(PROFILE_NAME) + 1:])):
-        errors.append("ATTEMPT_PERMISSION_PROFILE_INVALID")
-    if attempt.get("credential_paths_denied") is not True:
-        errors.append("ATTEMPT_CREDENTIAL_DENIAL_UNVERIFIED")
-    if attempt.get("trusted_workspace_denied") is not True:
-        errors.append("ATTEMPT_TRUSTED_WORKSPACE_DENIAL_UNVERIFIED")
-    if attempt.get("network_access") is not False:
-        errors.append("ATTEMPT_NETWORK_ACCESS_INVALID")
-    broker_wheel_sha256 = attempt.get("broker_wheel_sha256")
-    if (
-        not isinstance(broker_wheel_sha256, str)
-        or len(broker_wheel_sha256) != 64
-        or any(character not in "0123456789abcdef" for character in broker_wheel_sha256)
-    ):
-        errors.append("ATTEMPT_BROKER_WHEEL_SHA256_INVALID")
-    profile_sha256 = attempt.get("permission_profile_sha256")
-    if (
-        not isinstance(profile_sha256, str)
-        or len(profile_sha256) != 64
-        or any(character not in "0123456789abcdef" for character in profile_sha256)
-    ):
-        errors.append("ATTEMPT_PERMISSION_PROFILE_SHA256_INVALID")
-        return errors
-    errors.extend(validate_probe_receipt(receipt, profile_sha256, expected_profile))
-    return errors
-
-
-def _runtime_identity_errors(attempt: dict[str, Any]) -> list[str]:
-    trust = load_codex_release_trust()
-    distribution = trust["distribution"]
-    platform_trust = trust["platforms"]["linux-x86_64"]
-    expected = {
-        "runtime_identity_verification": "VERIFIED_OFFICIAL_NPM_ARTIFACT",
-        "distribution": distribution["name"],
-        "distribution_version": distribution["version"],
-        "platform_alias": platform_trust["npm_alias"],
-        "platform_version": platform_trust["published_version"],
-        "codex_launcher_sha256": distribution["launcher_sha256"],
-        "codex_native_sha256": platform_trust["native_sha256"],
-        "root_dist_integrity": distribution["dist_integrity"],
-        "platform_dist_integrity": platform_trust["dist_integrity"],
-        "node_interpreter_used": False,
-        "execution_stability": "ROOT_OWNED_NON_WRITABLE_PACKAGE_LAYOUT",
-    }
-    if any(attempt.get(key) != value for key, value in expected.items()):
-        return ["ATTEMPT_CODEX_RUNTIME_IDENTITY_INVALID"]
-    protected_root = attempt.get("protected_runtime_root")
-    executable = attempt.get("execution_native")
-    if (
-        not isinstance(protected_root, str)
-        or not Path(protected_root).is_absolute()
-        or not isinstance(executable, str)
-        or Path(executable) != Path(protected_root) / "bin" / "codex"
-    ):
-        return ["ATTEMPT_CODEX_EXECUTION_PATH_INVALID"]
-    return []
 
 
 def _citation_errors(response: dict[str, Any], indexed: dict[str, tuple[str, ...]]) -> list[str]:
