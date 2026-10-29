@@ -30,6 +30,10 @@ from .predecessor import (
     verify_v2_operation,
 )
 from .request import RequestContractError, parse_issue_body
+from .source_authorization import (
+    SourceAuthorizationError,
+    require_private_source_environment,
+)
 
 
 ReconciliationError = ReconciliationGitHubError
@@ -98,8 +102,10 @@ def reconcile_repository(
             private_mode_requested = (
                 environment.get("REVIEW_BROKER_BOUNDED_PRIVATE_V1_ENABLED") == "true"
             )
-            if private_mode_requested and not source_token:
-                raise PrivateSourceCredentialRequired
+            if private_mode_requested:
+                require_private_source_environment(
+                    repository, private_repositories, source_token
+                )
             if get_json is not None:
                 source_getter = getter
             else:
@@ -129,6 +135,14 @@ def reconcile_repository(
                         broker_repository, active_journal, getter
                     ),
                 )
+        except SourceAuthorizationError as exc:
+            decisions.append({
+                "issue_number": issue.get("number"),
+                "action": str(exc),
+                "reason": "Dedicated read-only private-source authority is unavailable.",
+                "outcome": "BLOCKED",
+            })
+            continue
         except PrivateSourceCredentialRequired:
             decisions.append({
                 "issue_number": issue.get("number"),
