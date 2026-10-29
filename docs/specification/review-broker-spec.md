@@ -5,7 +5,7 @@ asset_type: "specification"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker v1 Specification"
-version: "0.4.2"
+version: "0.4.3"
 ---
 
 # Review Broker v1 Specification
@@ -117,10 +117,25 @@ Sensitive or high-assurance requests require a separately justified admission
 path. No configuration variable is activated merely by publishing source.
 
 All existing ReviewRequest, immutable-source, packet, credential-screening,
-one-shot, evidence-validation and publication controls remain applicable. The
-requester continues to own the variable mission and criteria. A reviewer result
-is evidence only; it never authorizes merge, publication, source modification
-or alteration of normative premises. See RB-PI-SEC-01 (#27).
+one-shot, evidence-validation and publication controls remain applicable. Before
+armament, this mode records a separate low-sensitivity-v1 preflight bound to the
+exact request, attempt, packet, profile, runtime and executing broker. It verifies
+the approved runtime and installed profile identities, packet-tree integrity,
+credential-separated environment request and declared shell disablement. It
+does not execute the comprehensive direct sandbox probe and records effective
+Codex policy attestation and comprehensive isolation as unavailable and
+unqualified. Missing or cross-mode evidence fails closed.
+
+The comprehensive admission path retains its strict direct sandbox probe and
+original oracle. Historical hard-link readability, managed-policy overrides,
+`/proc` uncertainty and unavailable effective-policy attestation remain
+unchanged. A successful bounded preflight does not qualify comprehensive
+isolation, while demonstrated credential exposure or unexpected privilege still
+blocks the affected path.
+
+The requester continues to own the variable mission and criteria. A reviewer
+result is evidence only; it never authorizes merge, publication, source
+modification or alteration of normative premises. See RB-PI-SEC-01 (#27).
 
 ## Required separations
 

@@ -6,8 +6,8 @@ import os
 from pathlib import Path
 import sys
 
-from .codex import invoke_once, preflight_codex_runtime, sanitized_environment
-from .codex_runtime_identity import verify_codex_runtime
+from .bounded_preflight import add_bounded_preflight_arguments, run_bounded_preflight_command
+from .codex import invoke_once, preflight_codex_runtime
 from .evidence import quarantine_contaminated_evidence
 from .codespace import CodespaceController
 from .execution_recovery import (
@@ -38,7 +38,7 @@ from .pilot_runtime_config import RB03_RUNTIME, RB04_RUNTIME, RB05_RUNTIME
 from .queue import AttemptState
 from .requester import CliError, request as _request, result as _result, status as _status
 from .reviewer_profile import install_reviewer_profile, reviewer_home_from_environment
-from .security_probe import run_reviewer_isolation_probe
+from .security_probe import run_installed_reviewer_isolation_probe
 from .validation import validate_evidence
 
 DEFAULT_BROKER_REPOSITORY = "fanilosendrison/review-broker"
@@ -121,6 +121,7 @@ def _parser() -> argparse.ArgumentParser:
     probe_profile.add_argument("--codex-runtime-root", required=True, type=Path)
     preflight_runtime = subcommands.add_parser("internal-preflight-codex-runtime")
     preflight_runtime.add_argument("--runtime-root", required=True, type=Path)
+    add_bounded_preflight_arguments(subcommands)
     invoke = subcommands.add_parser("internal-invoke")
     invoke.add_argument("--packet-dir", required=True, type=Path)
     invoke.add_argument("--schema", required=True, type=Path)
@@ -251,21 +252,18 @@ def main(argv: list[str] | None = None) -> int:
             install_reviewer_profile(home, args.trusted_workspace, args.packet_dir)
             return 0
         if args.command == "internal-probe-reviewer-profile":
-            child_environment, _ = sanitized_environment(dict(os.environ))
-            home = reviewer_home_from_environment(child_environment)
-            runtime = verify_codex_runtime(child_environment, args.codex_runtime_root)
-            receipt = run_reviewer_isolation_probe(
-                home,
-                args.trusted_workspace,
-                args.packet_dir,
-                runtime.executable,
-                environment=child_environment,
+            receipt = run_installed_reviewer_isolation_probe(
+                args.trusted_workspace, args.packet_dir, args.codex_runtime_root,
+                environment=dict(os.environ),
             )
             print(canonical_bytes(receipt).decode("utf-8"))
             return 0
         if args.command == "internal-preflight-codex-runtime":
             receipt = preflight_codex_runtime(args.runtime_root)
             print(canonical_bytes(receipt).decode("utf-8"))
+            return 0
+        if args.command == "internal-bounded-v1-preflight":
+            print(canonical_bytes(run_bounded_preflight_command(args)).decode("utf-8"))
             return 0
         if args.command == "internal-invoke":
             invoke_once(

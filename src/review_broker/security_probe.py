@@ -13,7 +13,12 @@ import tempfile
 from typing import Any, Callable, Mapping
 
 from .codex import sanitized_environment
-from .reviewer_profile import profile_name, verify_reviewer_profile
+from .codex_runtime_identity import verify_codex_runtime
+from .reviewer_profile import (
+    profile_name,
+    reviewer_home_from_environment,
+    verify_reviewer_profile,
+)
 
 
 class SecurityProbeError(RuntimeError):
@@ -147,6 +152,25 @@ def _probe_python_executable() -> Path:
     if not os.access(resolved, os.X_OK):
         raise SecurityProbeError("PROBE_PYTHON_EXECUTABLE_INVALID")
     return resolved
+
+
+def run_installed_reviewer_isolation_probe(
+    trusted_workspace: Path,
+    packet_directory: Path,
+    codex_runtime_root: Path,
+    *,
+    environment: Mapping[str, str],
+) -> dict[str, Any]:
+    child_environment, _ = sanitized_environment(environment)
+    home = reviewer_home_from_environment(child_environment)
+    runtime = verify_codex_runtime(child_environment, codex_runtime_root)
+    return run_reviewer_isolation_probe(
+        home,
+        trusted_workspace,
+        packet_directory,
+        runtime.executable,
+        environment=child_environment,
+    )
 
 
 def validate_probe_receipt(receipt: dict[str, Any], profile_sha256: str, profile_identity: str) -> list[str]:

@@ -22,7 +22,7 @@ from review_broker.validation import validate_evidence
 class EvidenceValidationTests(unittest.TestCase):
     def fixture(self, root: Path, *, quote="alpha", terminal=True, failure=False,
                 claim="A conclusion that the validator cannot semantically adjudicate.",
-                uncertainty="Semantic correctness is not machine-validated."):
+                uncertainty="Semantic correctness is not machine-validated.", attempt_overrides=None):
         source = b"alpha line\r\nbeta line\r\n"
         oid = hashlib.sha1(b"blob " + str(len(source)).encode() + b"\0" + source).hexdigest()
         record = SourceRecord.from_bytes("sample/repo", "a" * 40, "doc.md", oid, source)
@@ -58,6 +58,13 @@ class EvidenceValidationTests(unittest.TestCase):
             if terminal:
                 events.append({"type": "turn.completed"})
         profile_sha256 = "4" * 64
+        (root / "broker-metadata.json").write_bytes(canonical_bytes({
+            "schema_version": 1,
+            "request_id": manifest["request_id"],
+            "attempt_id": "attempt:sha256:" + "3" * 64,
+            "admission_mode": "comprehensive-security",
+            "executing_broker_sha": "7" * 40,
+        }) + b"\n")
         (root / "attempt.json").write_bytes(canonical_bytes({
             "attempt_id": "attempt:sha256:" + "3" * 64,
             "broker_wheel_sha256": "6" * 64,
@@ -78,7 +85,7 @@ class EvidenceValidationTests(unittest.TestCase):
             "permission_profile_sha256": profile_sha256,
             "credential_paths_denied": True,
             "trusted_workspace_denied": True,
-            "network_access": False,
+            "network_access": False, **(attempt_overrides or {}),
         }) + b"\n")
         security_observations = {
             "packet_canary_readable": True,

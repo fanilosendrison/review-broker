@@ -24,6 +24,7 @@ REQUIRED_EVIDENCE_FILES = (
     "input-before.sha256",
     "input-after.sha256",
     "reviewer-security-probe.json",
+    "bounded-v1-preflight.json",
     "recovery-manifest.json",
     "terminal-capture.json",
     "validation.json",
