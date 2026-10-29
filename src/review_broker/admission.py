@@ -4,7 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
-from .identity import mission_identity, policy_identity, request_identity, subject_identity
+from .identity import (
+    mission_identity,
+    policy_identity,
+    request_identity,
+    review_intent_identity,
+    subject_identity,
+)
 from .request import validate_request
 
 
@@ -29,6 +35,11 @@ def select_operational_admission(
     get_json: JsonGetter,
 ) -> str:
     """Select one explicit pre-claim operational admission path."""
+    if (
+        request.get("schema_version") == 2
+        and environment.get("REVIEW_BROKER_V2_ENABLED") != "true"
+    ):
+        raise AdmissionError("V2_OPERATIONAL_ADMISSION_DISABLED")
     if environment.get("REVIEW_BROKER_SECURITY_QUALIFIED") == "true":
         if not environment.get("REVIEW_BROKER_SECURITY_EVIDENCE_ID", "").strip():
             raise AdmissionError("SECURITY_EVIDENCE_MISSING")
@@ -82,6 +93,11 @@ def resolve_request(
     base = pr.get("base", {}).get("sha")
     if not _sha(head) or not _sha(base):
         raise AdmissionError("GITHUB_PR_IDENTITY_INCOMPLETE")
+    request_expected_head = subject.get("expected_head_commit")
+    if request.get("schema_version") == 2:
+        if expected_head is not None and expected_head != request_expected_head:
+            raise AdmissionError("EXPECTED_HEAD_AUTHORITY_MISMATCH")
+        expected_head = request_expected_head
     if expected_head is not None and head != expected_head:
         raise AdmissionError(f"PR_HEAD_MISMATCH:expected={expected_head}:actual={head}")
     compare = get_json(f"repos/{repository}/compare/{base}...{head}")
@@ -97,7 +113,7 @@ def resolve_request(
         "base_commit": base,
         "merge_base": merge_base,
     }
-    return {
+    resolved = {
         "schema_version": 1,
         "request": request,
         "request_id": request_identity(request),
@@ -106,6 +122,9 @@ def resolve_request(
         "mission_id": mission_identity(request["mission"]),
         "policy_id": policy_identity(request["policy"]),
     }
+    if request.get("schema_version") == 2:
+        resolved["review_intent_id"] = review_intent_identity(request)
+    return resolved
 
 
 def authorize_and_resolve(

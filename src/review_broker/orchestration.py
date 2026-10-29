@@ -21,6 +21,7 @@ from .admission import (
 from .identity import artifact_identity, canonical_bytes
 from .packets import GitSourceReader, SourceSpec, build_packet
 from .github_journal import GitHubRefJournal
+from .predecessor import github_predecessor_authority, verify_v2_operation
 from .publication import (
     GitHubPublisher,
     build_publication_intent,
@@ -83,7 +84,13 @@ def prepare_issue(
         broker_repository,
         base_branch=environment.get("REVIEW_BROKER_DEFAULT_BRANCH", "dev"),
     )
-    attempt = journal.claim(resolved["request_id"])
+    if request.get("schema_version") == 2:
+        authority = github_predecessor_authority(
+            broker_repository, journal, lambda endpoint: _gh_json(endpoint)
+        )
+        verify_v2_operation(request, resolved, authority)
+    admission = resolved if request.get("schema_version") == 2 else None
+    attempt = journal.claim(resolved["request_id"], admission)
     admission_evidence = artifact_identity(canonical_bytes(resolved))
     preparation_action = decide_preparation_recovery(attempt, admission_evidence)
     if preparation_action is PreparationRecoveryAction.DUPLICATE_TERMINAL_OR_MODEL_CAPABLE:

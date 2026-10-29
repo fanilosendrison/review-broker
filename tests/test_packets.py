@@ -175,7 +175,7 @@ class PacketTests(unittest.TestCase):
             class Journal:
                 def __init__(self, *args, **kwargs):
                     self.record = None
-                def claim(self, request_id):
+                def claim(self, request_id, admission=None):
                     self.record = AttemptRecord(request_id, attempt_identity(request_id, 1),
                                                 AttemptState.REQUESTED)
                     return self.record

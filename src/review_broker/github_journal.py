@@ -55,14 +55,19 @@ class GitHubRefJournal:
         self.base_branch = base_branch
         self.runner = runner
 
-    def claim(self, request_id: str) -> AttemptRecord:
+    def claim(
+        self, request_id: str, admission: dict[str, Any] | None = None,
+    ) -> AttemptRecord:
         existing = self._read(request_id)
         if existing is not None:
+            if admission is not None and existing[1].admission != admission:
+                raise StateTransitionError("CLAIM_ADMISSION_CONFLICT")
             return existing[1]
         record = AttemptRecord(
             request_id=request_id,
             attempt_id=attempt_identity(request_id, 1),
             state=AttemptState.REQUESTED,
+            admission=admission,
             history=({"state": AttemptState.REQUESTED.value, "evidence_ids": []},),
         )
         base_sha = self._ref_sha(f"heads/{self.base_branch}")
@@ -78,6 +83,8 @@ class GitHubRefJournal:
         winner = self._read(request_id)
         if winner is None:
             raise StateTransitionError("ATOMIC_CLAIM_FAILED")
+        if admission is not None and winner[1].admission != admission:
+            raise StateTransitionError("CLAIM_ADMISSION_CONFLICT")
         return winner[1]
 
     def get(self, request_id: str) -> AttemptRecord:
