@@ -1,7 +1,11 @@
 """Credential-separated environment construction for private source reads."""
 from __future__ import annotations
 
+from contextlib import contextmanager
 import os
+from pathlib import Path
+import tempfile
+from typing import Iterator, Mapping
 
 
 class SourceAuthorizationError(RuntimeError):
@@ -34,6 +38,21 @@ def require_private_source_environment(
         "GIT_CONFIG_VALUE_1": "!gh auth git-credential",
     })
     return environment
+
+
+@contextmanager
+def isolated_source_environment(
+    environment: Mapping[str, str] | None,
+) -> Iterator[dict[str, str] | None]:
+    if environment is None:
+        yield None
+        return
+    with tempfile.TemporaryDirectory(prefix="review-broker-source-auth-") as temporary:
+        root = Path(temporary)
+        home, config = root / "home", root / "xdg"
+        home.mkdir(mode=0o700)
+        config.mkdir(mode=0o700)
+        yield {**environment, "HOME": str(home), "XDG_CONFIG_HOME": str(config)}
 
 
 def _source_environment_for_repository(

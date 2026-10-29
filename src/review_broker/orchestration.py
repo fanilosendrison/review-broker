@@ -39,6 +39,7 @@ from .request import parse_issue_body
 from .source_authorization import (
     SourceAuthorizationError as OrchestrationError,
     _source_environment_for_repository,
+    isolated_source_environment,
     require_private_source_environment,
 )
 
@@ -353,15 +354,11 @@ def _gh_json(
     *,
     environment: Mapping[str, str] | None = None,
 ) -> Any:
-    result = subprocess.run(
-        ["gh", "api", endpoint],
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=120,
-        shell=False,
-        env=environment,
-    )
+    with isolated_source_environment(environment) as subprocess_environment:
+        result = subprocess.run(
+            ["gh", "api", endpoint], text=True, capture_output=True, check=False,
+            timeout=120, shell=False, env=subprocess_environment,
+        )
     if result.returncode != 0:
         raise OrchestrationError("GITHUB_API_FAILED")
     try:
