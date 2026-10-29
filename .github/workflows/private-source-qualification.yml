@@ -1,0 +1,143 @@
+name: Private source qualification
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: review-broker-private-source-qualification
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Mint dedicated private-source token
+        id: source_auth
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ vars.REVIEW_BROKER_SOURCE_APP_ID }}
+          private-key: ${{ secrets.REVIEW_BROKER_SOURCE_APP_PRIVATE_KEY }}
+          owner: fanilosendrison
+
+      - name: Qualify exact read-only source acquisition
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.source_auth.outputs.token }}
+          GITHUB_TOKEN: ""
+          REVIEW_BROKER_CODESPACE_TOKEN: ""
+          EXPECTED_REPOSITORY: fanilosendrison/review-broker
+          EXPECTED_PULL_REQUEST: "45"
+          EXPECTED_HEAD: d728086bd8faf082e5b2725a59c21cc6ab2b55ea
+          EXPECTED_PATH: docs/architecture/requester-owned-mission-decision-proposal.md
+          SOURCE_APP_SLUG: ${{ steps.source_auth.outputs.app-slug }}
+          SOURCE_INSTALLATION_ID: ${{ steps.source_auth.outputs.installation-id }}
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+
+          test -n "$GH_TOKEN"
+          test -z "$GITHUB_TOKEN"
+          test -z "$REVIEW_BROKER_CODESPACE_TOKEN"
+          test -n "$SOURCE_APP_SLUG"
+          test -n "$SOURCE_INSTALLATION_ID"
+
+          qualification_root="$(mktemp -d)"
+          cleanup() {
+            unset GH_TOKEN GITHUB_TOKEN REVIEW_BROKER_CODESPACE_TOKEN
+            rm -rf "$qualification_root"
+          }
+          trap cleanup EXIT
+          export HOME="$qualification_root/home"
+          export XDG_CONFIG_HOME="$qualification_root/xdg"
+          export GIT_CONFIG_NOSYSTEM=1
+          export GIT_TERMINAL_PROMPT=0
+          mkdir -m 700 "$HOME" "$XDG_CONFIG_HOME"
+
+          test "$(gh auth token)" = "$GH_TOKEN"
+
+          gh api "installation/repositories?per_page=100" \
+            > "$qualification_root/installation.json"
+          test "$(jq -r '.total_count' "$qualification_root/installation.json")" = "1"
+          test "$(jq -r '.repositories | length' "$qualification_root/installation.json")" = "1"
+          test "$(jq -r '.repositories[0].full_name' "$qualification_root/installation.json")" \
+            = "$EXPECTED_REPOSITORY"
+
+          gh api "repos/$EXPECTED_REPOSITORY" > "$qualification_root/repository.json"
+          test "$(jq -r '.full_name' "$qualification_root/repository.json")" \
+            = "$EXPECTED_REPOSITORY"
+          test "$(jq -r '.visibility' "$qualification_root/repository.json")" = "private"
+          test "$(jq -r '.private' "$qualification_root/repository.json")" = "true"
+
+          gh api "repos/$EXPECTED_REPOSITORY/pulls/$EXPECTED_PULL_REQUEST" \
+            > "$qualification_root/pull-request.json"
+          test "$(jq -r '.state' "$qualification_root/pull-request.json")" = "open"
+          head_commit="$(jq -r '.head.sha' "$qualification_root/pull-request.json")"
+          base_commit="$(jq -r '.base.sha' "$qualification_root/pull-request.json")"
+          test "$head_commit" = "$EXPECTED_HEAD"
+          test "$base_commit" != "null"
+
+          gh api "repos/$EXPECTED_REPOSITORY/compare/$base_commit...$head_commit" \
+            > "$qualification_root/compare.json"
+          merge_base="$(jq -r '.merge_base_commit.sha' "$qualification_root/compare.json")"
+          test "$merge_base" != "null"
+
+          gh api "repos/$EXPECTED_REPOSITORY/pulls/$EXPECTED_PULL_REQUEST/files?per_page=100" \
+            > "$qualification_root/files.json"
+          test "$(jq -r 'length' "$qualification_root/files.json")" = "1"
+          test "$(jq -r '.[0].filename' "$qualification_root/files.json")" = "$EXPECTED_PATH"
+          api_status="$(jq -r '.[0].status' "$qualification_root/files.json")"
+          test "$api_status" = "added"
+
+          gh repo clone "$EXPECTED_REPOSITORY" "$qualification_root/source.git" -- \
+            --filter=blob:none --no-checkout
+          for commit in "$base_commit" "$head_commit" "$merge_base"; do
+            git -C "$qualification_root/source.git" fetch origin "$commit" --depth=1
+          done
+
+          mapfile -d '' changed_paths < <(
+            git -C "$qualification_root/source.git" diff --name-only -z \
+              "$merge_base" "$head_commit"
+          )
+          test "${#changed_paths[@]}" = "1"
+          test "${changed_paths[0]}" = "$EXPECTED_PATH"
+          git_status="$(git -C "$qualification_root/source.git" diff --name-status \
+            "$merge_base" "$head_commit" -- "$EXPECTED_PATH")"
+          test "$git_status" = $'A\t'"$EXPECTED_PATH"
+
+          if git -C "$qualification_root/source.git" cat-file -e \
+            "$merge_base:$EXPECTED_PATH" 2>/dev/null; then
+            echo "UNEXPECTED_ADDED_FILE_PREIMAGE"
+            exit 1
+          fi
+          git -C "$qualification_root/source.git" cat-file -e \
+            "$head_commit:$EXPECTED_PATH"
+          postimage_sha256="$(
+            git -C "$qualification_root/source.git" show \
+              "$head_commit:$EXPECTED_PATH" | sha256sum | cut -d ' ' -f 1
+          )"
+          diff_sha256="$(
+            git -C "$qualification_root/source.git" diff --binary \
+              "$merge_base" "$head_commit" -- "$EXPECTED_PATH" | \
+              sha256sum | cut -d ' ' -f 1
+          )"
+          test "${#postimage_sha256}" = "64"
+          test "${#diff_sha256}" = "64"
+
+          echo "QUALIFICATION_DISPOSITION=PASS"
+          echo "SOURCE_APP_SLUG=$SOURCE_APP_SLUG"
+          echo "SOURCE_INSTALLATION_ID=$SOURCE_INSTALLATION_ID"
+          echo "INSTALLATION_REPOSITORY_SCOPE=$EXPECTED_REPOSITORY"
+          echo "REPOSITORY_VISIBILITY=private"
+          echo "PULL_REQUEST=$EXPECTED_PULL_REQUEST"
+          echo "BASE_COMMIT=$base_commit"
+          echo "HEAD_COMMIT=$head_commit"
+          echo "MERGE_BASE_COMMIT=$merge_base"
+          echo "CHANGED_FILE=$EXPECTED_PATH"
+          echo "PREIMAGE_SHA256=NOT_APPLICABLE_ADDED_FILE"
+          echo "POSTIMAGE_SHA256=$postimage_sha256"
+          echo "DIFF_SHA256=$diff_sha256"
+          echo "CREDENTIAL_BOUNDARY=DEDICATED_SOURCE_APP_TOKEN_ONLY"
