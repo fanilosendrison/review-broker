@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Requester-Declared Reference Contract Proposal"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Requester-Declared Reference Contract Proposal
@@ -24,6 +24,15 @@ reviewer of PR #45 could only see PR change material, not the cited Issues #43
 and #44 or relevant governing sources. That review's `COMPLETED / VALID /
 CURRENT / NO_GO` result is immutable. Source absence was a known packet scope
 limitation, not evidence of a failed model invocation.
+
+The first bounded independent review of **this proposal** (#53, original PR #52
+head `3f721f00163263e1a31063d2cbb48e377eaa669f`) returned
+`COMPLETED / VALID / CURRENT / NO_GO` with findings F001–F008. That result
+remains immutable. Its packet contained only the proposal and its PR diff: it
+did **not** establish cross-document agreement with #43/#44/#51, existing
+contracts, implementation or historical receipts. This revision clarifies
+proposed semantics in response; **no corrected-head independent review,
+contract acceptance or external-authority qualification is claimed**.
 
 **Authority boundary:** This document is a proposed design, not a new accepted
 ReviewRequest, ReviewResult, packet, source, or execution contract. Current v1/v2
@@ -52,7 +61,13 @@ consumer acceptance remain distinct.
 
 The proposed successor request has one optional, ordered `references` array.
 An absent array or an empty array means **no requester-declared references**,
-not that the mission's implicit evidence needs have been satisfied.
+not that the mission's implicit evidence needs have been satisfied. The
+packet/result must truthfully expose the **declared and actually available**
+material boundary, including an empty declaration. Broker validation of that
+boundary does not certify that the mission has all substantively necessary
+evidence. Generic reviewer instructions require disclosure of **recognized**
+missing evidence and remaining uncertainty; they cannot guarantee detection
+of every implicit requirement in natural language.
 
 Each declaration has exactly three common properties:
 
@@ -112,12 +127,20 @@ wire-schema approval**:
 
 A remote mutable source may additionally specify a **content expectation**
 (e.g., `expected_sha256`, explicitly scoped to the selected component or
-complete returned object). If set, an observed mismatch is never silently
-accepted. The exact wire placement and validation constraints of that optional
-pin are successor-schema work, not settled by this example. Inline content is
-already part of canonical request bytes. An uploaded file instead requires an
+complete returned object). If set, an observed mismatch fails validation, even
+when `required=false`; it cannot be downgraded to a permitted omission.
+The exact wire placement and validation constraints of that optional pin are
+successor-schema work, not settled by this example. Inline content is already
+part of canonical request bytes. An uploaded file instead requires an
 immutable, authenticated transfer receipt that identifies its received bytes
 before it can be referenced by a request.
+
+Without an expected content pin, a remote mutable source is **late-bound**:
+the request selects its logical location, but its exact content is established
+only by the packet snapshot durably committed during preparation. The
+`request_id` alone does **not** identify the remote bytes that will be observed;
+the bound `packet_id` does. A request cannot promise deterministic acquisition
+across a crash **before** that commitment.
 
 ### R3 — Supported product forms without a universal ingestion platform
 
@@ -133,12 +156,22 @@ before it can be referenced by a request.
 
 These are **reference forms**, not new subject kinds. For `github_pr`, a
 component selector may request the description, exact code change material,
-conversation comments, review submissions and/or inline review comments.
-A requested collection requires a complete, bounded component inventory;
-all pages must be accounted for. Each mutable description or comment is
-captured separately. The PR head alone does not identify those bodies.
-Linked Issues, third-party documents and recursive URLs are never included
-implicitly.
+individually identified conversation comments, review submissions and/or inline
+review comments. Each selected mutable component needs its own identity,
+captured bytes, hash and observation metadata; the PR head identifies code,
+**not** mutable description, review or comment bodies.
+
+**Pagination completeness is not snapshot atomicity.** A changing GitHub PR
+can yield a mixed-time set even when every returned page was fetched. For
+the first PR-reference implementation, prefer explicit component identifiers.
+An "all comments/reviews" selector is admissible only after a bounded
+membership, pagination and concurrent-mutation consistency rule is qualified;
+otherwise its required collection is unsupported. The broker may describe
+distinct component observations with their separate observation times, but
+must **not** claim one coherent point-in-time PR snapshot without evidence.
+Any mission requiring an atomic composite snapshot fails closed if that
+guarantee cannot be established. Linked Issues, third-party documents and
+recursive URLs are never included implicitly.
 
 The first **implementation candidate** supports UTF-8 inline text and
 same-authorized-repository Git files, GitHub Issue bodies, and individual Issue
@@ -149,12 +182,15 @@ citation contract merely by being named.
 
 ### R4 — Captured snapshots are technical observations, not origin proofs
 
-The broker records a distinct outcome for **every** declared reference:
-`captured` or `omitted`, with a bounded reason for omission. A captured source
-records the requester reference ID, its source designation and role, acquired
-bytes and SHA-256, byte length, stable `Sxxx` source identifier(s) where
-applicable, snapshot path, observation metadata, and technical source
-provenance actually verified.
+For a **successfully prepared packet**, the broker records a distinct
+outcome for **every** declared reference: `captured` or `omitted`, with a
+bounded reason for an authorized omission. An unauthorized, malformed or
+otherwise inadmissible declaration **rejects the request before a successful
+packet exists**; rejection belongs to the admission/error boundary, not to a
+third source outcome or to `omitted`. A captured source records the requester
+reference ID, its source designation and role, acquired bytes and SHA-256,
+byte length, stable `Sxxx` source identifier(s) where applicable, snapshot
+path, observation metadata, and technical source provenance actually verified.
 
 For Git, record repository identity, commit, path, Git blob OID, SHA-256 and
 original bytes. For GitHub Issues/comments, record the identified GitHub
@@ -176,23 +212,29 @@ carries the whole referenced set and its immutable identity.
 
 ### R5 — Required, optional and unauthorized are distinct
 
-- A **required** source that is missing, unverifiable, unsupported, oversized,
-  unauthorized, incompletely captured, or inconsistent with an expected digest
-  prevents model-capable armament. No "complete review" may be reported.
+- A **required** authorized source that is missing, unavailable, unsupported,
+  oversized or incompletely captured prevents model-capable armament. No
+  "complete review" may be reported.
 - An **optional** source may be `omitted` only when the broker can reliably
   establish an allowed absence/unavailability under an authorized acquisition
   path. It is not transmitted, not cited and not counted as examined. The
-  omission and reason remain bound to the immutable packet.
+  omission and reason remain bound to the immutable prepared packet.
 - Authorization failure, ambiguous permission/nonexistence, unsafe destinations,
-  or a disallowed source class are **admission failures even when optional**;
-  `required=false` is not a way to bypass the read boundary.
+  a disallowed source class, or a mismatch against an explicitly expected
+  digest **rejects admission/preparation even when optional**. Such failures
+  do not produce a `captured` or `omitted` entry in a successful packet.
+  `required=false` is not a bypass for permissions or exact-version expectations.
 - References mentioned only in natural-language mission instructions do not
-  become silently declared, and the broker does not claim to detect all
-  implicit substantive evidence requirements.
+  become silently declared. The broker does not claim to detect all implicit
+  substantive evidence requirements; the packet must disclose its actual
+  source boundary rather than imply mission-level completeness.
 
 No requester instruction can disable technical admission or citation
-validation. The reviewer may independently report insufficient substantive
-evidence without the broker making a domain-level sufficiency judgment.
+validation. Generic reviewer instructions require that **identified** missing
+material and substantive uncertainty be reported. The reviewer, not the broker,
+judges substantive adequacy; the consumer retains downstream admission.
+Neither a structurally valid response nor an empty `references` array
+establishes that the mission's implicit evidence needs were satisfied.
 
 ### R6 — Packet integration without relaxing PR change scope
 
@@ -233,19 +275,28 @@ Proposed successor identity rules:
 
 1. `request_id` hashes the **complete canonical successor request**, including
    exact reference declarations, any version pins, inline bytes, immutable
-   upload receipts, operation and explicit re-review authorization nonce.
-   Identical canonical bytes yield the same claim: delivery duplication or
-   source drift cannot authorize a second model invocation.
-2. A **version-distinguished Review Intent** hashes the logical PR subject,
-   requester mission, requested reviewer settings, and each reference's
-   `id`, `required`, kind and **logical selector**. It excludes source-version
-   expectations, observed snapshots, Git file commit when the repository/path
-   remain the logical selector, mutable body hashes, inline content, and upload
-   receipt bytes. Inline/upload use their reference ID as their logical slot;
-   matching slots are not proof of semantically equivalent content.
-3. A different reference logical target, component selection, required flag,
-   mission or reviewer setting produces a different Review Intent. Merely
-   observing a new version of the same logical remote target does not.
+   upload receipts identifying received bytes, operation and explicit
+   re-review authorization nonce. Identical canonical bytes yield the same
+   claim: delivery duplication or remote-source drift cannot authorize a
+   second model invocation. Different inline/upload bytes have **different
+   exact requests**, even if they occupy the same logical reference slot.
+2. A **version-distinguished Review Intent** represents a continuing logical
+   examination purpose; it hashes the logical PR subject, requester mission,
+   requested reviewer settings, and each reference's `id`, `required`, kind
+   and **logical selector**. It deliberately excludes source-version pins,
+   observed snapshots, Git file commit when repository/path remain the logical
+   target, mutable body hashes, inline content and upload receipt bytes.
+   For inline/upload the requester-chosen ID is the **logical slot**, not a
+   proof of semantic equivalence between different supplied contents.
+3. Reusing an inline/upload ID asserts **continuity of the question under
+   changing input**, not sameness of evidence. Changed exact content requires
+   a **new, explicitly authorized request**: use the successor's same-head
+   repeat operation when the PR head is unchanged, not a second `initial`
+   request under the same intent. A different reference logical target, ID,
+   component selection, required flag, mission or reviewer setting creates a
+   different Review Intent; merely observing a newer version of the same
+   logical remote reference does not. Intent equality is never used as proof
+   of identical material; packet identity carries the actual captured bytes.
 4. Version 3 identity bases must include an explicit identity-version
    discriminator. They must not collide semantically with or reinterpret v1/v2
    `review-intent`, `policy_id`, `program_id` or predecessor evidence.
@@ -267,42 +318,58 @@ explicit versioned validation:
 | Event | Required treatment |
 | --- | --- |
 | Same request delivered twice | Same request ID, claim and at-most-once attempt |
-| Same logical references, changed PR head | New authorized `changed_head` request |
-| Same PR head, changed reference snapshot | New authorized `repeat_same_head` request with distinct nonce |
-| Different logical reference selector or requiredness | New Review Intent; explicit new initial request |
-| Crash before a reference snapshot is durably committed | Safe pre-model recovery may reacquire; no inference or earlier snapshot claim |
+| Same logical references, changed PR head | New explicitly authorized `changed_head` request |
+| Same PR head, changed reference bytes (remote or supplied inline/upload) | New explicitly authorized `repeat_same_head` request with distinct nonce; no automatic refresh |
+| Different logical reference selector or requiredness | New Review Intent; explicitly authorized `initial` under that new intent |
+| Crash before a reference snapshot is durably committed | Safe pre-model recovery **may see different unpinned bytes** under the same unarmed request/claim; no earlier snapshot stability is asserted |
 | Crash after a packet/snapshot identity is durably prepared | Resume must verify/reuse the **same exact bytes**; changed re-fetch cannot replace it |
 | Interrupted/indeterminate model-capable attempt | Never silently retry or rearm the same request |
 
 A source snapshot is committed when packet evidence is **durably linked to the
-journal's prepared state**, not merely when a transient local file was fetched.
-If a prepared packet cannot be reproduced byte-identically and authorized
-artifacts cannot be recovered, fail closed; do not "refresh" under the old
-claim. At-most-once Codex invocation remains a separate requirement; no
-provider-level exactly-once inference is claimed.
+journal's prepared state**, not merely when transient files were fetched. Before
+that point, an unpinned mutable source can change, including across pre-model
+recovery, without changing the canonical request or claim. That is **not** an
+immutable-snapshot guarantee; only the eventually committed packet identifies
+the bytes that the reviewer is authorized to receive. A caller requiring an
+exact prior version must supply a content expectation or an immutable selector.
+If a prepared packet cannot be recovered or reproduced byte-identically, fail
+closed; do not "refresh" under the old claim.
+
+`PREPARED` is the snapshot-binding boundary, **not** the model invocation
+uniqueness mechanism. The existing `docs/contracts/review-execution.md`
+requires durable `ARMED` and `invocation_count = 1` **before** Codex
+transport, with no automatic model retry after arming; the successor must
+preserve that independent execution rule and the existing recovery contract.
+No provider-level exactly-once inference is claimed.
 
 This does **not** require acquisition before the journal claim for all sources:
 the current `REQUESTED → ADMITTED → PREPARED` lifecycle can be preserved if
 required-completeness is guaranteed before any model-capable armament and
-recovery identity evidence is trustworthy.
+recovery identity evidence is trustworthy. No new state machine is proposed.
 
 ### R9 — Distinct reference freshness, no historical result mutation
 
-A `CURRENT` subject HEAD does not establish current references. Preserve
-subject applicability and a **separately scoped, dated observation** of
-reference freshness. For an observable mutable reference, possible check
-outcomes are `CURRENT`, `SUPERSEDED`, `UNDETERMINED` or `NOT_CHECKED`. Immutable
-or directly supplied snapshots need no later external-currentness assertion.
+A `CURRENT` subject HEAD does **not** establish that independently mutable
+references are current. The **initial successor scope** binds the exact
+reference snapshots examined and identifies which sources are mutable; it
+does **not** require a post-review reference freshness check or assert
+`reference_currentness=CURRENT`. If no later check is performed, reference
+freshness remains **not checked**, without adding an unapproved status field
+to the current ReviewResult v1 contract. Directly supplied or immutable
+snapshots need no external-currentness claim.
 
-Results always identify **the exact reference snapshots examined**. Their
-validity as historical evidence does not change when an upstream resource
-changes. A subsequent freshness check is a distinct authenticated observation
-and must never overwrite historical ReviewResult bytes or mint a new inference.
-The future result representation or linked observation needs its own accepted
-versioned contract: ReviewResult v1 cannot acquire new fields silently.
+The reviewed snapshots remain historical evidence even if a source later
+changes. An **optional, separately designed future** freshness observation
+must be authenticated and bound to the exact historical request/packet
+identity, component selector and captured digest, with an observation
+timestamp, acquisition authority and explicit current/stale/unknown
+semantics before any such claim can be qualified. No enum or wire
+representation for this future observation is approved here. Any later check
+must not alter an immutable ReviewResult or trigger another inference.
 
-If no freshness recheck occurred, do not claim that the reference is current.
-No automatic network refresh is required on every `reviewctl result` read.
+A result reader must not infer reference freshness from subject applicability
+or silently refresh references. No external fetch is universally required on
+`reviewctl result` retrieval.
 
 ### R10 — Least authority and bounded transport
 
@@ -372,10 +439,21 @@ for PR-independent **subjects** stays separate under #43 PI-REQ-02.
    claims do not gain automatic equivalence.
 8. **Packet tampering:** changed bytes, source roles, omission flags,
    component inventory, extraction, rendered prompt or order fail verification.
-9. **Composite GitHub PR:** requested description/review/diff components are
-   complete or rejected, never conflated with PR head alone.
+9. **Composite GitHub PR:** exact named components are captured with distinct
+   observation identities; pagination alone never establishes atomicity.
+   A mutating "all comments" collection cannot pass as a coherent point-in-time
+   snapshot without qualified membership/consistency evidence.
 10. **Historical compatibility:** every original v1/v2 canonical request, ID,
     publication receipt and result remains byte-for-byte interpretable.
+11. **Unpinned late binding:** a pre-`PREPARED` crash may observe new remote
+    bytes, but a durably prepared packet cannot change, and `ARMED` remains
+    an independent one-invocation boundary.
+12. **Known missing evidence:** an empty declared reference set and authorized
+    optional omission are visibly reported as source-coverage limits, never
+    represented as proof of semantic mission completeness.
+13. **Freshness not checked:** a subject-current result with mutable references
+    makes no unsupported reference-currentness claim; no implicit network read
+    or historical-result mutation occurs.
 
 The acceptance target is **reference completeness, immutable provenance and
 truthful limits**, not any manufactured reviewer `GO`.
@@ -385,18 +463,20 @@ truthful limits**, not any manufactured reviewer `GO`.
 A reviewer independent of the author should attempt to falsify the following
 claims against the existing contracts/code and #44 D1–D9:
 
-- **F1 — Identity:** Logical selectors versus version pins versus supplied bytes
-  yield unambiguous successor request/intent/packet identities, especially for
-  inline/upload and mutable remote sources.
-- **F2 — Recovery:** The pre-/post-`PREPARED` boundary prevents a new reference
-  snapshot from replacing committed evidence or triggering a second invocation.
+- **F1 — Identity:** Logical intent continuity versus byte-exact request and
+  packet identity remains explicit even when inline/upload contents change
+  under one reference ID or remote references are unpinned.
+- **F2 — Recovery:** The pre-/post-`PREPARED` boundary binds immutable
+  snapshots, while the **separate existing `ARMED` mechanism** enforces
+  invocation uniqueness; neither substitutes for the other.
 - **F3 — Scope:** A packet containing references cannot falsely satisfy or
   weaken exact PR change-scope validation.
 - **F4 — Composition with #44:** Mission freedom and removal of mandatory
   semantic profiles do not erase effective technical policy provenance or
   retrofit historical `policy_id`/`program_id` semantics.
-- **F5 — Applicability:** Separate, dated reference-currentness claims neither
-  mutate a result nor overclaim applicability when no recheck occurs.
+- **F5 — Applicability:** The first successor makes no unverified reference
+  freshness claim; any later authenticated observation is separately
+  versioned/bound and never alters historical results.
 - **F6 — Acquisition authority:** Required/optional semantics cannot launder
   unauthorized reads or false external/origin claims.
 - **F7 — Minimality:** No separate reference service, RAG, general ingestion
@@ -407,6 +487,19 @@ with the smallest relevant source lines. The reviewer may return NO_GO or
 uncertainties. A favorable design review is **not** a product-owner decision
 to accept a normative contract, publish on `dev`, implement, grant permissions,
 start Codespaces or invoke Codex.
+
+**F008 evidence boundary:** Current ReviewRequest v2 packets contain only
+PR change material; the historical #53 review did not include the governing
+materials below and cannot independently validate external-authority claims.
+Before product-owner contract-design acceptance, separately confront this
+proposal with Issue #43 PI-REQ-03, Issues #44/#51, `docs/contracts/review-request-v2.md`,
+`docs/contracts/review-execution.md`, `docs/contracts/review-evidence.md`,
+`docs/contracts/review-result.md`, the closed v2 schema, `changes.py`,
+`packets.py`, `identity.py`, `predecessor.py` and authenticated historical
+#50/#53 evidence. Such corroboration must be labeled **separate from the
+bounded reviewer packet**; source names or assertions alone are not proof.
+No future source-access or implementation qualification is claimed by this
+design document.
 
 ## 5. Explicit non-goals and pending disposition
 
