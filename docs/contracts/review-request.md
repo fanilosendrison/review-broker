@@ -5,7 +5,7 @@ asset_type: "contract"
 domain: "independent-review"
 severity: "strict"
 name: "ReviewRequest v1 Contract"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # ReviewRequest v1 Contract
@@ -63,11 +63,15 @@ A derived `Request-ID` may appear outside the markers. No other Issue text has
 request semantics. Multiple envelopes, noncanonical JSON, unknown fields, and
 unauthorized authors or repositories fail admission.
 
-## Re-review decision boundary
+## Version compatibility and re-review boundary
 
-The accepted v1 fields do not distinguish duplicate delivery, a fresh request
-for a newly resolved PR head, and explicit re-execution of an earlier attempt.
-The implementation therefore preserves one deterministic logical claim and
-does not allocate a new attempt after a subject change. GitHub Issue #20 records
-the required contract decision; no identity or ordinal rule may be inferred
-before that decision is accepted.
+The v1 fields do not distinguish duplicate delivery, a fresh request for a newly
+resolved PR head, and explicit re-execution of an earlier attempt. V1 therefore
+continues to preserve one deterministic logical claim and does not allocate a
+new attempt after a subject change.
+
+The accepted v2 semantics are defined separately in
+`docs/contracts/review-request-v2.md`. They do not add fields to v1, reinterpret
+historical v1 bytes, activate v2 support, or authorize execution. Existing v1
+canonical bytes, identities, attempts, claims, artifacts, journals, publication
+receipts, and result retrieval remain valid.

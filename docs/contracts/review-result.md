@@ -5,7 +5,7 @@ asset_type: "contract"
 domain: "independent-review"
 severity: "strict"
 name: "ReviewResult v1 Contract"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # ReviewResult v1 Contract
@@ -50,6 +50,13 @@ such an attestation.
 The original verdict is immutable. Publication re-resolves the pull-request head
 and records `CURRENT`, `SUPERSEDED`, or `UNDETERMINED` separately. A historical
 `GO` cannot authorize a new SHA.
+
+A changed-head or same-head repeat request has its own result. A newer result
+does not mutate, validate, invalidate, or automatically override a predecessor
+result and does not authorize consumer action. In particular, a prior invalid
+result does not become valid because a subsequent review succeeds. These rules
+preserve the existing independent execution, evidence, verdict, and
+applicability dimensions for v1 and future v2 results.
 
 ## Publication evidence
 

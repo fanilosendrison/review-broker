@@ -5,7 +5,7 @@ asset_type: "specification"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker v1 Specification"
-version: "0.4.3"
+version: "0.5.0"
 ---
 
 # Review Broker v1 Specification
@@ -42,17 +42,35 @@ The consumer owns admission, publication, merge, architectural adoption, and
 scientific acceptance. A reviewer `GO` is evidence for the consumer's policy,
 not authorization for any downstream action.
 
-## Supported v1 boundary
+## Versioned request boundary
+
+ReviewRequest v1 remains the only implemented request contract. Its logical
+request stays stable while resolution records the exact head, base, merge base,
+source manifest, policy, and mission identities. Its canonical bytes,
+identities, claims, attempts, artifacts, journals, publication receipts, and
+result retrieval remain unchanged.
+
+The accepted ReviewRequest v2 contract separates a stable Review Intent from an
+exact-head request and its single ordinal-1 execution attempt. Review Intent
+binds the logical GitHub pull request, requester mission, selected policy, and
+requested reviewer policy under the `review-intent:sha256:` identity domain. A
+v2 request additionally binds the expected head and one explicit operation:
+`initial`, `changed_head`, or `repeat_same_head`. Identical canonical request
+bytes remain one deterministic claim. Changed-head and same-head repeat reviews
+require distinct authorized requests; neither is automatic. See
+`docs/contracts/review-request-v2.md`.
+
+This publication selects normative semantics only. No v2 parser, executable
+schema, admission path, claim, execution, recovery, or publication path is
+active until separately implemented and qualified. Historical v1 requests are
+never reinterpreted as v2.
 
 The implemented subject kind is an explicitly authorized GitHub pull request.
-The logical request remains stable while resolution records the exact head,
-base, merge base, source manifest, policy, and mission identities. Other
-subject kinds are extensibility points only and are not claimed as supported.
-
-The initial reviewer backend is Codex CLI through an existing ChatGPT
-subscription. The qualified target is model `gpt-5.6-sol`, reasoning effort
-`xhigh`, read-only sandbox, schema-constrained final output, and JSONL event
-capture. API-key fallback and model substitution are forbidden.
+Other subject kinds are extensibility points only and are not claimed as
+supported. The initial reviewer backend is Codex CLI through an existing
+ChatGPT subscription. The qualified target is model `gpt-5.6-sol`, reasoning
+effort `xhigh`, read-only sandbox, schema-constrained final output, and JSONL
+event capture. API-key fallback and model substitution are forbidden.
 
 ## Risk-proportionate security and staged v1 admission (2026-10-28)
 
