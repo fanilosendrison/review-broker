@@ -6,7 +6,9 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import stat
 import subprocess
+import sys
 import tempfile
 from typing import Any, Callable, Mapping
 
@@ -44,6 +46,7 @@ def run_reviewer_isolation_probe(
     runner: Runner = subprocess.run,
     environment: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
+    python_executable = _probe_python_executable()
     profile = verify_reviewer_profile(reviewer_home, trusted_workspace, packet_directory)
     name = profile_name(packet_directory)
     codex_home = profile.parent
@@ -92,7 +95,7 @@ def run_reviewer_isolation_probe(
                     "-p", name,
                     "-P", name,
                     "-C", str(probe_root),
-                    "python3", str(script),
+                    str(python_executable), str(script),
                 ],
                 cwd=str(probe_root),
                 env=child_environment,
@@ -130,6 +133,20 @@ def run_reviewer_isolation_probe(
     if mismatches:
         raise SecurityProbeError("SECURITY_BOUNDARY_NOT_QUALIFIED:" + ",".join(mismatches))
     return receipt
+
+
+def _probe_python_executable() -> Path:
+    candidate = Path(sys.executable)
+    try:
+        resolved = candidate.resolve(strict=True)
+        metadata = resolved.stat()
+    except OSError as exc:
+        raise SecurityProbeError("PROBE_PYTHON_EXECUTABLE_INVALID") from exc
+    if not candidate.is_absolute() or not stat.S_ISREG(metadata.st_mode):
+        raise SecurityProbeError("PROBE_PYTHON_EXECUTABLE_INVALID")
+    if not os.access(resolved, os.X_OK):
+        raise SecurityProbeError("PROBE_PYTHON_EXECUTABLE_INVALID")
+    return resolved
 
 
 def validate_probe_receipt(receipt: dict[str, Any], profile_sha256: str, profile_identity: str) -> list[str]:
