@@ -22,7 +22,17 @@ def require_private_source_environment(
         for key, value in os.environ.items()
         if key in {"HOME", "PATH", "XDG_CONFIG_HOME", "SSL_CERT_FILE", "SSL_CERT_DIR"}
     }
-    environment["GH_TOKEN"] = source_token
+    environment.update({
+        "GH_TOKEN": source_token,
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_CONFIG_COUNT": "2",
+        "GIT_CONFIG_KEY_0": "credential.helper",
+        "GIT_CONFIG_VALUE_0": "",
+        "GIT_CONFIG_KEY_1": "credential.https://github.com.helper",
+        "GIT_CONFIG_VALUE_1": "!gh auth git-credential",
+    })
     return environment
 
 

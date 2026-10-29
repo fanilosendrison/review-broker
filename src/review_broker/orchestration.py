@@ -123,9 +123,12 @@ def prepare_issue(
         raise OrchestrationError("PULL_REQUEST_HAS_NO_FILES")
     with tempfile.TemporaryDirectory(prefix="review-broker-source-") as temporary:
         source_repository = Path(temporary) / "source.git"
+        clone_repository = request["subject"]["repository"]
+        if source_environment is not None:
+            clone_repository = f"https://github.com/{clone_repository}.git"
         clone = subprocess.run(
             [
-                "gh", "repo", "clone", request["subject"]["repository"],
+                "gh", "repo", "clone", clone_repository,
                 str(source_repository), "--", "--filter=blob:none", "--no-checkout",
             ],
             text=True,
