@@ -238,11 +238,14 @@ def publish_validated_result(
     private_repositories = _csv_set(
         os.environ.get("REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES", "")
     )
-    source_environment = _source_environment_for_repository(
-        subject["repository"],
-        private_repositories,
-        source_token,
-    )
+    if metadata.get("admission_mode") == BOUNDED_PRIVATE_V1_ADMISSION:
+        source_environment = require_private_source_environment(
+            subject["repository"], private_repositories, source_token
+        )
+    else:
+        source_environment = _source_environment_for_repository(
+            subject["repository"], private_repositories, source_token
+        )
     pr = _gh_json(
         f"repos/{subject['repository']}/pulls/{subject['pull_request']}",
         environment=source_environment,

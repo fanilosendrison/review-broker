@@ -13,9 +13,9 @@ from review_broker.admission import (
     AdmissionError,
     select_operational_admission,
 )
-from review_broker.orchestration import prepare_issue
+from review_broker.orchestration import prepare_issue, publish_validated_result
 from review_broker.packets import GitSourceReader
-from review_broker.identity import attempt_identity
+from review_broker.identity import attempt_identity, canonical_bytes
 from review_broker.queue import AttemptRecord, AttemptState, transition_record
 from review_broker.request import build_issue_body
 from review_broker.source_authorization import (
@@ -259,6 +259,43 @@ class BoundedPrivateAdmissionTests(unittest.TestCase):
         self.assertNotIn(source_token, " ".join(
             argument for command, _ in commands for argument in command
         ))
+
+    def test_private_publication_revalidation_rejects_ambient_fallback(self):
+        values = {
+            "resolved-request.json": {
+                "request_id": "request:sha256:" + "1" * 64,
+                "subject": {"repository": REPOSITORY, "pull_request": 45},
+            },
+            "broker-metadata.json": {
+                "admission_mode": BOUNDED_PRIVATE_V1_ADMISSION,
+                "issue_number": 46,
+            },
+            "input-manifest.json": {},
+            "attempt.json": {},
+            "validation.json": {},
+        }
+        cases = (
+            ({}, "synthetic-source-token", "PRIVATE_SOURCE_REPOSITORY_NOT_AUTHORIZED"),
+            ({"REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES": REPOSITORY}, None,
+             "PRIVATE_SOURCE_CREDENTIAL_REQUIRED"),
+        )
+        for additions, source_token, error in cases:
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                for name, value in values.items():
+                    (root / name).write_bytes(canonical_bytes(value) + b"\n")
+                with mock.patch.dict(
+                    "os.environ",
+                    {"GH_TOKEN": "ambient-publication-token", **additions},
+                    clear=True,
+                ), mock.patch(
+                    "review_broker.orchestration._gh_json",
+                    side_effect=AssertionError("private source access forbidden"),
+                ) as getter, self.assertRaisesRegex(SourceAuthorizationError, error):
+                    publish_validated_result(
+                        "sample/broker", root, source_token=source_token
+                    )
+                getter.assert_not_called()
 
     def test_private_mode_is_disabled_by_default(self):
         environment = dict(self.environment)
