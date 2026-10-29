@@ -21,6 +21,24 @@ def request_identity(request: dict[str, Any]) -> str:
     return _identity("request", request)
 
 
+def review_intent_basis(request: dict[str, Any]) -> dict[str, Any]:
+    subject = request["subject"]
+    return {
+        "subject": {
+            "kind": subject["kind"],
+            "repository": subject["repository"],
+            "pull_request": subject["pull_request"],
+        },
+        "mission": request["mission"],
+        "policy": request["policy"],
+        "reviewer": request["reviewer"],
+    }
+
+
+def review_intent_identity(request: dict[str, Any]) -> str:
+    return _identity("review-intent", review_intent_basis(request))
+
+
 def mission_identity(mission: dict[str, Any]) -> str:
     return _identity("mission", mission)
 

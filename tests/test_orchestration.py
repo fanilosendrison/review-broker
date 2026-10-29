@@ -31,7 +31,7 @@ class SharedJournal:
         self.records = {}
         self.claim_count = 0
 
-    def claim(self, request_id):
+    def claim(self, request_id, admission=None):
         with self._lock:
             record = self.records.get(request_id)
             if record is None:
@@ -39,6 +39,7 @@ class SharedJournal:
                     request_id=request_id,
                     attempt_id="attempt:sha256:" + "a" * 64,
                     state=AttemptState.REQUESTED,
+                    admission=admission,
                 )
                 self.records[request_id] = record
                 self.claim_count += 1

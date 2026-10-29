@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fanilosendrison/review-broker/schemas/review-request-v2.schema.json",
+  "title": "ReviewRequest v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "subject", "mission", "policy", "reviewer", "review_operation"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "repository", "pull_request", "expected_head_commit"],
+      "properties": {
+        "kind": {"const": "github_pr"},
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+        "pull_request": {"type": "integer", "minimum": 1},
+        "expected_head_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      }
+    },
+    "mission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "objective", "instructions", "criteria"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+        "objective": {"type": "string", "minLength": 1, "maxLength": 2000},
+        "instructions": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {"type": "string", "minLength": 1, "maxLength": 2000}
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "version"],
+      "properties": {
+        "profile": {"enum": ["publication", "architecture", "code", "scientific", "custom"]},
+        "version": {"const": 1}
+      }
+    },
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend", "model", "reasoning_effort"],
+      "properties": {
+        "backend": {"const": "codex-cli"},
+        "model": {"const": "gpt-5.6-sol"},
+        "reasoning_effort": {"const": "xhigh"}
+      }
+    },
+    "review_operation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "initial"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "previous_request_id"],
+          "properties": {
+            "kind": {"const": "changed_head"},
+            "previous_request_id": {"type": "string", "pattern": "^request:sha256:[0-9a-f]{64}$"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "previous_request_id", "authorization_nonce"],
+          "properties": {
+            "kind": {"const": "repeat_same_head"},
+            "previous_request_id": {"type": "string", "pattern": "^request:sha256:[0-9a-f]{64}$"},
+            "authorization_nonce": {"type": "string", "pattern": "^[0-9a-f]{32}$"}
+          }
+        }
+      ]
+    }
+  }
+}

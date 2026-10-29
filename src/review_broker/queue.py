@@ -65,10 +65,11 @@ class AttemptRecord:
     evidence_locator: dict[str, Any] | None = None
     publication_intent: dict[str, Any] | None = None
     publication_receipt: dict[str, Any] | None = None
+    admission: dict[str, Any] | None = None
     history: tuple[dict[str, Any], ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        value = {
             "schema_version": 1,
             "request_id": self.request_id,
             "attempt_id": self.attempt_id,
@@ -81,6 +82,9 @@ class AttemptRecord:
             "publication_receipt": self.publication_receipt,
             "history": list(self.history),
         }
+        if self.admission is not None:
+            value["admission"] = self.admission
+        return value
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "AttemptRecord":
@@ -94,6 +98,7 @@ class AttemptRecord:
             evidence_locator=value.get("evidence_locator"),
             publication_intent=value.get("publication_intent"),
             publication_receipt=value.get("publication_receipt"),
+            admission=value.get("admission"),
             history=tuple(value.get("history", [])),
         )
 
@@ -112,15 +117,20 @@ class InMemoryJournal:
         with self._lock:
             return len(self._by_attempt)
 
-    def claim(self, request_id: str) -> AttemptRecord:
+    def claim(
+        self, request_id: str, admission: dict[str, Any] | None = None,
+    ) -> AttemptRecord:
         with self._lock:
             existing = self._by_request.get(request_id)
             if existing is not None:
+                if admission is not None and existing.admission != admission:
+                    raise StateTransitionError("CLAIM_ADMISSION_CONFLICT")
                 return existing
             record = AttemptRecord(
                 request_id=request_id,
                 attempt_id=attempt_identity(request_id, 1),
                 state=AttemptState.REQUESTED,
+                admission=admission,
                 history=({"state": AttemptState.REQUESTED.value, "evidence_ids": []},),
             )
             self._save(record)

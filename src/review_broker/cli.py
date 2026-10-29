@@ -31,13 +31,20 @@ from .pilot03_authorization import load_execution_authorization
 from .pilot03_controller import run_pilot03_controller
 from .pilot03_synthetic import run_synthetic_pilot_03
 from .pilot03_transport import Pilot03CodespaceTransport
+from .pilot_cli import (
+    PILOT_COMMANDS,
+    add_pilot_controller,
+    run_prepared_controller,
+    run_remote_pilot,
+)
 from .pilot04_controller import run_pilot04_controller
 from .pilot04_synthetic import run_synthetic_pilot_04
 from .pilot05_controller import run_pilot05_controller
 from .pilot05_synthetic import run_synthetic_pilot_05
 from .pilot_runtime_config import RB03_RUNTIME, RB04_RUNTIME, RB05_RUNTIME
 from .queue import AttemptState
-from .requester import CliError, request as _request, result as _result, status as _status
+from .requester import (CliError, request as _request, request_v2 as _request_v2,
+                        result as _result, status as _status)
 from .reviewer_profile import install_reviewer_profile, reviewer_home_from_environment
 from .security_probe import run_installed_reviewer_isolation_probe
 from .validation import validate_evidence
@@ -45,30 +52,6 @@ from .validation import validate_evidence
 DEFAULT_BROKER_REPOSITORY = "fanilosendrison/review-broker"
 
 
-def _add_pilot_controller(subcommands, name: str):
-    controller = subcommands.add_parser(name)
-    controller.add_argument("--execution-authorization", type=Path)
-    controller.add_argument("--source-sha", required=True)
-    controller.add_argument("--broker-wheel", required=True, type=Path)
-    controller.add_argument("--codespace", required=True)
-    controller.add_argument("--ssh-config", required=True, type=Path)
-    controller.add_argument("--ssh-host-alias", required=True)
-def _run_prepared_controller(args, runtime, controller):
-    authorization = load_execution_authorization(args.execution_authorization)
-    transport = Pilot03CodespaceTransport(
-        args.codespace, args.ssh_host_alias, args.ssh_config, runtime=runtime,
-    )
-    result = controller(
-        authorization=authorization, source_sha=args.source_sha,
-        wheel_path=args.broker_wheel, codespace_identity=args.codespace,
-        transport=transport,
-    )
-    print(canonical_bytes(result).decode("utf-8"))
-    return 0 if result.get("pilot_acceptance") == "PASS" else 1
-def _run_remote_pilot(args, runner):
-    result = runner(broker_wheel_sha256=args.broker_wheel_sha256)
-    print(canonical_bytes(result).decode("utf-8"))
-    return 0 if result.get("pilot_functional") == "PASS" else 1
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="reviewctl")
     parser.add_argument(
@@ -86,18 +69,20 @@ def _parser() -> argparse.ArgumentParser:
     pilot_02.add_argument("--acknowledge-unqualified-pilot", action="store_true")
     pilot_03 = subcommands.add_parser("pilot-synthetic-03")
     pilot_03.add_argument("--broker-wheel-sha256", required=True)
-    _add_pilot_controller(subcommands, "pilot-synthetic-03-controller")
+    add_pilot_controller(subcommands, "pilot-synthetic-03-controller")
     pilot_04 = subcommands.add_parser("pilot-synthetic-04")
     pilot_04.add_argument("--broker-wheel-sha256", required=True)
-    _add_pilot_controller(subcommands, "pilot-synthetic-04-controller")
+    add_pilot_controller(subcommands, "pilot-synthetic-04-controller")
     pilot_05 = subcommands.add_parser("pilot-synthetic-05")
     pilot_05.add_argument("--broker-wheel-sha256", required=True)
-    _add_pilot_controller(subcommands, "pilot-synthetic-05-controller")
+    add_pilot_controller(subcommands, "pilot-synthetic-05-controller")
     request = subcommands.add_parser("request")
     request.add_argument("--repo", required=True)
     request.add_argument("--pr", required=True, type=int)
     request.add_argument("--profile", required=True)
     request.add_argument("--mission-file", required=True, type=Path)
+    request_v2 = subcommands.add_parser("request-v2")
+    request_v2.add_argument("--request-file", required=True, type=Path)
     status = subcommands.add_parser("status")
     status.add_argument("--request", required=True)
     result = subcommands.add_parser("result")
@@ -187,12 +172,8 @@ def main(argv: list[str] | None = None) -> int:
     # Do not even transiently consume or suppress a privileged variable in a
     # pilot process: pilot_environment() must reject it before model transport.
     source_token = (
-        None if args.command in (
-            "pilot-synthetic", "pilot-synthetic-02", "pilot-synthetic-03",
-            "pilot-synthetic-03-controller", "pilot-synthetic-04",
-            "pilot-synthetic-04-controller", "pilot-synthetic-05",
-            "pilot-synthetic-05-controller",
-        ) else os.environ.pop("REVIEW_BROKER_SOURCE_TOKEN", None)
+        None if args.command in PILOT_COMMANDS
+        else os.environ.pop("REVIEW_BROKER_SOURCE_TOKEN", None)
     )
     try:
         if args.command == "pilot-synthetic":
@@ -211,19 +192,30 @@ def main(argv: list[str] | None = None) -> int:
             print(canonical_bytes(result).decode("utf-8"))
             return 0 if result.get("pilot_functional") == "PASS" else 1
         if args.command == "pilot-synthetic-03":
-            return _run_remote_pilot(args, run_synthetic_pilot_03)
+            return run_remote_pilot(args, run_synthetic_pilot_03)
         if args.command == "pilot-synthetic-03-controller":
-            return _run_prepared_controller(args, RB03_RUNTIME, run_pilot03_controller)
+            return run_prepared_controller(
+                args, RB03_RUNTIME, run_pilot03_controller,
+                load_execution_authorization, Pilot03CodespaceTransport,
+            )
         if args.command == "pilot-synthetic-04":
-            return _run_remote_pilot(args, run_synthetic_pilot_04)
+            return run_remote_pilot(args, run_synthetic_pilot_04)
         if args.command == "pilot-synthetic-04-controller":
-            return _run_prepared_controller(args, RB04_RUNTIME, run_pilot04_controller)
+            return run_prepared_controller(
+                args, RB04_RUNTIME, run_pilot04_controller,
+                load_execution_authorization, Pilot03CodespaceTransport,
+            )
         if args.command == "pilot-synthetic-05":
-            return _run_remote_pilot(args, run_synthetic_pilot_05)
+            return run_remote_pilot(args, run_synthetic_pilot_05)
         if args.command == "pilot-synthetic-05-controller":
-            return _run_prepared_controller(args, RB05_RUNTIME, run_pilot05_controller)
+            return run_prepared_controller(
+                args, RB05_RUNTIME, run_pilot05_controller,
+                load_execution_authorization, Pilot03CodespaceTransport,
+            )
         if args.command == "request":
             return _request(args)
+        if args.command == "request-v2":
+            return _request_v2(args)
         if args.command == "status":
             return _status(args)
         if args.command == "result":

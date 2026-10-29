@@ -8,8 +8,14 @@ import subprocess
 from typing import Any
 
 from .github_journal import GitHubRefJournal
-from .identity import canonical_bytes, request_identity
-from .request import RequestContractError, build_issue_body, create_request, parse_issue_body
+from .identity import canonical_bytes, request_identity, review_intent_identity
+from .request import (
+    RequestContractError,
+    build_issue_body,
+    create_request,
+    parse_issue_body,
+    validate_request,
+)
 from .verifiedresult import read_verified_result
 
 
@@ -27,6 +33,27 @@ def request(args: argparse.Namespace) -> int:
         "--title", title, "--body", body,
     ])
     print(f"REQUEST_ID={request_identity(value)}")
+    print(f"ISSUE_URL={outcome.stdout.strip()}")
+    return 0
+
+
+def request_v2(args: argparse.Namespace) -> int:
+    value = _read_json_object(args.request_file, maximum_bytes=100_000)
+    validate_request(value)
+    if value.get("schema_version") != 2:
+        raise CliError("REQUEST_V2_FILE_VERSION_INVALID")
+    body = build_issue_body(value)
+    subject = value["subject"]
+    title = (
+        f"Review request v2 — {subject['repository']}#{subject['pull_request']} — "
+        f"{value['mission']['id']}"
+    )
+    outcome = _run([
+        "gh", "issue", "create", "--repo", args.broker_repo,
+        "--title", title, "--body", body,
+    ])
+    print(f"REQUEST_ID={request_identity(value)}")
+    print(f"REVIEW_INTENT_ID={review_intent_identity(value)}")
     print(f"ISSUE_URL={outcome.stdout.strip()}")
     return 0
 
