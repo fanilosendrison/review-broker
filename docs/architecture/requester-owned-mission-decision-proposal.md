@@ -84,7 +84,9 @@ Review Broker continues to own:
 - Reviewer independence.
 - Runtime permissions.
 - Credential isolation.
-- At-most-once attempt semantics.
+- One durable execution attempt per distinct ReviewRequest v2, permitting at most
+  one Codex CLI invocation after durable armament, without automatic model retry
+  or any claim of provider-level exactly-once inference.
 - Technical evidence validation.
 - Publication and recovery.
 - Explicit uncertainty and incomplete outcomes.
@@ -105,11 +107,12 @@ These instructions are protocol safeguards, not semantic review profiles.
 
 The successor design must distinguish:
 
-1. Substantive evidence requested by the agent.
-2. Evidence supplied or produced during the review.
-3. Technical properties independently verified by Review Broker.
-4. Reviewer conclusions.
-5. Remaining uncertainty.
+1. Substantive evidence required by the requester.
+2. Evidence supplied by the requester or source producers, distinguished from
+   evidence independently produced or observed during examination.
+3. Technical evidence properties independently verified by Review Broker.
+4. Reviewer findings and conclusions.
+5. Remaining uncertainty and missing evidence.
 6. Downstream evidence admission by the consumer.
 
 A technically valid citation does not prove that the cited claim is correct. A
@@ -212,9 +215,12 @@ regardless of missing evidence. The substantive topic may still be expressible
 as a mission, but those instructions cannot disable broker-owned validation or
 force a verdict.
 
-Review Broker continues to validate supported citation anchors, preserve missing
-evidence and uncertainty, and reject an unsupported outcome. Mission admission
-and evidence sufficiency remain separate determinations.
+Review Broker validates supported technical properties of the result, including
+output-schema conformance and citation anchoring, and rejects technically invalid
+evidence. The reviewer remains responsible for reporting unsupported substantive
+conclusions and missing evidence. The consumer decides whether the review
+provides sufficient grounds for downstream action. Requester instructions cannot
+disable technical validation or compel a favorable verdict.
 
 ## Compatibility summary
 
