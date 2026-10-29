@@ -4,7 +4,11 @@ from __future__ import annotations
 import os
 from typing import Any, Mapping
 
-from .admission import BOUNDED_V1_ADMISSION, AdmissionError, AuthorizationPolicy, authorize, resolve_request, select_operational_admission
+from .admission import (
+    BOUNDED_PRIVATE_V1_ADMISSION, COMPREHENSIVE_ADMISSION,
+    AdmissionError,
+    AuthorizationPolicy, authorize, resolve_request, select_operational_admission,
+)
 from .artifact_resume import ArtifactResumeError, resume_from_durable_artifact
 from .codespace import CodespaceController, CodespaceError
 from .evidence import build_shutdown_observation
@@ -91,19 +95,31 @@ def reconcile_repository(
             request = parse_issue_body(issue.get("body") or "")
             authorize(issue["user"]["login"], request, authorization)
             repository = request["subject"]["repository"]
-            admission_getter = getter if get_json is not None else github_json
-            admission_mode = select_operational_admission(request, environment, admission_getter)
-            private_source = repository in private_repositories and admission_mode != BOUNDED_V1_ADMISSION
-            if private_source and not source_token:
+            private_mode_requested = (
+                environment.get("REVIEW_BROKER_BOUNDED_PRIVATE_V1_ENABLED") == "true"
+            )
+            if private_mode_requested and not source_token:
                 raise PrivateSourceCredentialRequired
             if get_json is not None:
                 source_getter = getter
             else:
-                selected_token = source_token if private_source else None
+                selected_token = source_token if private_mode_requested else None
 
                 def source_getter(endpoint: str) -> Any:
                     return github_json(endpoint, token=selected_token)
 
+            admission_mode = select_operational_admission(
+                request, environment, source_getter,
+                requester=issue["user"]["login"],
+            )
+            private_source = repository in private_repositories and admission_mode in {
+                BOUNDED_PRIVATE_V1_ADMISSION, COMPREHENSIVE_ADMISSION,
+            }
+            if private_source and not source_token:
+                raise PrivateSourceCredentialRequired
+            if get_json is None and private_source:
+                def source_getter(endpoint: str) -> Any:
+                    return github_json(endpoint, token=source_token)
             resolved = resolve_request(request, source_getter)
             if request.get("schema_version") == 2:
                 verify_v2_operation(
