@@ -14,6 +14,7 @@ from review_broker.admission import (
     select_operational_admission,
 )
 from review_broker.orchestration import prepare_issue
+from review_broker.packets import GitSourceReader
 from review_broker.identity import attempt_identity
 from review_broker.queue import AttemptRecord, AttemptState, transition_record
 from review_broker.request import build_issue_body
@@ -143,6 +144,22 @@ class BoundedPrivateAdmissionTests(unittest.TestCase):
         self.assertNotIn("synthetic-source-token", " ".join(
             value for key, value in environment.items() if key != "GH_TOKEN"
         ))
+
+    def test_lazy_git_object_read_uses_canonical_private_source_environment(self):
+        with mock.patch.dict("os.environ", {"PATH": "/usr/bin"}, clear=True):
+            environment = require_private_source_environment(
+                REPOSITORY, frozenset({REPOSITORY}), "synthetic-source-token"
+            )
+        completed = mock.Mock(returncode=0, stdout=b"object", stderr=b"")
+        with mock.patch(
+            "review_broker.packets.subprocess.run", return_value=completed
+        ) as runner:
+            result = GitSourceReader(Path("source.git"), environment=environment)._git(
+                "cat-file", "blob", "a" * 40
+            )
+        self.assertEqual(result, b"object")
+        self.assertEqual(runner.call_args.kwargs["env"], environment)
+        self.assertNotIn("synthetic-source-token", runner.call_args.args[0])
 
     def test_private_clone_fetch_and_reader_share_dedicated_source_environment(self):
         source_token = "synthetic-source-token"
