@@ -21,6 +21,9 @@ jobs:
           app-id: ${{ vars.REVIEW_BROKER_SOURCE_APP_ID }}
           private-key: ${{ secrets.REVIEW_BROKER_SOURCE_APP_PRIVATE_KEY }}
           owner: fanilosendrison
+          permission-contents: read
+          permission-pull-requests: read
+          permission-metadata: read
 
       - name: Qualify exact read-only source acquisition
         shell: bash
@@ -53,91 +56,109 @@ jobs:
           test -n "$SOURCE_APP_SLUG"
           test -n "$SOURCE_INSTALLATION_ID"
 
-          qualification_root="$(mktemp -d)"
+          source_subprocess() (
+            for variable in $(compgen -e); do
+              case "$variable" in
+                HOME|PATH|XDG_CONFIG_HOME|SSL_CERT_FILE|SSL_CERT_DIR|GH_TOKEN|GIT_CONFIG_NOSYSTEM|GIT_CONFIG_GLOBAL|GIT_TERMINAL_PROMPT|GIT_CONFIG_COUNT|GIT_CONFIG_KEY_0|GIT_CONFIG_VALUE_0|GIT_CONFIG_KEY_1|GIT_CONFIG_VALUE_1) ;;
+                *) unset "$variable" ;;
+              esac
+            done
+            exec "$@"
+          )
+          local_subprocess() (
+            unset GH_TOKEN GITHUB_TOKEN REVIEW_BROKER_CODESPACE_TOKEN
+            exec "$@"
+          )
+
+          qualification_root="$(local_subprocess mktemp -d)"
           cleanup() {
             unset GH_TOKEN GITHUB_TOKEN REVIEW_BROKER_CODESPACE_TOKEN
             rm -rf "$qualification_root"
           }
           trap cleanup EXIT
-          export HOME="$qualification_root/home"
-          export XDG_CONFIG_HOME="$qualification_root/xdg"
-          export GIT_CONFIG_NOSYSTEM=1
-          export GIT_TERMINAL_PROMPT=0
-          mkdir -m 700 "$HOME" "$XDG_CONFIG_HOME"
 
-          test "$(gh auth token)" = "$GH_TOKEN"
+          test "$(source_subprocess gh auth token)" = "$GH_TOKEN"
 
-          gh api "installation/repositories?per_page=100" \
+          source_subprocess gh api "installation/repositories?per_page=100" \
             > "$qualification_root/installation.json"
-          test "$(jq -r '.total_count' "$qualification_root/installation.json")" = "1"
-          test "$(jq -r '.repositories | length' "$qualification_root/installation.json")" = "1"
-          test "$(jq -r '.repositories[0].full_name' "$qualification_root/installation.json")" \
+          test "$(local_subprocess jq -r '.total_count' "$qualification_root/installation.json")" = "1"
+          test "$(local_subprocess jq -r '.repositories | length' "$qualification_root/installation.json")" = "1"
+          test "$(local_subprocess jq -r '.repositories[0].full_name' "$qualification_root/installation.json")" \
             = "$EXPECTED_REPOSITORY"
 
-          gh api "repos/$EXPECTED_REPOSITORY" > "$qualification_root/repository.json"
-          test "$(jq -r '.full_name' "$qualification_root/repository.json")" \
+          source_subprocess gh api "repos/$EXPECTED_REPOSITORY" \
+            > "$qualification_root/repository.json"
+          test "$(local_subprocess jq -r '.full_name' "$qualification_root/repository.json")" \
             = "$EXPECTED_REPOSITORY"
-          test "$(jq -r '.visibility' "$qualification_root/repository.json")" = "private"
-          test "$(jq -r '.private' "$qualification_root/repository.json")" = "true"
+          test "$(local_subprocess jq -r '.visibility' "$qualification_root/repository.json")" = "private"
+          test "$(local_subprocess jq -r '.private' "$qualification_root/repository.json")" = "true"
 
-          gh api "repos/$EXPECTED_REPOSITORY/pulls/$EXPECTED_PULL_REQUEST" \
+          source_subprocess gh api "repos/$EXPECTED_REPOSITORY/pulls/$EXPECTED_PULL_REQUEST" \
             > "$qualification_root/pull-request.json"
-          test "$(jq -r '.state' "$qualification_root/pull-request.json")" = "open"
-          head_commit="$(jq -r '.head.sha' "$qualification_root/pull-request.json")"
-          base_commit="$(jq -r '.base.sha' "$qualification_root/pull-request.json")"
+          test "$(local_subprocess jq -r '.state' "$qualification_root/pull-request.json")" = "open"
+          head_commit="$(local_subprocess jq -r '.head.sha' "$qualification_root/pull-request.json")"
+          base_commit="$(local_subprocess jq -r '.base.sha' "$qualification_root/pull-request.json")"
           test "$head_commit" = "$EXPECTED_HEAD"
           test "$base_commit" != "null"
 
-          gh api "repos/$EXPECTED_REPOSITORY/compare/$base_commit...$head_commit" \
+          source_subprocess gh api \
+            "repos/$EXPECTED_REPOSITORY/compare/$base_commit...$head_commit" \
             > "$qualification_root/compare.json"
-          merge_base="$(jq -r '.merge_base_commit.sha' "$qualification_root/compare.json")"
+          merge_base="$(local_subprocess jq -r '.merge_base_commit.sha' "$qualification_root/compare.json")"
           test "$merge_base" != "null"
 
-          gh api "repos/$EXPECTED_REPOSITORY/pulls/$EXPECTED_PULL_REQUEST/files?per_page=100" \
+          source_subprocess gh api \
+            "repos/$EXPECTED_REPOSITORY/pulls/$EXPECTED_PULL_REQUEST/files?per_page=100" \
             > "$qualification_root/files.json"
-          test "$(jq -r 'length' "$qualification_root/files.json")" = "1"
-          test "$(jq -r '.[0].filename' "$qualification_root/files.json")" = "$EXPECTED_PATH"
-          api_status="$(jq -r '.[0].status' "$qualification_root/files.json")"
+          test "$(local_subprocess jq -r 'length' "$qualification_root/files.json")" = "1"
+          test "$(local_subprocess jq -r '.[0].filename' "$qualification_root/files.json")" \
+            = "$EXPECTED_PATH"
+          api_status="$(local_subprocess jq -r '.[0].status' "$qualification_root/files.json")"
           test "$api_status" = "added"
 
           expected_remote="https://github.com/$EXPECTED_REPOSITORY.git"
-          gh repo clone "$expected_remote" "$qualification_root/source.git" -- \
+          source_subprocess gh repo clone \
+            "$expected_remote" "$qualification_root/source.git" -- \
             --filter=blob:none --no-checkout
-          test "$(git -C "$qualification_root/source.git" remote get-url origin)" \
+          test "$(source_subprocess git -C "$qualification_root/source.git" remote get-url origin)" \
             = "$expected_remote"
           case "$expected_remote" in
             *"$GH_TOKEN"*) echo "SOURCE_TOKEN_IN_REMOTE_URL"; exit 1 ;;
           esac
           for commit in "$base_commit" "$head_commit" "$merge_base"; do
-            git -C "$qualification_root/source.git" fetch origin "$commit" --depth=1
+            source_subprocess git -C "$qualification_root/source.git" \
+              fetch origin "$commit" --depth=1
           done
 
           mapfile -d '' changed_paths < <(
-            git -C "$qualification_root/source.git" diff --name-only -z \
+            source_subprocess git -C "$qualification_root/source.git" diff --name-only -z \
               "$merge_base" "$head_commit"
           )
           test "${#changed_paths[@]}" = "1"
           test "${changed_paths[0]}" = "$EXPECTED_PATH"
-          git_status="$(git -C "$qualification_root/source.git" diff --name-status \
-            "$merge_base" "$head_commit" -- "$EXPECTED_PATH")"
+          git_status="$(source_subprocess git -C "$qualification_root/source.git" \
+            diff --name-status "$merge_base" "$head_commit" -- "$EXPECTED_PATH")"
           test "$git_status" = $'A\t'"$EXPECTED_PATH"
 
-          if git -C "$qualification_root/source.git" cat-file -e \
+          if source_subprocess git -C "$qualification_root/source.git" cat-file -e \
             "$merge_base:$EXPECTED_PATH" 2>/dev/null; then
             echo "UNEXPECTED_ADDED_FILE_PREIMAGE"
             exit 1
           fi
-          git -C "$qualification_root/source.git" cat-file -e \
+          source_subprocess git -C "$qualification_root/source.git" cat-file -e \
             "$head_commit:$EXPECTED_PATH"
-          postimage_sha256="$(
-            git -C "$qualification_root/source.git" show \
-              "$head_commit:$EXPECTED_PATH" | sha256sum | cut -d ' ' -f 1
+          postimage_hash_output="$(
+            source_subprocess git -C "$qualification_root/source.git" show \
+              "$head_commit:$EXPECTED_PATH" | local_subprocess sha256sum
           )"
-          diff_sha256="$(
-            git -C "$qualification_root/source.git" diff --binary \
-              "$merge_base" "$head_commit" -- "$EXPECTED_PATH" | \
-              sha256sum | cut -d ' ' -f 1
+          postimage_sha256="${postimage_hash_output%% *}"
+          diff_hash_output="$(
+            source_subprocess git -C "$qualification_root/source.git" diff \
+              --binary --full-index --no-ext-diff --no-textconv \
+              --find-renames --find-copies-harder \
+              "$merge_base" "$head_commit" -- | local_subprocess sha256sum
           )"
+          diff_sha256="${diff_hash_output%% *}"
           test "${#postimage_sha256}" = "64"
           test "${#diff_sha256}" = "64"
 
