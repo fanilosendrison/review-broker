@@ -251,8 +251,9 @@ checks or unproved requested atomicity **fail before `PREPARED`**. They do
 not produce a "PREPARED but unarmable" packet or a third source outcome.
 If a durable `REQUESTED`/`ADMITTED` claim already exists, preserve the
 truthful pre-model failure evidence without advancing to `PREPARED`;
-recovery continues under the existing pre-model contract. A captured source records the requester
-reference ID, its source designation and role, acquired bytes and SHA-256,
+recovery continues under the existing pre-model contract.
+
+A captured source records the requester reference ID, its source designation and role, acquired bytes and SHA-256,
 byte length, stable `Sxxx` source identifier(s) where applicable, snapshot
 path, observation metadata, and technical source provenance actually verified.
 
@@ -344,8 +345,8 @@ Proposed successor identity rules:
 
 1. `request_id` hashes the **complete canonical successor request**, including
    the required `atomicity` value, exact reference declarations, any version
-   pins, inline bytes, immutable
-   upload receipts identifying received bytes, operation and explicit
+   pins, inline bytes, immutable upload receipts identifying received
+   bytes, operation and explicit
    re-review authorization nonce. Identical canonical bytes yield the same
    claim: delivery duplication or remote-source drift cannot authorize a
    second model invocation. Different inline/upload bytes have **different
@@ -353,8 +354,7 @@ Proposed successor identity rules:
 2. A **version-distinguished Review Intent** represents a continuing logical
    examination purpose; it hashes the logical PR subject, requester mission,
    requested reviewer settings, the declared `atomicity` requirement, and
-   each reference's `id`, `required`, kind
-   and **logical selector**. It deliberately excludes source-version pins,
+   each reference's `id`, `required`, kind and **logical selector**. It deliberately excludes source-version pins,
    observed snapshots, Git file commit when repository/path remain the logical
    target, mutable body hashes, inline content and upload receipt bytes.
    For inline/upload the requester-chosen ID is the **logical slot**, not a
