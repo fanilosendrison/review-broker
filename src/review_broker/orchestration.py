@@ -39,6 +39,7 @@ from .request import parse_issue_body
 from .source_authorization import (
     SourceAuthorizationError as OrchestrationError,
     _source_environment_for_repository,
+    isolated_source_environment,
     require_private_source_environment,
 )
 
@@ -77,7 +78,6 @@ def prepare_issue(
 
     def source_getter(endpoint: str) -> Any:
         return _gh_json(endpoint, environment=source_environment)
-
     admission_mode = select_operational_admission(
         request, environment, source_getter, requester=requester
     )
@@ -122,10 +122,22 @@ def prepare_issue(
     if not changed:
         raise OrchestrationError("PULL_REQUEST_HAS_NO_FILES")
     with tempfile.TemporaryDirectory(prefix="review-broker-source-") as temporary:
-        source_repository = Path(temporary) / "source.git"
+        source_root = Path(temporary)
+        source_repository = source_root / "source.git"
+        git_environment = source_environment
+        if source_environment is not None:
+            source_home, source_config = source_root / "home", source_root / "xdg"
+            source_home.mkdir(mode=0o700)
+            source_config.mkdir(mode=0o700)
+            git_environment = {
+                **source_environment, "HOME": str(source_home),
+                "XDG_CONFIG_HOME": str(source_config)}
+        clone_repository = request["subject"]["repository"]
+        if source_environment is not None:
+            clone_repository = f"https://github.com/{clone_repository}.git"
         clone = subprocess.run(
             [
-                "gh", "repo", "clone", request["subject"]["repository"],
+                "gh", "repo", "clone", clone_repository,
                 str(source_repository), "--", "--filter=blob:none", "--no-checkout",
             ],
             text=True,
@@ -133,7 +145,7 @@ def prepare_issue(
             check=False,
             timeout=300,
             shell=False,
-            env=source_environment,
+            env=git_environment,
         )
         if clone.returncode != 0:
             raise OrchestrationError("SOURCE_ACQUISITION_FAILED")
@@ -146,11 +158,11 @@ def prepare_issue(
                 check=False,
                 timeout=180,
                 shell=False,
-                env=source_environment,
+                env=git_environment,
             )
             if fetch.returncode != 0:
                 raise OrchestrationError("SOURCE_COMMIT_FETCH_FAILED")
-        reader = GitSourceReader(source_repository, environment=source_environment)
+        reader = GitSourceReader(source_repository, environment=git_environment)
         merge_base = resolved["subject"]["merge_base"]
         head = resolved["subject"]["head_commit"]
         paths = [item.get("filename") for item in changed]
@@ -235,11 +247,14 @@ def publish_validated_result(
     private_repositories = _csv_set(
         os.environ.get("REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES", "")
     )
-    source_environment = _source_environment_for_repository(
-        subject["repository"],
-        private_repositories,
-        source_token,
-    )
+    if metadata.get("admission_mode") == BOUNDED_PRIVATE_V1_ADMISSION:
+        source_environment = require_private_source_environment(
+            subject["repository"], private_repositories, source_token
+        )
+    else:
+        source_environment = _source_environment_for_repository(
+            subject["repository"], private_repositories, source_token
+        )
     pr = _gh_json(
         f"repos/{subject['repository']}/pulls/{subject['pull_request']}",
         environment=source_environment,
@@ -339,15 +354,11 @@ def _gh_json(
     *,
     environment: Mapping[str, str] | None = None,
 ) -> Any:
-    result = subprocess.run(
-        ["gh", "api", endpoint],
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=120,
-        shell=False,
-        env=environment,
-    )
+    with isolated_source_environment(environment) as subprocess_environment:
+        result = subprocess.run(
+            ["gh", "api", endpoint], text=True, capture_output=True, check=False,
+            timeout=120, shell=False, env=subprocess_environment,
+        )
     if result.returncode != 0:
         raise OrchestrationError("GITHUB_API_FAILED")
     try:

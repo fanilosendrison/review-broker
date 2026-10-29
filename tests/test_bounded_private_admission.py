@@ -1,6 +1,7 @@
 """Exact, default-disabled bounded private-source admission."""
 import copy
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -12,9 +13,15 @@ from review_broker.admission import (
     AdmissionError,
     select_operational_admission,
 )
-from review_broker.orchestration import prepare_issue
+from review_broker.orchestration import prepare_issue, publish_validated_result
+from review_broker.packets import GitSourceReader
+from review_broker.identity import attempt_identity, canonical_bytes
+from review_broker.queue import AttemptRecord, AttemptState, transition_record
 from review_broker.request import build_issue_body
-from review_broker.source_authorization import SourceAuthorizationError
+from review_broker.source_authorization import (
+    SourceAuthorizationError,
+    require_private_source_environment,
+)
 
 
 REQUEST = json.loads((Path(__file__).parent / "fixtures" / "sample-request.json").read_text())
@@ -106,6 +113,203 @@ class BoundedPrivateAdmissionTests(unittest.TestCase):
             endpoints,
             ["repos/sample/broker/issues/46", "repos/sample/broker/issues/46"],
         )
+
+    def test_private_source_environment_is_transient_and_ignores_ambient_git_auth(self):
+        ambient = {
+            "HOME": "/safe/home",
+            "PATH": "/safe/bin",
+            "GH_TOKEN": "ambient-publication-token",
+            "GITHUB_TOKEN": "ambient-workflow-token",
+            "GIT_CONFIG_GLOBAL": "/ambient/gitconfig",
+            "GIT_CONFIG_COUNT": "99",
+        }
+        with mock.patch.dict("os.environ", ambient, clear=True):
+            environment = require_private_source_environment(
+                REPOSITORY, frozenset({REPOSITORY}), "synthetic-source-token"
+            )
+        self.assertEqual(environment, {
+            "HOME": "/safe/home",
+            "PATH": "/safe/bin",
+            "GH_TOKEN": "synthetic-source-token",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_CONFIG_COUNT": "2",
+            "GIT_CONFIG_KEY_0": "credential.helper",
+            "GIT_CONFIG_VALUE_0": "",
+            "GIT_CONFIG_KEY_1": "credential.https://github.com.helper",
+            "GIT_CONFIG_VALUE_1": "!gh auth git-credential",
+        })
+        self.assertNotIn("ambient", " ".join(environment.values()))
+        self.assertNotIn("synthetic-source-token", " ".join(
+            value for key, value in environment.items() if key != "GH_TOKEN"
+        ))
+
+    def test_lazy_git_object_read_uses_canonical_private_source_environment(self):
+        with mock.patch.dict("os.environ", {"PATH": "/usr/bin"}, clear=True):
+            environment = require_private_source_environment(
+                REPOSITORY, frozenset({REPOSITORY}), "synthetic-source-token"
+            )
+        completed = mock.Mock(returncode=0, stdout=b"object", stderr=b"")
+        with mock.patch(
+            "review_broker.packets.subprocess.run", return_value=completed
+        ) as runner:
+            result = GitSourceReader(Path("source.git"), environment=environment)._git(
+                "cat-file", "blob", "a" * 40
+            )
+        self.assertEqual(result, b"object")
+        self.assertEqual(runner.call_args.kwargs["env"], environment)
+        self.assertNotIn("synthetic-source-token", runner.call_args.args[0])
+
+    def test_private_clone_fetch_and_reader_share_dedicated_source_environment(self):
+        source_token = "synthetic-source-token"
+        source_environment = {
+            "HOME": "/ambient/home",
+            "PATH": "/usr/bin",
+            "GH_TOKEN": source_token,
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_CONFIG_COUNT": "2",
+            "GIT_CONFIG_KEY_0": "credential.helper",
+            "GIT_CONFIG_VALUE_0": "",
+            "GIT_CONFIG_KEY_1": "credential.https://github.com.helper",
+            "GIT_CONFIG_VALUE_1": "!gh auth git-credential",
+        }
+        environment = {
+            **self.environment,
+            "REVIEW_BROKER_AUTHORIZED_REQUESTERS": REQUESTER,
+            "REVIEW_BROKER_AUTHORIZED_REPOSITORIES": REPOSITORY,
+            "REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES": REPOSITORY,
+        }
+        base = "1" * 40
+        merge_base = "2" * 40
+        commands = []
+        reader_environments = []
+
+        def getter(endpoint, **_kwargs):
+            if endpoint == "repos/sample/broker/issues/46":
+                return {"body": build_issue_body(self.request),
+                        "user": {"login": REQUESTER}}
+            if endpoint == f"repos/{REPOSITORY}":
+                return {"full_name": REPOSITORY, "visibility": "private", "private": True}
+            if endpoint == "installation/repositories?per_page=100":
+                return {"total_count": 1, "repositories": [{"full_name": REPOSITORY}]}
+            if endpoint == f"repos/{REPOSITORY}/pulls/45":
+                return {"head": {"sha": HEAD},
+                        "base": {"sha": base, "repo": {"id": 7}}}
+            if "/compare/" in endpoint:
+                return {"merge_base_commit": {"sha": merge_base}}
+            if "/files?" in endpoint:
+                return [{"filename": "proposal.md", "status": "added"}]
+            if "/git/matching-refs/heads/review-claims/" in endpoint:
+                return []
+            raise AssertionError(endpoint)
+
+        class Journal:
+            def __init__(self, *_args, **_kwargs):
+                self.record = None
+            def claim(self, request_id, admission=None):
+                self.record = AttemptRecord(
+                    request_id, attempt_identity(request_id, 1),
+                    AttemptState.REQUESTED, admission=admission,
+                )
+                return self.record
+            def transition(self, request_id, state, evidence_ids):
+                self.record = transition_record(self.record, state, evidence_ids)
+                return self.record
+
+        class Reader:
+            def __init__(self, _repository, environment=None):
+                reader_environments.append(environment)
+            @staticmethod
+            def changed_paths(_merge_base, _head):
+                return {"proposal.md"}
+            @staticmethod
+            def read(_source):
+                return object()
+            @staticmethod
+            def diff(_merge_base, _head):
+                return b"diff"
+
+        def transport(command, **kwargs):
+            commands.append((command, kwargs.get("env")))
+            return mock.Mock(returncode=0)
+
+        with tempfile.TemporaryDirectory() as temporary, \
+             mock.patch.dict(
+                 "os.environ", {"HOME": "/ambient/home", "PATH": "/usr/bin"},
+                 clear=True,
+             ), \
+             mock.patch("review_broker.orchestration._gh_json", side_effect=getter), \
+             mock.patch("review_broker.orchestration.GitHubRefJournal", Journal), \
+             mock.patch("review_broker.orchestration.GitSourceReader", Reader), \
+             mock.patch("review_broker.orchestration.subprocess.run", side_effect=transport), \
+             mock.patch("review_broker.orchestration.build_packet", return_value={
+                 "source_manifest_id": "source-manifest:sha256:" + "3" * 64,
+                 "packet_id": "packet:sha256:" + "4" * 64,
+             }):
+            output = Path(temporary) / "packet"
+            output.mkdir()
+            prepare_issue(
+                "sample/broker", 46, output,
+                environment=environment, source_token=source_token,
+            )
+
+        self.assertEqual(commands[0][0][3], f"https://github.com/{REPOSITORY}.git")
+        git_environment = commands[0][1]
+        self.assertTrue(all(command_environment == git_environment
+                            for _, command_environment in commands))
+        self.assertEqual(reader_environments, [git_environment])
+        self.assertNotEqual(git_environment["HOME"], source_environment["HOME"])
+        self.assertNotEqual(
+            git_environment["XDG_CONFIG_HOME"], source_environment.get("XDG_CONFIG_HOME")
+        )
+        self.assertEqual(
+            {key: value for key, value in git_environment.items()
+             if key not in {"HOME", "XDG_CONFIG_HOME"}},
+            {key: value for key, value in source_environment.items() if key != "HOME"},
+        )
+        self.assertNotIn(source_token, " ".join(
+            argument for command, _ in commands for argument in command
+        ))
+
+    def test_private_publication_revalidation_rejects_ambient_fallback(self):
+        values = {
+            "resolved-request.json": {
+                "request_id": "request:sha256:" + "1" * 64,
+                "subject": {"repository": REPOSITORY, "pull_request": 45},
+            },
+            "broker-metadata.json": {
+                "admission_mode": BOUNDED_PRIVATE_V1_ADMISSION,
+                "issue_number": 46,
+            },
+            "input-manifest.json": {},
+            "attempt.json": {},
+            "validation.json": {},
+        }
+        cases = (
+            ({}, "synthetic-source-token", "PRIVATE_SOURCE_REPOSITORY_NOT_AUTHORIZED"),
+            ({"REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES": REPOSITORY}, None,
+             "PRIVATE_SOURCE_CREDENTIAL_REQUIRED"),
+        )
+        for additions, source_token, error in cases:
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                for name, value in values.items():
+                    (root / name).write_bytes(canonical_bytes(value) + b"\n")
+                with mock.patch.dict(
+                    "os.environ",
+                    {"GH_TOKEN": "ambient-publication-token", **additions},
+                    clear=True,
+                ), mock.patch(
+                    "review_broker.orchestration._gh_json",
+                    side_effect=AssertionError("private source access forbidden"),
+                ) as getter, self.assertRaisesRegex(SourceAuthorizationError, error):
+                    publish_validated_result(
+                        "sample/broker", root, source_token=source_token
+                    )
+                getter.assert_not_called()
 
     def test_private_mode_is_disabled_by_default(self):
         environment = dict(self.environment)

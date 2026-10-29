@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 from unittest import mock
@@ -7,6 +8,7 @@ import tempfile
 import unittest
 
 from review_broker.identity import canonical_bytes
+from review_broker.orchestration import _gh_json
 from review_broker.packets import (
     PacketError,
     SourceSpec,
@@ -15,6 +17,7 @@ from review_broker.packets import (
     build_packet,
     verify_packet,
 )
+from review_broker.source_authorization import require_private_source_environment
 
 
 class PacketTests(unittest.TestCase):
@@ -259,6 +262,32 @@ class PacketTests(unittest.TestCase):
                             return_value=subprocess.CompletedProcess([], 0, b"ok", b"")) as runner:
                 self.assertEqual(GitSourceReader(repo, environment=bounded)._git("rev-parse"), b"ok")
                 self.assertEqual(runner.call_args.kwargs["env"], bounded)
+
+    def test_private_api_read_uses_ephemeral_home_and_no_ambient_configuration(self):
+        observed_paths = []
+
+        def runner(command, **kwargs):
+            environment = kwargs["env"]
+            self.assertEqual(command, ["gh", "api", "repos/sample/private"])
+            self.assertNotEqual(environment["HOME"], "/ambient/home")
+            self.assertNotEqual(environment["XDG_CONFIG_HOME"], "/ambient/xdg")
+            self.assertTrue(Path(environment["HOME"]).is_dir())
+            self.assertTrue(Path(environment["XDG_CONFIG_HOME"]).is_dir())
+            observed_paths.extend((environment["HOME"], environment["XDG_CONFIG_HOME"]))
+            return subprocess.CompletedProcess(command, 0, "{}", "")
+
+        with mock.patch.dict(
+            os.environ,
+            {"HOME": "/ambient/home", "XDG_CONFIG_HOME": "/ambient/xdg",
+             "PATH": "/usr/bin"},
+            clear=True,
+        ):
+            environment = require_private_source_environment(
+                "sample/private", frozenset({"sample/private"}), "synthetic-token"
+            )
+        with mock.patch("review_broker.orchestration.subprocess.run", side_effect=runner):
+            self.assertEqual(_gh_json("repos/sample/private", environment=environment), {})
+        self.assertTrue(all(not Path(path).exists() for path in observed_paths))
 
     def test_candidate_commit_mismatch_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
