@@ -5,7 +5,7 @@ asset_type: "qualification-record"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Credential-Isolation Assessment"
-version: "0.1.5"
+version: "0.1.6"
 ---
 
 # Reviewer Credential-Isolation Assessment
@@ -243,3 +243,20 @@ a dedicated low-sensitivity repository allowlist, both existing authorization
 allowlists, and unambiguous public GitHub visibility. The existing comprehensive
 security gate is preserved independently. Neither path is activated by this
 source preparation, and no consumer pull request is executed.
+
+## Bounded-v1 preflight reconciliation
+
+The 0.4.14 candidate reconciles the pre-arm workflow with the accepted
+risk-proportionate policy. Comprehensive admission retains the existing direct
+sandbox probe and its strict historical oracle. Low-sensitivity-v1 instead
+requires a distinct receipt produced by trusted broker code after runtime,
+profile and immutable packet-tree verification and before durable armament. The
+receipt records that no direct sandbox probe ran, comprehensive isolation is
+unqualified and effective Codex policy attestation is unavailable.
+
+This evidence scope does not change any historical result. The readable hard
+link, managed-policy overrides, `/proc` uncertainty, unobserved tool routes and
+failed Issue #31 direct probes remain non-passing comprehensive evidence. A
+bounded receipt cannot substitute for comprehensive evidence, and a strict
+probe receipt cannot substitute for bounded-mode evidence. Direct credential
+exposure or unexpected privilege remains a blocker for the affected path.

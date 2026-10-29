@@ -5,7 +5,7 @@ asset_type: "security-model"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Threat Model"
-version: "0.1.3"
+version: "0.1.4"
 ---
 
 # Review Broker Threat Model
@@ -85,10 +85,13 @@ packet directory, explicitly denies the home and workspace, denies writes and
 network access, prevents login shells, and supplies a fixed minimal subprocess
 environment. Controlled producer probes must pass immediately before invocation.
 
-These producer controls are not sufficient qualification by themselves.
-Authenticated model execution remains disabled until an independent reviewer
-challenges the profile, alternate credential paths, process visibility, and
-probe evidence.
+These producer controls are not sufficient comprehensive qualification by
+themselves. The comprehensive path retains the direct sandbox probe and strict
+oracle. The separately accepted low-sensitivity-v1 path uses a non-probing
+pre-arm record for exact runtime/profile identity, packet-tree integrity,
+sanitized environment and declared shell-disable configuration. That bounded
+record explicitly leaves effective-policy attestation unavailable and
+comprehensive isolation unqualified; it does not erase any probe counterexample.
 
 ### Persistent Codespace compromise
 
@@ -146,8 +149,11 @@ Low-sensitivity PR review uses a separate default-disabled operational gate.
 It requires exact enablement and executing-SHA binding, dedicated and general
 repository allowlists, requester authorization, and authoritative public
 visibility before any claim or execution side effect. Public visibility does
-not itself classify a repository as low sensitivity. The comprehensive
-high-assurance qualification variable remains separate and unset.
+not itself classify a repository as low sensitivity. Before armament, trusted
+workflow code must produce a mode-specific bounded preflight receipt tied to the
+exact immutable packet and installed runtime/profile identities. Reviewed
+content cannot select the mode. The comprehensive high-assurance qualification
+variable remains separate and unset.
 
 ## Residual risks and comprehensive blocker
 

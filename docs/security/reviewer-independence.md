@@ -5,7 +5,7 @@ asset_type: "security-contract"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Independence Contract"
-version: "0.2.1"
+version: "0.2.2"
 ---
 
 # Reviewer Independence Contract
@@ -112,11 +112,12 @@ metadata. The broker never infers either from a CLI flag.
 ### Comprehensive security qualification
 
 The comprehensive path retains its independent qualification variable and
-evidence identifier. Its controlled probes seek effective process, tool,
-filesystem, environment, network, credential, recovery and cleanup assurance.
-Historical NO-GO, PARTIAL and UNDETERMINED observations remain applicable. The
-broker cannot review itself into comprehensive qualification, and this path
-remains unavailable unless its exact existing gate is explicitly satisfied.
+evidence identifier. Its controlled direct sandbox probe and strict original
+oracle seek effective process, tool, filesystem, environment, network,
+credential, recovery and cleanup assurance. Historical NO-GO, PARTIAL and
+UNDETERMINED observations remain applicable. The broker cannot review itself
+into comprehensive qualification, and this path remains unavailable unless its
+exact existing gate and probe evidence are satisfied.
 
 ### Bounded low-sensitivity v1 admission
 
@@ -128,10 +129,20 @@ and authoritative public repository visibility. Unknown visibility and private
 repositories fail closed. Admission occurs before journal claim, packet
 construction, Codespace startup or model-capable execution.
 
+This bounded scope uses a distinct pre-arm evidence record rather than the
+comprehensive direct sandbox probe. The record binds the exact request, attempt,
+packet, attempt-bound profile, verified runtime and executing broker; verifies
+the immutable packet tree and credential-separated environment request; and
+records the shell-disable request. Cross-mode, missing, malformed or mismatched
+evidence fails closed. The assurance mode is selected only by trusted admission,
+not request or reviewed content.
+
 This bounded scope does not assert effective model identity, reasoning effort,
-universal filesystem isolation, complete tool isolation or comprehensive
-security qualification. It preserves the verified runtime identity, requested
-Sol/xhigh policy, shell-disable request, packet guards, credential quarantine,
-one-shot execution and independent evidence validation as defense in depth.
-No reviewer can merge, publish its own result or elevate its findings into
-normative authority.
+universal filesystem isolation, complete tool isolation, effective-policy
+attestation or comprehensive security qualification. The direct probe is
+recorded as not executed and comprehensive isolation as unqualified. Historical
+hard-link and `/proc` findings remain unchanged. Verified runtime identity,
+requested Sol/xhigh policy, shell-disable request, packet guards, credential
+quarantine, one-shot execution and independent evidence validation remain
+defense in depth. No reviewer can merge, publish its own result or elevate its
+findings into normative authority.
