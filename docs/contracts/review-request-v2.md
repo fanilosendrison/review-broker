@@ -5,18 +5,18 @@ asset_type: "contract"
 domain: "independent-review"
 severity: "strict"
 name: "ReviewRequest v2 Contract"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # ReviewRequest v2 Contract
 
 ## Publication and implementation status
 
-This document is the accepted normative contract for ReviewRequest v2. It does
-not claim that v2 parsing, schemas, admission, claims, execution, recovery, or
-publication are implemented or active. ReviewRequest v1 remains the only
-implemented request version until a separately authorized implementation is
-qualified and published.
+This document is the accepted normative contract for ReviewRequest v2. Version
+0.4.17 implements the schema, parsing, identity, admission, predecessor,
+execution, recovery, publication, and retrieval integration described here.
+Operational v2 admission remains explicitly default-disabled and requires
+separate authorization. ReviewRequest v1 remains supported unchanged.
 
 ## Stable Review Intent
 
@@ -125,7 +125,12 @@ head to equal `subject.expected_head_commit` before creating an execution claim.
 A mismatch fails closed. For predecessor-bearing operations, trustworthy
 historical evidence must identify the predecessor request, its Review Intent,
 and its exact expected head. Unavailable, malformed, conflicting, or
-incompletely bound history fails closed.
+incompletely bound history fails closed. A v2 predecessor uses its immutable
+journal-bound admission record, including its exact expected and resolved head.
+A historical v1 predecessor never gains an `expected_head_commit` field. Its
+head is the observed `resolved_request.subject.head_commit` from the existing
+receipt-authenticated published result, and its Review Intent is derived from
+its unchanged v1 request fields.
 
 `initial` has no predecessor. `changed_head` requires the predecessor to have
 the same Review Intent and a different verified expected head.
