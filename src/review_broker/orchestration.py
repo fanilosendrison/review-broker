@@ -77,7 +77,6 @@ def prepare_issue(
 
     def source_getter(endpoint: str) -> Any:
         return _gh_json(endpoint, environment=source_environment)
-
     admission_mode = select_operational_admission(
         request, environment, source_getter, requester=requester
     )
@@ -122,7 +121,16 @@ def prepare_issue(
     if not changed:
         raise OrchestrationError("PULL_REQUEST_HAS_NO_FILES")
     with tempfile.TemporaryDirectory(prefix="review-broker-source-") as temporary:
-        source_repository = Path(temporary) / "source.git"
+        source_root = Path(temporary)
+        source_repository = source_root / "source.git"
+        git_environment = source_environment
+        if source_environment is not None:
+            source_home, source_config = source_root / "home", source_root / "xdg"
+            source_home.mkdir(mode=0o700)
+            source_config.mkdir(mode=0o700)
+            git_environment = {
+                **source_environment, "HOME": str(source_home),
+                "XDG_CONFIG_HOME": str(source_config)}
         clone_repository = request["subject"]["repository"]
         if source_environment is not None:
             clone_repository = f"https://github.com/{clone_repository}.git"
@@ -136,7 +144,7 @@ def prepare_issue(
             check=False,
             timeout=300,
             shell=False,
-            env=source_environment,
+            env=git_environment,
         )
         if clone.returncode != 0:
             raise OrchestrationError("SOURCE_ACQUISITION_FAILED")
@@ -149,11 +157,11 @@ def prepare_issue(
                 check=False,
                 timeout=180,
                 shell=False,
-                env=source_environment,
+                env=git_environment,
             )
             if fetch.returncode != 0:
                 raise OrchestrationError("SOURCE_COMMIT_FETCH_FAILED")
-        reader = GitSourceReader(source_repository, environment=source_environment)
+        reader = GitSourceReader(source_repository, environment=git_environment)
         merge_base = resolved["subject"]["merge_base"]
         head = resolved["subject"]["head_commit"]
         paths = [item.get("filename") for item in changed]

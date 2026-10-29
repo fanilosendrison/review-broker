@@ -57,6 +57,8 @@ jobs:
           test -n "$SOURCE_INSTALLATION_ID"
 
           source_subprocess() (
+            export HOME="$source_home"
+            export XDG_CONFIG_HOME="$source_config"
             for variable in $(compgen -e); do
               case "$variable" in
                 HOME|PATH|XDG_CONFIG_HOME|SSL_CERT_FILE|SSL_CERT_DIR|GH_TOKEN|GIT_CONFIG_NOSYSTEM|GIT_CONFIG_GLOBAL|GIT_TERMINAL_PROMPT|GIT_CONFIG_COUNT|GIT_CONFIG_KEY_0|GIT_CONFIG_VALUE_0|GIT_CONFIG_KEY_1|GIT_CONFIG_VALUE_1) ;;
@@ -71,6 +73,9 @@ jobs:
           )
 
           qualification_root="$(local_subprocess mktemp -d)"
+          source_home="$qualification_root/home"
+          source_config="$qualification_root/xdg"
+          local_subprocess mkdir -m 700 "$source_home" "$source_config"
           cleanup() {
             unset GH_TOKEN GITHUB_TOKEN REVIEW_BROKER_CODESPACE_TOKEN
             rm -rf "$qualification_root"

@@ -164,6 +164,7 @@ class BoundedPrivateAdmissionTests(unittest.TestCase):
     def test_private_clone_fetch_and_reader_share_dedicated_source_environment(self):
         source_token = "synthetic-source-token"
         source_environment = {
+            "HOME": "/ambient/home",
             "PATH": "/usr/bin",
             "GH_TOKEN": source_token,
             "GIT_CONFIG_NOSYSTEM": "1",
@@ -236,7 +237,10 @@ class BoundedPrivateAdmissionTests(unittest.TestCase):
             return mock.Mock(returncode=0)
 
         with tempfile.TemporaryDirectory() as temporary, \
-             mock.patch.dict("os.environ", {"PATH": "/usr/bin"}, clear=True), \
+             mock.patch.dict(
+                 "os.environ", {"HOME": "/ambient/home", "PATH": "/usr/bin"},
+                 clear=True,
+             ), \
              mock.patch("review_broker.orchestration._gh_json", side_effect=getter), \
              mock.patch("review_broker.orchestration.GitHubRefJournal", Journal), \
              mock.patch("review_broker.orchestration.GitSourceReader", Reader), \
@@ -253,9 +257,19 @@ class BoundedPrivateAdmissionTests(unittest.TestCase):
             )
 
         self.assertEqual(commands[0][0][3], f"https://github.com/{REPOSITORY}.git")
-        self.assertTrue(all(command_environment == source_environment
+        git_environment = commands[0][1]
+        self.assertTrue(all(command_environment == git_environment
                             for _, command_environment in commands))
-        self.assertEqual(reader_environments, [source_environment])
+        self.assertEqual(reader_environments, [git_environment])
+        self.assertNotEqual(git_environment["HOME"], source_environment["HOME"])
+        self.assertNotEqual(
+            git_environment["XDG_CONFIG_HOME"], source_environment.get("XDG_CONFIG_HOME")
+        )
+        self.assertEqual(
+            {key: value for key, value in git_environment.items()
+             if key not in {"HOME", "XDG_CONFIG_HOME"}},
+            {key: value for key, value in source_environment.items() if key != "HOME"},
+        )
         self.assertNotIn(source_token, " ".join(
             argument for command, _ in commands for argument in command
         ))
