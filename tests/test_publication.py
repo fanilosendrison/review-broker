@@ -1,6 +1,8 @@
 from dataclasses import replace
 import json
+from pathlib import Path
 import subprocess
+import tempfile
 import unittest
 from unittest import mock
 from argparse import Namespace
@@ -9,6 +11,8 @@ from review_broker.cli import _result
 from review_broker.verifiedresult import ResultUnavailable, read_verified_result
 
 from review_broker.github_journal import GitHubRefJournal
+from review_broker.identity import canonical_bytes
+from review_broker.orchestration import publish_validated_result
 from review_broker.publication import (
     GitHubPublisher,
     PublicationError,
@@ -234,6 +238,52 @@ class PublicationJournalTests(unittest.TestCase):
                                    publication_receipt=None)
         with self.assertRaisesRegex(ResultUnavailable, "PUBLICATION_INDETERMINATE"):
             read_verified_result("sample/repo", REQUEST_ID, journal=journal, publisher=publisher)
+
+    def test_identity_failure_precedes_reservation_and_comment_publication(self):
+        class Journal:
+            def get(self, request_id):
+                return AttemptRecord(
+                    request_id=request_id,
+                    attempt_id=ATTEMPT_ID,
+                    state=AttemptState.VALIDATED,
+                )
+
+            def reserve_publication(self, *args):
+                raise AssertionError("reservation forbidden")
+
+        class Publisher:
+            def __init__(self, repository):
+                pass
+
+            def identity(self):
+                raise PublicationError("PUBLICATION_ACTIONS_ACTOR_INVALID")
+
+            def publish_reserved(self, *args, **kwargs):
+                raise AssertionError("comment publication forbidden")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            values = {
+                "resolved-request.json": {
+                    "request_id": REQUEST_ID,
+                    "subject": {"repository": "sample/subject", "pull_request": 7},
+                },
+                "broker-metadata.json": {"issue_number": 7},
+                "input-manifest.json": {},
+                "attempt.json": {"attempt_id": ATTEMPT_ID},
+                "validation.json": {},
+            }
+            for name, value in values.items():
+                (root / name).write_bytes(canonical_bytes(value) + b"\n")
+            patches = (
+                mock.patch("review_broker.orchestration._gh_json", return_value={"head": {"sha": "a" * 40}}),
+                mock.patch("review_broker.orchestration.build_review_result", return_value=result()),
+                mock.patch("review_broker.orchestration.GitHubRefJournal", return_value=Journal()),
+                mock.patch("review_broker.orchestration.GitHubPublisher", Publisher),
+            )
+            with patches[0], patches[1], patches[2], patches[3]:
+                with self.assertRaisesRegex(PublicationError, "ACTIONS_ACTOR_INVALID"):
+                    publish_validated_result("sample/repo", root)
 
     def test_multiple_exact_attributable_comments_are_an_incident(self):
         publication_intent = intent("d")

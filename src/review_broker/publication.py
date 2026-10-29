@@ -13,6 +13,7 @@ from jsonschema import Draft202012Validator
 
 from .evidence import credential_material_detected
 from .identity import canonical_bytes
+from .publisher_identity import PublisherIdentityError, resolve_publisher_identity
 
 RESULT_MARKER = "<!-- review-broker-result:v1 -->"
 RESULT_END_MARKER = "<!-- /review-broker-result:v1 -->"
@@ -258,10 +259,10 @@ class GitHubPublisher:
         self.runner = runner
 
     def identity(self) -> dict[str, Any]:
-        value = self._json("GET", "user")
-        if not isinstance(value.get("login"), str) or not isinstance(value.get("id"), int):
-            raise PublicationError("PUBLICATION_ACTOR_INVALID")
-        return {"login": value["login"], "id": value["id"]}
+        try:
+            return resolve_publisher_identity(lambda endpoint: self._json("GET", endpoint))
+        except PublisherIdentityError as exc:
+            raise PublicationError(str(exc)) from exc
 
     def observe(
         self,
