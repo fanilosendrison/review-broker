@@ -154,7 +154,6 @@ def validate_bounded_preflight_receipt(
     required = {
         "evidence_type": _evidence_type(admission_mode),
         "assurance_scope": _assurance_scope(admission_mode),
-        "admission_mode": admission_mode,
         "direct_sandbox_probe_executed": False,
         "comprehensive_isolation_qualified": False,
         "runtime_identity": "VERIFIED",
@@ -182,6 +181,12 @@ def validate_bounded_preflight_receipt(
         "BOUNDED_PREFLIGHT_FIELD_INVALID:" + key
         for key, value in required.items() if receipt.get(key) != value
     ]
+    receipt_mode = receipt.get("admission_mode")
+    if admission_mode == BOUNDED_PRIVATE_V1_ADMISSION:
+        if receipt_mode != admission_mode:
+            errors.append("BOUNDED_PREFLIGHT_FIELD_INVALID:admission_mode")
+    elif receipt_mode not in {None, BOUNDED_V1_ADMISSION}:
+        errors.append("BOUNDED_PREFLIGHT_FIELD_INVALID:admission_mode")
     if receipt.get("schema_version") != 1:
         errors.append("BOUNDED_PREFLIGHT_SCHEMA_INVALID")
     if any(receipt.get(key) != runtime_evidence.get(key) for key in RUNTIME_EVIDENCE_KEYS):

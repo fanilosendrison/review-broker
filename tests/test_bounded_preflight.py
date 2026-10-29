@@ -219,6 +219,18 @@ class BoundedEvidenceValidationTests(unittest.TestCase):
             self.assertEqual(result["assurance_scope"], "LOW_SENSITIVITY_V1")
             self.assertFalse(result["comprehensive_isolation_qualified"])
 
+    def test_historical_public_receipt_without_admission_mode_remains_valid(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest, receipt = self.fixture(root)
+            receipt.pop("admission_mode")
+            (root / "bounded-v1-preflight.json").write_bytes(
+                canonical_bytes(receipt) + b"\n"
+            )
+            result = validate_evidence(root, setup=manifest)
+            self.assertEqual(result["evidence_status"], "VALID")
+            self.assertEqual(result["assurance_scope"], "LOW_SENSITIVITY_V1")
+
     def test_comprehensive_mode_still_requires_original_probe(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
