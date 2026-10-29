@@ -1,10 +1,7 @@
 """Lost-delivery discovery and evidence-bound durable reconciliation."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-import json
 import os
-import subprocess
 from typing import Any, Mapping
 
 from .admission import BOUNDED_V1_ADMISSION, AdmissionError, AuthorizationPolicy, authorize, resolve_request, select_operational_admission
@@ -15,11 +12,23 @@ from .github_journal import GitHubRefJournal
 from .identity import artifact_identity, canonical_bytes
 from .queue import AttemptState
 from .recovery import RecoveryAction, decide_recovery
+from .reconciliation_github import (
+    ReconciliationGitHubError,
+    dispatch_review_workflow,
+    github_json,
+    paginated_list,
+    utc_now,
+    workflow_context,
+)
+from .predecessor import (
+    PredecessorError,
+    github_predecessor_authority,
+    verify_v2_operation,
+)
 from .request import RequestContractError, parse_issue_body
 
 
-class ReconciliationError(RuntimeError):
-    """Reconciliation cannot safely complete the advertised operation."""
+ReconciliationError = ReconciliationGitHubError
 
 
 class PrivateSourceCredentialRequired(ReconciliationError):
@@ -40,8 +49,8 @@ def reconcile_repository(
     max_ref_pages: int = 100,
     source_token: str | None = None,
 ) -> list[dict[str, Any]]:
-    getter = get_json or _gh_json
-    dispatcher = dispatch or _dispatch_review_workflow
+    getter = get_json or github_json
+    dispatcher = dispatch or dispatch_review_workflow
     default_branch = environment.get("REVIEW_BROKER_DEFAULT_BRANCH", "dev")
     authorization = AuthorizationPolicy(
         requesters=_csv_set(environment.get("REVIEW_BROKER_AUTHORIZED_REQUESTERS", "")),
@@ -50,13 +59,13 @@ def reconcile_repository(
     private_repositories = _csv_set(
         environment.get("REVIEW_BROKER_PRIVATE_SOURCE_REPOSITORIES", "")
     )
-    issues = _paginated_list(
+    issues = paginated_list(
         getter,
         f"repos/{broker_repository}/issues?state=open",
         maximum_pages=max_issue_pages,
         incomplete_error="ISSUE_SCAN_INCOMPLETE",
     )
-    refs = _paginated_list(
+    refs = paginated_list(
         getter,
         f"repos/{broker_repository}/git/matching-refs/heads/review-claims/",
         maximum_pages=max_ref_pages,
@@ -82,7 +91,7 @@ def reconcile_repository(
             request = parse_issue_body(issue.get("body") or "")
             authorize(issue["user"]["login"], request, authorization)
             repository = request["subject"]["repository"]
-            admission_getter = getter if get_json is not None else _gh_json
+            admission_getter = getter if get_json is not None else github_json
             admission_mode = select_operational_admission(request, environment, admission_getter)
             private_source = repository in private_repositories and admission_mode != BOUNDED_V1_ADMISSION
             if private_source and not source_token:
@@ -93,9 +102,17 @@ def reconcile_repository(
                 selected_token = source_token if private_source else None
 
                 def source_getter(endpoint: str) -> Any:
-                    return _gh_json(endpoint, token=selected_token)
+                    return github_json(endpoint, token=selected_token)
 
             resolved = resolve_request(request, source_getter)
+            if request.get("schema_version") == 2:
+                verify_v2_operation(
+                    request,
+                    resolved,
+                    github_predecessor_authority(
+                        broker_repository, active_journal, getter
+                    ),
+                )
         except PrivateSourceCredentialRequired:
             decisions.append({
                 "issue_number": issue.get("number"),
@@ -104,7 +121,9 @@ def reconcile_repository(
                 "outcome": "BLOCKED",
             })
             continue
-        except (AdmissionError, RequestContractError, KeyError, TypeError) as exc:
+        except (
+            AdmissionError, PredecessorError, RequestContractError, KeyError, TypeError,
+        ) as exc:
             decisions.append({
                 "issue_number": issue.get("number"),
                 "action": "REJECTED_REQUEST",
@@ -123,7 +142,8 @@ def reconcile_repository(
             })
             continue
         processed_requests.add(request_id)
-        record = active_journal.claim(request_id)
+        admission = resolved if request.get("schema_version") == 2 else None
+        record = active_journal.claim(request_id, admission)
         codespace_state = codespace_state or active_controller.state()
         decision = decide_recovery(record, codespace_state=codespace_state)
         if decision.action is RecoveryAction.RESUME_PRE_MODEL:
@@ -232,7 +252,7 @@ def _execute_recovery_decision(
             "attempt_id": record.attempt_id,
             "journal_state": record.state.value,
             "codespace_state": codespace_state,
-            "observed_at": _utc_now(),
+            "observed_at": utc_now(),
             "context": dict(context),
             "reason": decision.reason,
         }
@@ -304,97 +324,5 @@ def _reconciler_shutdown_observation(
     return receipt, observed
 
 
-def _paginated_list(
-    get_json: Any,
-    endpoint: str,
-    *,
-    maximum_pages: int,
-    incomplete_error: str,
-) -> list[dict[str, Any]]:
-    if maximum_pages < 1:
-        raise ValueError("maximum_pages must be positive")
-    values: list[dict[str, Any]] = []
-    separator = "&" if "?" in endpoint else "?"
-    for page in range(1, maximum_pages + 1):
-        batch = get_json(f"{endpoint}{separator}per_page=100&page={page}")
-        if not isinstance(batch, list) or any(not isinstance(item, dict) for item in batch):
-            raise ReconciliationError("PAGINATED_RESPONSE_INVALID")
-        values.extend(batch)
-        if len(batch) < 100:
-            return values
-    raise ReconciliationError(incomplete_error)
-
-
-def _dispatch_review_workflow(
-    broker_repository: str,
-    default_branch: str,
-    issue_number: int,
-) -> None:
-    _gh_request(
-        "POST",
-        f"repos/{broker_repository}/actions/workflows/review-request.yml/dispatches",
-        {"ref": default_branch, "inputs": {"issue_number": str(issue_number)}},
-    )
-
-
-def _gh_json(endpoint: str, *, token: str | None = None) -> Any:
-    child_environment = None
-    if token is not None:
-        child_environment = {
-            key: value
-            for key, value in os.environ.items()
-            if key in {"HOME", "PATH", "XDG_CONFIG_HOME", "SSL_CERT_FILE", "SSL_CERT_DIR"}
-        }
-        child_environment["GH_TOKEN"] = token
-    result = subprocess.run(
-        ["gh", "api", endpoint],
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=120,
-        shell=False,
-        env=child_environment,
-    )
-    if result.returncode != 0:
-        raise ReconciliationError("GITHUB_API_FAILED")
-    try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError as exc:
-        raise ReconciliationError("GITHUB_RESPONSE_INVALID") from exc
-
-
-def _gh_request(method: str, endpoint: str, payload: dict[str, Any]) -> None:
-    result = subprocess.run(
-        ["gh", "api", "--method", method, endpoint, "--input", "-"],
-        input=canonical_bytes(payload).decode("utf-8"),
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=120,
-        shell=False,
-    )
-    if result.returncode != 0:
-        raise ReconciliationError("GITHUB_API_FAILED")
-
-
-def workflow_context(
-    environment: Mapping[str, str],
-    *,
-    source: str,
-) -> dict[str, str]:
-    return {
-        "source": source,
-        "workflow_run_id": environment.get("GITHUB_RUN_ID", "UNAVAILABLE"),
-        "workflow_run_attempt": environment.get("GITHUB_RUN_ATTEMPT", "UNAVAILABLE"),
-        "workflow": environment.get("GITHUB_WORKFLOW", "UNAVAILABLE"),
-        "job": environment.get("GITHUB_JOB", "UNAVAILABLE"),
-        "ref": environment.get("GITHUB_REF", "UNAVAILABLE"),
-        "sha": environment.get("GITHUB_SHA", "UNAVAILABLE"),
-    }
-
-
 def _csv_set(value: str) -> frozenset[str]:
     return frozenset(item.strip() for item in value.split(",") if item.strip())
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
