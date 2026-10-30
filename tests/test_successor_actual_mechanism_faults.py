@@ -209,7 +209,7 @@ class ActualMechanismFaultTests(unittest.TestCase):
             request_id=record.request_id,
             attempt_id=record.attempt_id,
             observed_state="Shutdown",
-            context={"workflow_run_id": "synthetic"},
+            context={"workflow_run_id": "synthetic", "workflow_run_attempt": "1"},
         )
         result = record_shutdown_transition(record, shutdown)
         self.assertEqual(result.state, AttemptState.STOPPED)
@@ -221,7 +221,7 @@ class ActualMechanismFaultTests(unittest.TestCase):
             request_id=record.request_id,
             attempt_id=record.attempt_id,
             observed_state="Shutdown",
-            context={"workflow_run_id": "synthetic"},
+            context={"workflow_run_id": "synthetic", "workflow_run_attempt": "1"},
         )
         fake = dict(shutdown, observed_state="Available")
         with self.assertRaisesRegex(StateTransitionError, "SHUTDOWN_OBSERVATION_INVALID"):
