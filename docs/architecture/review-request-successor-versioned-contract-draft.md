@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Versioned Successor Review Contracts — Design Draft"
-version: "0.1.3"
+version: "0.1.4"
 ---
 
 # Versioned Successor Review Contracts — Design Draft
@@ -481,62 +481,68 @@ receipts remain unchanged. Source and packet file/line citations retain
 their supported mechanical meaning, not substantive-truth authority.
 Unsupported binary/PDF anchors have no invented source-line semantics.
 
-## 7. Durable lifecycle, permanent refusal and recoverable failure
+## 7. Durable lifecycle and bounded pre-model failure protocol
 
-The normal lifecycle remains:
-`REQUESTED → ADMITTED → PREPARED → ARMED → TERMINAL_CAPTURED →
-VALIDATED → REPORTED → STOPPED` (plus existing indeterminate paths).
-**The v3 failure paths below are proposed, not implemented today.**
+The exact proposed journal wire, failure receipts, dispatch transaction
+and crash/competing-worker cases are specified in the
+**[pre-model preparation protocol annex](pre-model-preparation-failure-protocol-draft.md)**.
+This non-normative v3 design is not implemented. [Draft test PR #57](https://github.com/fanilosendrison/review-broker/pull/57)
+independently identified two **current-code** behavior gaps:
+repeated `ADMITTED` dispatch and no receipt-backed direct
+`REQUESTED/ADMITTED → STOPPED`.
 
-| Event | Candidate disposition |
-| --- | --- |
-| Invalid request, disallowed kind or unauthorized target proven before claim | Reject without creating a claim |
-| Permanent error after `REQUESTED` or `ADMITTED`: unauthorized source, repository/object identity mismatch, pinned digest mismatch or unsupported requested atomicity | Record typed permanent-refusal evidence, then specialized pre-model terminal `STOPPED` after validated shutdown; never create `PREPARED` |
-| Transient GitHub/network/source-transfer interruption | Persist a CAS-protected **retryable-blocked disposition** under the original unarmed claim; no unbounded redispatch |
-| Crash before failure outcome is committed | Revalidate request/admission and permit only bounded, evidence-backed same-claim recovery |
-| Already `PREPARED` | Exact packet must be reproduced byte-identically; no refresh |
-| Already `ARMED` | At-most-once semantics unchanged; never retry inference |
+**Keep the existing AttemptState family.** A v3-only versioned
+preparation-control subrecord lives in the same Git-ref journal claim,
+never in a separate cross-ref ledger. It binds current reservation
+generation/worker, durable failure classification and evidence IDs.
+Historical v1/v2 journal serialization and recovery are preserved.
 
-### Minimal pre-model journal extension, subject to qualification
+**Initial automatic dispatch limit is exactly one.** The v3
+controller CAS-reserves generation 1 before external GitHub workflow
+dispatch. A worker must bind its exact run ID and prove the current
+reservation/generation before fetching source material, and recheck
+immediately before `PREPARED` and `ARMED`. Direct legacy
+`issues:opened` triggering must not bypass reservation for v3.
+Lost dispatch acknowledgement is **ambiguous**, not permission
+to dispatch again. No unbounded hourly reconciler redispatch.
 
-The existing `queue.py` permits `REQUESTED/ADMITTED →
-INDETERMINATE`, but **does not** currently permit a direct pre-model
-`REQUESTED → STOPPED` or `ADMITTED → STOPPED`. The candidate adds
-only **specialized receipt-validating transitions** for these two
-source states. Evidence must bind the exact request/attempt and
-admission, failure reason/source/identity, broker-owned policy,
-history without any `ARMED` transition, `invocation_count=0` and
-independently verified Codespace `Shutdown` (even if already shut down).
-A generic state transition must not inherit this permission. If
-shutdown cannot be observed, retain the refusal as durably blocked,
-report an infrastructure incident and **do not fabricate STOPPED**.
-A terminal refused claim cannot be rearmed by ordinary reconciliation.
+**Failure classification is bounded:** verified permanent
+source/identity/digest/unsupported-atomicity violations cause a
+durable `REFUSED_PERMANENT` CAS disposition before cleanup.
+A proven transient error or indeterminate observation leads to
+`BLOCKED` with a typed `TRANSIENT` or `UNKNOWN` receipt. An
+ambiguous 404 or failed GitHub dispatch response is not silently
+called a permitted omission. A new generation on the same unarmed
+attempt requires **one fresh authenticated recovery authorization
+per dispatch**, a previous-run/quiescence check and exact
+stable-source-identity revalidation. There are zero automatic
+redeliveries after the initial reservation: **no timeout
+heuristic** is needed to enforce this bound.
 
-Transient failure instead persists a typed **retryable-blocked
-preparation record** via an atomic journal compare-and-swap.
-The reconciler must inspect that record and **must not dispatch a
-known failed request every hour**. A corrected cause plus explicit
-recovery authorization can resume the **same** unarmed attempt
-only after revalidation of stable source IDs, admission and version
-pins. For unobserved crashes, use a finite, auditable preparation-
-generation/automatic-dispatch limit; exact budget and crash ordering
-are an offline acceptance gate, **not** an arbitrary hidden timeout.
-No new general AttemptState is proposed.
+**Terminal permanent refusal:** once the refusal CAS suppresses
+every future preparation/armament path, validate independently
+observed `Shutdown` for the exact dedicated Codespace owner.
+A narrowly specialized v3-only receipt-validation operation may
+transition `REQUESTED → STOPPED` or `ADMITTED → STOPPED`
+when it proves the same request/attempt, permanent failure,
+zero invocations, no `ARMED` history and actual Shutdown.
+Never accept generic STOPPED or create a fake ReviewResult.
+An unverified shutdown leaves the refusal durably blocked;
+reconciler performs cleanup only. A competing or stale worker
+cannot arm after its reservation is no longer current.
 
-### Drift and independent re-review
+**Keep packet and inference boundaries separate.** Before durable
+`PREPARED`, a permitted mutable source may be reacquired only
+under the same verified repository/object identity. After
+`PREPARED`, reconstruct exact recorded packet bytes or fail.
+The original durable `ARMED` and `invocation_count=1` guards
+remain before any model-capable transport; provider exactly-
+once is not claimed. No new general attempt state or service
+is justified by this proposal.
 
-An unpinned mutable source may be re-fetched before a **durably
-committed** `PREPARED` packet under the same authorized unarmed
-claim, but only if its bound repository/object IDs are unchanged.
-No pre-commit read constitutes a committed snapshot. After
-`PREPARED`, require the exact previously bound packet bytes or
-fail closed. A distinct authorized `repeat_same_head` is necessary
-for a **new review** after a committed packet or model-capable
-attempt, not for reacquiring an uncommitted source.
-
-`ARMED` and `invocation_count=1` remain independently durable
-**before** model transport. Never retry after arming or assert
-provider-level exactly-once. No v1/v2 journal is reinterpreted.
+The annex lists **PM01–PM20 future executable fault injections**;
+none is asserted to have passed on v3. The 15 actual-module tests
+in PR #57 cover the current v1/v2 code, not these v3 changes.
 
 ## 8. Result publication and applicability
 
@@ -601,7 +607,9 @@ of the unimplemented successor, real GitHub permissions, full RFC 8785,
 production crash/replay semantics, or an independent model review**.
 
 The first executable candidate must still independently qualify
-**without model invocation**:
+**without model invocation**, including the annex's **PM01–PM20**
+dispatch, refusal, CAS race and crash scenarios. Those proposed
+test cases have not been executed on any v3 implementation:
 
 1. Closed v3 request validation including required atomicity, unknown kinds,
    duplicate IDs, contradictory types and invalid expectation digests.
@@ -671,9 +679,12 @@ The following are **not silently resolved** by publishing this draft:
   heterogeneous mutable GitHub sources still reject.
 - Qualification of the required `references: []` schema, stable numeric
   `subject.repository_id` and authenticated reference-object binding.
-- Evidence-backed specialized pre-model `STOPPED` transitions, typed
-  permanent/transient dispositions, bounded reconciler dispatch and
-  fault-injection checks. None are implemented in this document.
+- Qualify the [pre-model protocol annex](pre-model-preparation-failure-protocol-draft.md):
+  versioned journal subrecord, exactly one automatic dispatch,
+  current-generation/worker fencing at `PREPARED` and `ARMED`,
+  failure receipts, specialized `STOPPED`, manual recovery
+  authorization and PM01–PM20 fault-injection matrix.
+  These v3 paths remain **unimplemented**.
 - Exact permission administration and authenticated GitHub Issue/comment
   acquisition; no unauthorized App permission expansion.
 - GitHub PR reference component collections, upload receipts, remote URL
@@ -729,11 +740,12 @@ bind each answer to an executable counterexample fixture:
    unsupported selector, unauthorized access, disallowed repository,
    failed expected digest or unestablished required atomicity must not
    accidentally become a recoverable `REQUESTED/ADMITTED` retry loop.
-   **Proposed answer:** extend only the two specialized, receipt-validated
-   `REQUESTED/ADMITTED → STOPPED` paths for permanent pre-model refusals;
-   persist a separate CAS-bound retryable-blocked disposition for
-   transient errors. These changes are *not implemented*. Fault-inject
-   dispatch, failure evidence, shutdown and recovery before adoption.
+   **Proposed answer:** the [focused protocol annex](pre-model-preparation-failure-protocol-draft.md)
+   fixes a single automatic dispatch CAS reservation, journal-bound
+   permanent/blocked dispositions, one fresh owner authorization per
+   subsequent dispatch, worker-generation fencing, and a versioned
+   specialized `REQUESTED/ADMITTED → STOPPED` path after actual Shutdown.
+   None is implemented; PM01–PM20 must be fault-tested before adoption.
    The runbook currently supports bounded same-attempt pre-model recovery;
    it does **not** authorize a later re-review after `ARMED`.
 6. **Testable atomicity contract (#56 F006).** `atomicity=true` is an
@@ -772,9 +784,11 @@ non-normative design of PR #52**:
 - Independent reviewers should seek counterexamples to identity bases,
   mutable-source recovery, atomicity scope, permission boundaries, mission
   evidence authority, result provenance, required/optional admission and
-  minimum possible representation. They must include the two **companion
-  draft annexes** and source-check the experimental 55-case report rather
-  than treating its producer PASS count as implemented qualification.
+  minimum possible representation. They must include all **three**
+  companion annexes, especially the pre-model protocol and PM01–PM20,
+  and source-check both the 55-case synthetic report and 15-case
+  current-module test evidence rather than misrepresenting either
+  as v3 qualification.
 - A favorable review is **not** automatic adoption as normative contract,
   approval to change executable schemas, expansion of GitHub permissions,
   launch of a Codespace or inference, or downstream merge authorization.
