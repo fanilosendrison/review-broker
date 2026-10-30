@@ -211,9 +211,15 @@ jobs:
           require(graphql_status == 200 and isinstance(mutation_result, dict), "GRAPHQL_UPDATE_HTTP_FAILED")
           require(not mutation_result.get("errors"), "GRAPHQL_UPDATE_ERRORS")
 
-          status, updated_ref = request("GET", f"/repos/{REPOSITORY}/git/ref/{short_ref}")
-          require(status == 200 and isinstance(updated_ref, dict), "UPDATED_REF_READ_FAILED")
-          require(updated_ref.get("object", {}).get("sha") == commit_c, "GRAPHQL_UPDATE_READBACK_MISMATCH")
+          update_readbacks = []
+          for _ in range(10):
+              status, updated_ref = request("GET", f"/repos/{REPOSITORY}/git/ref/{short_ref}")
+              observed_sha = updated_ref.get("object", {}).get("sha") if isinstance(updated_ref, dict) else None
+              update_readbacks.append({"status": status, "sha": observed_sha})
+              if status == 200 and observed_sha == commit_c:
+                  break
+              time.sleep(0.5)
+          require(update_readbacks[-1] == {"status": 200, "sha": commit_c}, "GRAPHQL_UPDATE_READBACK_MISMATCH")
 
           stale_status, stale_result = request(
               "POST", "/graphql", {"query": mutation, "variables": variables}
@@ -234,6 +240,7 @@ jobs:
               "head_sha": HEAD_SHA,
               "initial_concurrent_creation": "PASS",
               "intervals_overlap": intervals_overlap,
+              "post_update_readbacks": update_readbacks,
               "production_workflow_authority": "UNQUALIFIED",
               "qualification_ref": QUALIFICATION_REF,
               "qualification_ref_final_sha": commit_c,
