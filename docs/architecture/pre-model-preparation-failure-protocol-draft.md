@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Successor Pre-Model Preparation Failure Protocol"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Successor v3 — durable pre-model preparation outcomes
@@ -55,7 +55,7 @@ The required `pre_model_control` fields are:
 | `disposition` | One of `UNRESERVED`, `RESERVED`, `BLOCKED`, `REFUSED_PERMANENT` |
 | `reservation_id` | Null for generation 0; otherwise exact immutable dispatch-reservation identity |
 | `authorization_id` | Null for generation 0; otherwise exact initial request ID or independently authorized recovery receipt ID |
-| `worker` | Null until a worker's exact GitHub workflow run ID/attempt are durably bound |
+| `worker` | Null until bound; otherwise **exactly** `{"run_id": <positive integer>, "run_attempt": <positive integer>}`, persisted by worker-winning CAS before acquisition |
 | `failure_receipt_id` | Null until a current generation's validated failure receipt is durably bound |
 
 The schema and combination rules are **closed**. `UNRESERVED` is legal
@@ -142,6 +142,46 @@ If previous-run termination or identity cannot be established,
 record `BLOCKED / UNKNOWN` and do not infer that retry is safe.
 An owner may decline recovery; a blocked unarmed attempt is not
 a completed review.
+
+### Exact candidate recovery-authorization basis
+
+The **only** qualifying v3 recovery authority is an authenticated
+owner/operator action that produces this closed receipt (illustrative
+typed placeholders, **not** a live authorization):
+
+```json
+{
+  "schema_version": 1,
+  "evidence_type": "pre-model-recovery-authorization",
+  "request_id": "request:sha256:<64 lowercase hex>",
+  "attempt_id": "attempt:sha256:<64 lowercase hex>",
+  "previous_generation": 1,
+  "previous_reservation_id": "preparation-dispatch:sha256:<64 lowercase hex>",
+  "authorization_nonce": "<32 lowercase hex>",
+  "actor_github_id": 12345,
+  "prior_run_observation_id": "artifact:sha256:<64 lowercase hex>",
+  "authorized_at": "2026-10-30T00:00:00Z"
+}
+```
+
+The recovery authorization ID is
+`"pre-model-recovery:sha256:" + SHA256(RFC8785(receipt))`.
+Its `actor_github_id` must be verified from trusted GitHub/operator
+authentication for the exact requester/claim; the raw field is
+**not** proof of authorization. The prior-run observation must
+establish an appropriately quiescent previous workflow/resource,
+or fail closed. The authenticated receipt is durably bound in
+the single Git-ref journal before new dispatch. A unique nonce
+alone never grants permission, and repeat use of the same receipt
+cannot create another generation.
+
+The first generation uses `authorization_id=request_id`; subsequent
+generations use the above verified `pre-model-recovery:sha256:` ID.
+A recovery CAS must require `previous_generation` and the current
+prior reservation to match the latest journal state. Recovered
+generation number and dispatch reservation are derived
+deterministically from that winner; no independent counter or
+new model-attempt ID is allocated.
 
 This is a **finite automatic policy without timeouts**. It does
 not impose an arbitrary cap on separately approved manual owner
@@ -293,7 +333,7 @@ executed or independently qualified fixtures:
 | PM13 | Worker A and worker B race over one reservation | One run-bound winner; stale worker cannot prepare or arm |
 | PM14 | `PREPARED` packet rebuilt with different mutable bytes | Rebuild rejected without rewriting history |
 | PM15 | `ARMED` then lost transport response | Existing indeterminate/no-retry path; no manual reuse of invocation |
-| PM16 | Replayed/stale manual recovery authorization ID | No new reservation; no generation increase |
+| PM16 | Replayed/stale owner recovery nonce, wrong actor or previous reservation | No new reservation; no generation increase or authorization from asserted actor text |
 | PM17 | v1/v2 claim/read/reconciler and historical results | Exact old bytes/semantics remain unchanged |
 | PM18 | Receipt contains raw secret, unsupported code or malformed canonical bytes | Validation rejects and no successful terminal disposition |
 | PM19 | Permanent refusal already `STOPPED` when duplicate event arrives | No new claim, dispatch, or model call |
