@@ -176,13 +176,21 @@ jobs:
               "CREATE_REJECTION_NOT_DEFINITE_ALREADY_EXISTS",
           )
 
-          status, winner_ref = request("GET", f"/repos/{REPOSITORY}/git/ref/{short_ref}")
-          require(status == 200 and isinstance(winner_ref, dict), "WINNER_REF_READ_FAILED")
-          winner_sha = winner_ref.get("object", {}).get("sha")
           expected_winner_sha = responses[successes[0]]["proposed_sha"]
-          require(winner_sha == expected_winner_sha, "CREATE_WINNER_READBACK_MISMATCH")
+          creation_readbacks = []
+          for _ in range(10):
+              status, winner_ref = request("GET", f"/repos/{REPOSITORY}/git/ref/{short_ref}")
+              winner_sha = winner_ref.get("object", {}).get("sha") if isinstance(winner_ref, dict) else None
+              creation_readbacks.append({"status": status, "sha": winner_sha})
+              if status == 200 and winner_sha == expected_winner_sha:
+                  break
+              time.sleep(0.5)
+          require(
+              creation_readbacks[-1] == {"status": 200, "sha": expected_winner_sha},
+              "CREATE_WINNER_READBACK_MISMATCH",
+          )
 
-          commit_c = commit(winner_sha, tree_sha, "C")
+          commit_c = commit(expected_winner_sha, tree_sha, "C")
           graphql_status, repository_query = request(
               "POST",
               "/graphql",
@@ -235,6 +243,7 @@ jobs:
               "base_dev_sha": base_sha,
               "create_responses": responses,
               "create_single_winner": True,
+              "creation_readbacks": creation_readbacks,
               "executing_sha": WORKFLOW_SHA,
               "graphql_expected_old_cas": "PASS",
               "head_sha": HEAD_SHA,
