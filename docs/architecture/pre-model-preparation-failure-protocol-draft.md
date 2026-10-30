@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Successor Pre-Model Preparation Failure Protocol"
-version: "0.1.2"
+version: "0.1.3"
 ---
 
 # Successor v3 — durable pre-model preparation outcomes
@@ -64,6 +64,41 @@ semantics. **Rollout must prohibit an older v1-only executable from
 processing or rewriting a v2 claim**; merely changing the new parser
 does not retroactively protect older deployed workers. This version
 migration is a prerequisite before any v3 claim is enabled.
+
+### Minimal journal v2 migration candidate — isolated qualification #58
+
+[Test-only PR #58](https://github.com/fanilosendrison/review-broker/pull/58)
+now contains a **second, smaller** closed journal-v2 candidate alongside
+the original overwide pre-model prototype. The
+`journal-v2.compat.candidate.schema.json` variant retains **all
+production v1 `AttemptRecord.as_dict` fields under their original
+names**, plus `schema_version=2` and **only one new top-level field:
+`pre_model_control`**. It preserves historical `history[]` state/event
+entries (and their `evidence_ids`), appending bounded v3-only
+pre-model events without rewriting previous entries. The initial
+prototype's extra `packet_evidence_id` is unnecessary: `PREPARED`
+already binds packet evidence through its transition history and
+`evidence_ids`.
+
+The isolated compatibility adapter calls actual production
+`AttemptRecord.from_dict`/`as_dict` and `transition_record` for the
+legacy portion **after** a strict v2 schema/version check. It is
+not installed in `src/review_broker` or the live GitHub-ref journal.
+[CI 41052515721](https://github.com/fanilosendrison/review-broker/actions/runs/41052515721)
+reports **546 passing tests**, including 12 new migration-shape
+roundtrip/CAS tests and 15 separately mocked external-authority
+boundary tests. The full experiment is test-only; no v3 deployed
+journal, old-worker rollout, distributed GitHub-ref CAS or
+Codespace owner is thereby qualified.
+
+**Important v1 transition detail:** current production may durably
+record `state=ARMED` with `invocation_count=0` before separately
+setting invocation count to 1. The minimal candidate round-trips
+this intermediate as a valid state; a future trusted executor may
+invoke Codex **only after** the one-invocation durable boundary is
+established. If v3 chooses to combine ARMED and count=1 in one CAS,
+that is a separate normative change requiring counterexamples
+and preserving v1 historical records.
 
 The required `pre_model_control` fields are:
 
@@ -158,6 +193,20 @@ create another reservation or resend the same external dispatch.
 A failed/stale CAS is re-read; it is never force-updated or blindly
 retried. Losing dispatch or journal-write acknowledgement cannot
 create a second model-capable invocation.
+
+**Actual GitHub Actions API boundary (October 2026):** the
+[workflow dispatch endpoint](https://docs.github.com/en/rest/actions/workflows)
+supports an optional `return_run_details: true` argument returning
+`200` with `workflow_run_id`; its default remains `204` without a run
+ID. The current broker's `dispatch_review_workflow` does **not**
+yet request or persist this optional result. A future v3 controller
+may use the richer acknowledged run ID as evidence **only after**
+authenticated independent GET readback verifies exact broker
+repository ID, workflow ID, expected executable HEAD, run attempt
+and registered worker/reservation correlation. A `204`, invalid
+200 response or lost transport is **UNKNOWN**, not a reason for
+automatic redelivery. The run ID alone is **not** a source App
+authorization, an owner approval or a Codespace ownership lease.
 
 ### Explicit recovery only, no arbitrary timeout
 
@@ -326,6 +375,23 @@ For a proven `PERMANENT` failure **after claim, before PREPARED**:
    genuine `Shutdown` observation for that exact Codespace.
    A worker that never started its Codespace still needs a real
    observed Shutdown under the existing rule. Never synthesize it.
+
+   **Qualification result/limit of #58:** simulated metadata tests
+   reject a different run, workflow, repository, source HEAD and
+   reservation, and reject a mismatched injected resource owner.
+   However the [GitHub Codespaces REST resource
+   information](https://docs.github.com/en/rest/codespaces/codespaces)
+   provides a name, state, owner and repository context, **not**
+   an automatically authenticated exclusive *ReviewRequest/worker
+   generation* lease. The [Actions concurrency
+   group](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
+   governs scheduled workflows (including pending cancellations)
+   but does not by itself prove the absence of out-of-band
+   Codespace controllers. A matching *injected* owner record in a
+   test is a conditional assumption, **not qualified ownership**.
+   No stop operation may become permissible in v3 until that
+   external authority is independently established, or the
+   protocol must retain a blocked cleanup disposition.
 4. Via a **specialized** version-gated journal CAS, move only
    `REQUESTED → STOPPED` or `ADMITTED → STOPPED` if the exact
    already-committed `REFUSED_PERMANENT` receipt, no-`ARMED`
@@ -423,12 +489,18 @@ pre-model `STOPPED` transition. Reconciler must never infer liveness
 or permission from a timeout. An ambiguous/unknown outcome is
 explicitly blocked pending authorized recovery or disposition.
 
-**Not resolved by this draft:** strict dual-version journal reader
-and rollout incompatibility with older deployed workers; implementation
-API/schema details of the v3 claim, proven GitHub worker-input correlation
-and atomic fencing at `PREPARED/ARMED`; global Codespace ownership proof
-across requests, actual permission administration, offline race/fault
-test results or independent review of all governing sources. These require **separately authorized**
+**Not resolved by this draft:** acceptance of the new minimal
+v1-compatible journal-v2 wire candidate (its earlier overwide
+alternative remains explicitly superseded only as a **design
+preference**, not a normative artifact), strict dual-version decoder
+rollout isolation against **older deployed workers**, actual
+GitHub-ref CAS and external dispatch 200/204 evidence recovery,
+authenticated worker/run and owner-approval sources, and
+atomic worker fencing at `PREPARED/ARMED`. **Cross-request shared
+Codespace ownership is still unproven** even when simulated
+metadata comparisons pass; no operational stop authorization
+derives from those tests. Live external fault injection and
+source-complete independent review also remain missing. These require **separately authorized**
 normative-contract acceptance and implementation/qualification.
 
 No existing v1/v2 source files, workflows, package schemas,
@@ -441,6 +513,8 @@ were modified by this proposal.
 `GENERAL_ATTEMPT_STATE_ADDED=NO`
 `SPECIALIZED_STOPPED_TRANSITION=PROPOSED_NOT_IMPLEMENTED`
 `STRICT_JOURNAL_V2_DECODER_QUALIFIED=NO`
+`MINIMAL_JOURNAL_V2_SHAPE_TESTED_OFFLINE=YES`
+`ACTUAL_GITHUB_DISPATCH_AUTHORITY_QUALIFIED=NO`
 `WORKER_GENERATION_FENCING_QUALIFIED=NO`
 `SHARED_CODESPACE_OWNERSHIP_QUALIFIED=NO`
 `REAL_JOURNAL_CONCURRENCY_QUALIFIED=NO`
