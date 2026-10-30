@@ -12,6 +12,7 @@ from urllib.request import Request
 from .github_http_live_v3 import (
     HttpExecutorV3, HttpResponseV3, _RejectRedirects, urllib_executor,
 )
+from .github_graphql_response_v3 import graphql_error_code
 from .github_journal_transport_v3 import (
     CreateRefResultV3, CreateRefStatusV3, GraphQLRefUpdateV3,
     GraphQLUpdateResultV3, ReadResultV3, ReadStatusV3, TransportSnapshotV3,
@@ -379,14 +380,7 @@ class GitHubTransportLiveV3:
             if not isinstance(raw_errors, list) or not raw_errors:
                 errors = ("GRAPHQL_RESPONSE_INVALID",)
             else:
-                errors = tuple(
-                    f"GRAPHQL_TYPED_{error['type']}"
-                    if (isinstance(error, dict) and isinstance(error.get("type"), str)
-                        and re.fullmatch(r"[A-Z][A-Z0-9_]*", error["type"])
-                        and isinstance(error.get("path"), list) and "updateRefs" in error["path"])
-                    else "GRAPHQL_APPLICATION_ERROR"
-                    for error in raw_errors
-                )
+                errors = tuple(graphql_error_code(error) for error in raw_errors)
         data = body.get("data")
         if response.status != 200:
             return GraphQLUpdateResultV3(response.status, errors or ("GRAPHQL_HTTP_ERROR",))
