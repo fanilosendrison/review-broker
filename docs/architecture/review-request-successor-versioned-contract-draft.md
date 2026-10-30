@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Versioned Successor Review Contracts — Design Draft"
-version: "0.1.7"
+version: "0.1.8"
 ---
 
 # Versioned Successor Review Contracts — Design Draft
@@ -541,16 +541,28 @@ The current trusted workflow prepares the packet before its
 first Codespace `start`; future v3 must enforce a mandatory
 `PREPARED`/current-worker/generation gate **before every
 Codespace start/SSH/copy/stop effect**, including late workers.
-After a durable `REFUSED_PERMANENT` CAS, a trusted, complete
-workflow trace and qualified start gate can support an exact
-`pre-model-no-codespace-access` receipt. The journal then
-terminalizes that attempt with **zero Codespace operations**,
-zero invocations, and no fabricated `Shutdown` or ReviewResult.
-Another request's Codespace may legitimately remain Available.
+After a durable `REFUSED_PERMANENT` CAS, prefer a
+**proof by preventive execution gate**, not an exhaustive
+search for negative evidence in workflow-step logs:
+an authenticated, version-pinned trusted executable with
+*every* effectful Codespace entry point fenced by committed
+`PREPARED` and the current worker/generation; no unguarded
+old workers, alternative CLI/reconciler paths or early
+Codespace-control credential; and a journal history that
+never reached `PREPARED`. **Together**, these conditions
+imply the refused claim did not acquire Codespace through
+the broker, even if a workflow delivery is late. A
+versioned, evidence-bound no-acquisition receipt can then
+terminalize the claim with **zero Codespace operations**
+and no fabricated `Shutdown` or ReviewResult. Another
+request's Codespace may legitimately remain Available.
 
-If a start or other Codespace access may have occurred, if
-the worker/run inventory is incomplete, or if the mandatory
-gate is unqualified, **do not infer non-acquisition**.
+GitHub Actions job/step metadata is useful for run identity
+and diagnostics but does not, on its own, prove absence
+of arbitrary side effects or an alternative entry point.
+If deployed version, old-worker isolation, entry-point
+closure, credential confinement or the mandatory gate
+is unqualified, **do not infer non-acquisition**.
 Keep the refusal blocked, perform no blind stop, and require
 explicit recovery/authority investigation. Only **actual
 resource-acquiring** cleanup requires continuous exclusive
@@ -594,8 +606,15 @@ records the precise GitHub Actions 200/204 dispatch distinction,
 the new no-Codespace-access terminal evidence alternative, and
 why a lost response never permits automatic redelivery. The
 [isolated PM26–PM35 tests](https://github.com/fanilosendrison/review-broker/pull/58)
-exercise that alternative with **injected** workflow evidence,
-not a verified production start-gate attestation.
+exercise that alternative with **injected** workflow evidence.
+Additional source-confronted tests explore the **conditional
+preventive-gate implication**, while the current live
+`CodespaceController.stop()` and Shutdown receipt are verified
+to lack a per-request resource-owner authorization check.
+Neither set of tests proves a deployed v3 gate or external
+worker/credential isolation. The original test receipt
+requiring complete run traces is an **overwide experimental
+candidate**, not necessarily the minimal future wire.
 
 ## 8. Result publication and applicability
 
@@ -745,9 +764,13 @@ The following are **not silently resolved** by publishing this draft:
   via a unified discovery/controller path, **atomic**
   generation/worker fencing at `PREPARED` and `ARMED`, and a
   mandatory Codespace-access gate. Pre-model `STOPPED` requires
-  a trustworthy non-acquisition receipt, **not** automatic
-  shutdown of the global Codespace. Only genuinely acquired
-  resource cleanup requires exclusive ownership and Shutdown.
+  a trustworthy non-acquisition receipt backed preferably
+  by a **versioned, preventive, universally enforced
+  Codespace side-effect gate**, **not** arbitrary negative
+  run logs or automatic shutdown of the global Codespace.
+  All old-worker/CLI/reconciler bypass paths must be excluded.
+  Only genuinely acquired resource cleanup requires
+  exclusive ownership and Shutdown.
   Manual recovery authorization and **PM01–PM35** live
   fault-injection remain unqualified. These v3 paths are
   **not implemented**.
