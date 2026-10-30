@@ -76,9 +76,9 @@ class LegacyV3NamespaceIsolationTests(unittest.TestCase):
         called=[]
         def get(endpoint):
             called.append(endpoint)
-            if endpoint == f"repos/{BROKER}/issues?state=open":
+            if endpoint.startswith(f"repos/{BROKER}/issues?state=open&per_page=100&page="):
                 return [issue]
-            if endpoint == f"repos/{BROKER}/git/matching-refs/heads/review-claims/":
+            if endpoint.startswith(f"repos/{BROKER}/git/matching-refs/heads/review-claims/?per_page=100&page="):
                 return []
             raise AssertionError("UNEXPECTED_GITHUB_READ:"+endpoint)
         result=reconcile_repository(
