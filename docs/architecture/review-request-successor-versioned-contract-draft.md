@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Versioned Successor Review Contracts — Design Draft"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Versioned Successor Review Contracts — Design Draft
@@ -16,11 +16,16 @@ version: "0.1.0"
 
 This is a **draft successor contract design** for #51 PI-REQ-03, composed with
 the accepted but non-normative #44 D1–D9 mission direction. It is derived
-from the non-normative requester-reference proposal in **PR #52 at
-`6118954dd29c330bc5e21c742934e2a39821eb42`**. That PR has passed
-documentary product-owner adjudication but is **not merged**, and its current
-head has **no independent review**. This draft may be discussed, but is
-**not** authority to merge #52, change schemas, or enable inference.
+from the **published non-normative** requester-reference proposal in
+**PR #52 at `6118954dd29c330bc5e21c742934e2a39821eb42`**, merged
+into `dev` as commit `f9e902ee577d3a22330c3bf2fb04dcae28ed3034`
+after the owner explicitly accepted the **design direction with bounds**.
+The exact-head independent [ReviewRequest #56](https://github.com/fanilosendrison/review-broker/issues/56#issuecomment-6511613848)
+remains `COMPLETED / VALID / CURRENT / NO_GO` with seven findings and five
+uncertainties; earlier #53/#54 `NO_GO` results remain immutable. Product-owner
+publication **does not** promote a model verdict to `GO` or establish
+normative/executable successor guarantees. This draft is not authority to
+change schemas or enable inference.
 
 The current accepted v1/v2 request/result/packet/identity/attempt evidence
 remains immutable. The current implementation remains the authority for
@@ -535,16 +540,86 @@ The following are **not silently resolved** by publishing this draft:
 general ingestion platform.** The accepted non-normative direction in #51
 is not itself a substitute for these technical decisions.
 
+## 10a. Focused falsification gates inherited from ReviewRequest #56
+
+[ReviewRequest #56](https://github.com/fanilosendrison/review-broker/issues/56#issuecomment-6511613848)
+independently reviewed the **parent** design proposal, not this versioned draft.
+Its seven findings are **not automatically resolved** by this PR. Before
+normative adoption, explicitly resolve the following contract questions and
+bind each answer to an executable counterexample fixture:
+
+1. **Pre-commit drift vs authorized re-review (#56 F001).** Distinguish a
+   pre-`PREPARED` reacquisition under the *same* unarmed claim, where no
+   snapshot has been committed, from a new `repeat_same_head` review of
+   updated remote material. A committed `PREPARED` snapshot must never be
+   refreshed under the same claim. Document the persisted evidence that
+   makes the boundary observable on crash/recovery, including a failed
+   or incomplete pre-commit acquisition.
+2. **Immutable GitHub identity (#56 F002).** An `owner/repository` name can
+   be renamed, transferred or reused and is **not** an immutable identity.
+   The admitted resolved request and packet must bind GitHub's authenticated
+   stable repository ID, object identity and authorized installation, not
+   merely a name and the captured content digest. If a name resolves to a
+   different repository ID on recovery, **fail closed**. Decide whether the
+   canonical v3 selector requires a requester-supplied expected repository
+   ID or obtains and durably binds one before claiming a new identity;
+   do not accept an unprovable original target. This is a pending schema
+   question, not a silently inserted field.
+3. **Inline/upload logical slot continuity (#56 F003).** Reusing the same
+   requester-selected reference ID can express continuity of a question,
+   **not** substantive evidence equivalence. A different content value
+   produces a distinct exact request/packet, and a same-intent successor
+   cannot bypass explicit re-review permission and trusted predecessor
+   evidence. Do not add an automatic semantic-equivalence classifier.
+4. **Canonical basis and historical compatibility (#56 F004).** Qualify the
+   exact v3 closed schema, RFC 8785 canonical basis, version-separated
+   identity domain, source selectors and predecessor rules using offline
+   request/intent/packet fixtures, including a changed logical GitHub
+   repository identity. Historical v1/v2 identities must remain immutable.
+5. **Permanent versus recoverable pre-model failure (#56 F005).** An
+   unsupported selector, unauthorized access, disallowed repository,
+   failed expected digest or unestablished required atomicity must not
+   accidentally become a recoverable `REQUESTED/ADMITTED` retry loop.
+   Differentiate permanent refusal from a qualified transient transfer
+   error. Explicitly map both to the **existing journal transitions**,
+   event/evidence obligations, and no-inference cleanup semantics, or
+   demonstrate by counterexample why a new state is unavoidable.
+   The runbook currently supports bounded same-attempt pre-model recovery;
+   it does **not** authorize a later re-review after `ARMED`.
+6. **Testable atomicity contract (#56 F006).** `atomicity=true` is an
+   obligation, not a claim of general cross-provider snapshot isolation.
+   Define which **exact combinations of mutable/immutable sources** have
+   a qualified common consistency basis, which authenticated facts prove
+   the cut, and what a failing fixture looks like. Do not infer coherence
+   from same clock times, separate hashes or completed pagination.
+   All unsupported source combinations must fail before `PREPARED`; avoid
+   treating perpetual rejection as proof that useful atomicity is supported.
+7. **Source-complete independent qualification (#56 F007).** The v2 broker
+   packet examines only PR-changed material. A later independent review
+   claiming conformity to #43/#44/#51 and governing contracts must **actually
+   include their exact contents**, or state the limitation and use a
+   separate read-only reviewer with explicitly verified inputs and
+   independent execution provenance. Never call PR-only evidence a
+   cross-document review.
+
+No unresolved item above is a license to re-open exhaustive internal Codex
+security attestation, expand source permissions, or add a generic ingestion
+layer. There is no authority in this draft to update normative schemas or
+run a model.
+
 ## 11. Publication, review and authorization gate
 
-This document is intentionally a **draft PR dependent on PR #52**:
+This document is intentionally a **draft PR dependent on the now-published
+non-normative design of PR #52**:
 
-- Do not merge this draft until PR #52's outstanding independent/publication
-  gate is explicitly disposed and accepted as a non-normative design baseline.
+- Parent PR #52 publication is complete; **that prerequisite is satisfied**,
+  but the three historical independent `NO_GO` results remain valid evidence
+  of the bounded design's unsettled technical details.
 - Review this exact candidate against #43 PI-REQ-03, #44 D1–D9, #51's
   disposition, accepted v1/v2 contracts, packet/result schemas, implementation
-  and exact-SHA historical evidence; do not rely on an older v2 packet as
-  full cross-document verification.
+  and exact-SHA historical evidence; do not rely on a v2 PR-change-only packet
+  as full cross-document verification. Publication of #52 is not publication
+  approval for this draft.
 - Independent reviewers should seek counterexamples to identity bases,
   mutable-source recovery, atomicity scope, permission boundaries, mission
   evidence authority, result provenance, required/optional admission and
@@ -559,7 +634,7 @@ This document is intentionally a **draft PR dependent on PR #52**:
 `REVIEW_REQUEST_V3_IMPLEMENTED=NO`
 `PACKET_V2_IMPLEMENTED=NO`
 `REVIEW_RESULT_V2_IMPLEMENTED=NO`
-`PARENT_DESIGN_PR52_MERGED=NO`
+`PARENT_DESIGN_PR52_MERGED=YES`
 `NORMS_AND_SCHEMAS_UNCHANGED=YES`
 `IMPLEMENTATION_AUTHORIZED=NO`
 `LIVE_INFERENCE_AUTHORIZED=NO`
