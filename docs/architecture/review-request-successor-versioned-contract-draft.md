@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Versioned Successor Review Contracts — Design Draft"
-version: "0.1.2"
+version: "0.1.3"
 ---
 
 # Versioned Successor Review Contracts — Design Draft
@@ -540,16 +540,27 @@ provider-level exactly-once. No v1/v2 journal is reinterpreted.
 
 ## 8. Result publication and applicability
 
-ReviewResult v1 cannot silently receive a new meaning for `policy_id` when
-#44 removes requester semantic profile selection. The proposed successor
-result therefore requires **separately versioned technical-policy
-provenance**. A minimal result-v2 candidate preserves existing
-independent `execution_status`, `evidence_status`, `review_verdict` and
-PR-HEAD `applicability`, packet/request/attempt identities and verified
-source/line findings. It must reference the **broker-owned effective
-technical policy identity** without calling it the historical semantic
-`policy_id`. The exact result-v2 JSON shape and backward-compatible
-retrieval rules remain an explicit normative-contract gate.
+ReviewResult v1 cannot silently acquire a new meaning for its historical
+requester-semantic `policy_id` when #44 removes mandatory semantic profiles.
+The proposed successor therefore needs **versioned technical permission
+profile identity**, distinct from a claim of effectively attested Codex
+enforcement. Its smallest candidate representation is specified in the
+[separate minimal result-v2 proposal](review-result-v2-technical-policy-proposal.md):
+replace v1 `policy_id` with `technical_policy_id`, require
+`reference_coverage` and exact `resolved_request`, preserve independent
+execution/evidence/verdict/applicability and historical v1 result bytes.
+
+The `technical_policy_id` candidate hashes precisely the canonical
+verified installed **permission-profile name and original profile-byte
+SHA-256**, with an identity-version discriminator. It is checked against
+packet/attempt/preflight evidence; it is **not** a proof of the provider's
+effective policy enforcement. The result's `reference_coverage` records
+each declared reference exactly once as packet-bound `captured` with
+`Sxxx` source ID, or permitted optional `omitted` with
+`AUTHORIZED_ABSENT`. Captured does **not** mean examined, and
+subject-role `Sxxx` sources remain separately examinable.
+The exact accepted JSON schema, publisher receipt and retrieval behavior
+remain a normative and offline-qualification gate.
 
 The result's `packet_id` binds captured and omitted references via
 the verified packet manifest. `sources_examined` is still a reviewer
@@ -581,7 +592,16 @@ and a verified absence of source credentials in the model runtime.
 Requester's GitHub Issue/token, publication and Codespace-control
 credentials cannot substitute for source read authority.
 
-The first candidate must qualify **without model invocation**:
+A producer-authored [offline falsification experiment](review-request-successor-offline-qualification.md)
+has exercised **55 synthetic cases (55 PASS)**, including real local Git
+B/H/H2 objects, mocked admission/journal recovery and an illustrative
+closed result-v2 subset. The experimental runner and JSON report were
+generated separately from this repository. This is **not a qualification
+of the unimplemented successor, real GitHub permissions, full RFC 8785,
+production crash/replay semantics, or an independent model review**.
+
+The first executable candidate must still independently qualify
+**without model invocation**:
 
 1. Closed v3 request validation including required atomicity, unknown kinds,
    duplicate IDs, contradictory types and invalid expectation digests.
@@ -637,11 +657,14 @@ The following are **not silently resolved** by publishing this draft:
 - Stable repository and reference-object identity fixtures must include
   both pre-claim target resolution and crash/recovery revalidation, not
   just post-acquisition byte hashing.
-- Justified placement and deterministic derivation of effective technical
-  `policy/program` provenance in packet/result; no reinterpretation of
-  historical `policy_id` or `program_id`.
-- Exact result-v2 field names, verified packet-manifest retrieval and
-  historical evidence availability/retention behavior.
+- Qualify the **proposed** installed technical permission-profile
+  identity and new result-v2 `technical_policy_id` against the actual
+  packet/attempt/preflight evidence. It does not mean effective-policy
+  attestation, and no historical `policy_id` or `program_id` changes.
+- Independently test the companion **minimal result-v2 wire proposal**,
+  `reference_coverage`, verified packet-manifest retrieval and
+  historical evidence availability/retention behavior; its field choices
+  are not yet normative or implemented.
 - Offline qualification of the newly proposed **Git-HEAD consistency
   profile** for `atomicity=true`: exact PR B/H + frozen inline + same-H
   Git references in the same immutable repository ID. Unsupported
@@ -749,7 +772,9 @@ non-normative design of PR #52**:
 - Independent reviewers should seek counterexamples to identity bases,
   mutable-source recovery, atomicity scope, permission boundaries, mission
   evidence authority, result provenance, required/optional admission and
-  minimum possible representation.
+  minimum possible representation. They must include the two **companion
+  draft annexes** and source-check the experimental 55-case report rather
+  than treating its producer PASS count as implemented qualification.
 - A favorable review is **not** automatic adoption as normative contract,
   approval to change executable schemas, expansion of GitHub permissions,
   launch of a Codespace or inference, or downstream merge authorization.
