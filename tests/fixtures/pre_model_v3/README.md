@@ -24,6 +24,16 @@ the shutdown receipt. GitHub-ref persistence, distributed CAS, App permissions,
 GitHub run identity, owner authentication and shared Codespace ownership are
 **injected simulated trust boundaries**, not independently established facts.
 
+**Observed prototype-to-production representation differences:** this candidate
+journal adds an explicit `packet_evidence_id` and uses a uniform, experimental
+`history[]` event shape. The present production v1 `AttemptRecord` has
+neither this top-level packet field nor that exact history format. A real
+v3 implementation would need a separately reviewed mapping or a smaller
+representation that retains the original evidence-ID/history semantics.
+The current fixture cannot be installed as a drop-in schema or serve as
+a complete migration specification. The current legacy decoder also
+accepts future-version records and drops unknown fields, as shown in PR #57.
+
 A complete real v3 `AttemptRecord` contract must also close the production
 admission/result/publication/evidence structures, the exact trusted versions
 of those schemas and its migration path. This journal fixture deliberately
