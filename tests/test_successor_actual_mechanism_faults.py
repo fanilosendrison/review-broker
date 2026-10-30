@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
+import base64
 from pathlib import Path
 import subprocess
 import tempfile
@@ -267,6 +268,46 @@ class ActualMechanismFaultTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(StateTransitionError, "ATOMIC_CLAIM_FAILED"):
             journal.claim(self.req_id)
+
+    def test_current_gitref_reader_downgrades_unrecognized_future_journal(self):
+        """Current parser accepts a future-shaped record and strips its fencing fields.
+
+        This is an observed version-dispatch compatibility gap, not support for v3.
+        """
+        record = self.claimed(AttemptState.ADMITTED).get(self.req_id)
+        future = record.as_dict()
+        future["schema_version"] = 2
+        future["pre_model_control"] = {
+            "schema_version": 1,
+            "generation": 1,
+            "disposition": "REFUSED_PERMANENT",
+            "reservation_id": "preparation-dispatch:sha256:" + "a" * 64,
+            "authorization_id": self.req_id,
+            "worker": None,
+            "failure_receipt_id": "artifact:sha256:" + "b" * 64,
+        }
+        from review_broker.identity import canonical_bytes
+        wire = base64.b64encode(canonical_bytes(future) + b"\\n").decode("ascii")
+        commit = "c" * 40
+
+        def runner(command, **_kwargs):
+            endpoint = command[4]
+            if "/git/refs/heads/review-claims/" in endpoint:
+                return subprocess.CompletedProcess(command, 0, json.dumps(
+                    {"object": {"sha": commit}}
+                ), "")
+            if endpoint.endswith("?ref=" + commit):
+                return subprocess.CompletedProcess(command, 0, json.dumps(
+                    {"encoding": "base64", "content": wire}
+                ), "")
+            raise AssertionError("UNEXPECTED_EXTERNAL_ACCESS:" + endpoint)
+
+        got = GitHubRefJournal("sample/broker", runner=runner).get(self.req_id)
+        rewritten = got.as_dict()
+        self.assertEqual(got.state, AttemptState.ADMITTED)
+        self.assertEqual(rewritten["schema_version"], 1)
+        self.assertNotIn("pre_model_control", rewritten)
+        self.assertEqual(got.request_id, self.req_id)
 
     def test_actual_request_parser_rejects_future_v3_not_yet_supported(self):
         candidate = dict(self.request, schema_version=3)
