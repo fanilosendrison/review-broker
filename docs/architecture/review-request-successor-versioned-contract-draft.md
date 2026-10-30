@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Versioned Successor Review Contracts — Design Draft"
-version: "0.1.4"
+version: "0.1.5"
 ---
 
 # Versioned Successor Review Contracts — Design Draft
@@ -487,24 +487,36 @@ The exact proposed journal wire, failure receipts, dispatch transaction
 and crash/competing-worker cases are specified in the
 **[pre-model preparation protocol annex](pre-model-preparation-failure-protocol-draft.md)**.
 This non-normative v3 design is not implemented. [Draft test PR #57](https://github.com/fanilosendrison/review-broker/pull/57)
-independently identified two **current-code** behavior gaps:
-repeated `ADMITTED` dispatch and no receipt-backed direct
-`REQUESTED/ADMITTED → STOPPED`.
+at `4ef45da3e0de2fe852d2a4a88df0644acbc67d46`
+([CI PASS, 501 tests](https://github.com/fanilosendrison/review-broker/actions/runs/41042188166))
+has directly reproduced **three current-code gaps**: repeated
+`ADMITTED` dispatch, absence of a specialized receipt-backed
+`REQUESTED/ADMITTED → STOPPED` transition, and a current
+journal parser that would silently discard a future
+`pre_model_control` object by reserializing it as v1.
 
 **Keep the existing AttemptState family.** A v3-only versioned
 preparation-control subrecord lives in the same Git-ref journal claim,
 never in a separate cross-ref ledger. It binds current reservation
 generation/worker, durable failure classification and evidence IDs.
-Historical v1/v2 journal serialization and recovery are preserved.
+**Mandatory before any v3 enablement:** strict journal v1/v2
+wire-version decoding; current `AttemptRecord.from_dict` ignores
+`schema_version` and silently drops unrecognized `pre_model_control`
+fields on round-trip. Older deployed workers must not touch v3
+claims. Historical v1/v2 journal serialization and semantics are
+preserved, not rewritten.
 
 **Initial automatic dispatch limit is exactly one.** The v3
 controller CAS-reserves generation 1 before external GitHub workflow
-dispatch. A worker must bind its exact run ID and prove the current
-reservation/generation before fetching source material, and recheck
-immediately before `PREPARED` and `ARMED`. Direct legacy
-`issues:opened` triggering must not bypass reservation for v3.
-Lost dispatch acknowledgement is **ambiguous**, not permission
-to dispatch again. No unbounded hourly reconciler redispatch.
+dispatch. The `issues:opened` event and reconciler are **discovery
+paths to the same controller**, never independent v3 model-capable
+workers. A worker CAS-binds its exact run ID, and generation,
+reservation, worker and disposition must be checked **within the
+same claim CAS that commits `PREPARED` and `ARMED`**.
+A separate read/recheck is insufficient against intervening
+recovery/refusal commits. Lost dispatch acknowledgement is
+**ambiguous**, not permission to dispatch again. No unbounded
+hourly reconciler redispatch.
 
 **Failure classification is bounded:** verified permanent
 source/identity/digest/unsupported-atomicity violations cause a
@@ -515,13 +527,20 @@ ambiguous 404 or failed GitHub dispatch response is not silently
 called a permitted omission. A new generation on the same unarmed
 attempt requires **one fresh authenticated recovery authorization
 per dispatch**, a previous-run/quiescence check and exact
-stable-source-identity revalidation. There are zero automatic
-redeliveries after the initial reservation: **no timeout
+stable-source-identity revalidation. A new generation is forbidden
+from `PREPARED` or any later state; an ambiguously delivered old
+worker remains fenced even after a manual retry. There are zero
+automatic redeliveries after the initial reservation: **no timeout
 heuristic** is needed to enforce this bound.
 
 **Terminal permanent refusal:** once the refusal CAS suppresses
-every future preparation/armament path, validate independently
-observed `Shutdown` for the exact dedicated Codespace owner.
+every future preparation/armament path, **prove that the shared
+Codespace is not currently owned by another active request**
+before issuing any stop command. The existing shared GitHub Actions
+concurrency group is a candidate source of exclusivity, not by
+itself a durable cross-request ownership certificate. If ownership
+is unproven, block cleanup rather than stop another attempt.
+Then validate independently observed `Shutdown` for that owner.
 A narrowly specialized v3-only receipt-validation operation may
 transition `REQUESTED → STOPPED` or `ADMITTED → STOPPED`
 when it proves the same request/attempt, permanent failure,
@@ -540,9 +559,13 @@ remain before any model-capable transport; provider exactly-
 once is not claimed. No new general attempt state or service
 is justified by this proposal.
 
-The annex lists **PM01–PM20 future executable fault injections**;
-none is asserted to have passed on v3. The 15 actual-module tests
-in PR #57 cover the current v1/v2 code, not these v3 changes.
+The revised annex lists **PM01–PM25 future executable fault
+injections**, including journal-version downgrades, cross-request
+Codespace conflicts, duplicate entry points and atomic worker
+fencing. **None** is asserted to have passed on v3. PR #57's
+**16 tests against real current modules** (14 ordinary PASS and two
+expected future-contract failures; full CI 501 tests) cover v1/v2
+code, not these v3 changes.
 
 ## 8. Result publication and applicability
 
@@ -607,9 +630,10 @@ of the unimplemented successor, real GitHub permissions, full RFC 8785,
 production crash/replay semantics, or an independent model review**.
 
 The first executable candidate must still independently qualify
-**without model invocation**, including the annex's **PM01–PM20**
-dispatch, refusal, CAS race and crash scenarios. Those proposed
-test cases have not been executed on any v3 implementation:
+**without model invocation**, including the annex's **PM01–PM25**
+dispatch, refusal, CAS race, journal-version and shared-Codespace
+ownership scenarios. Those proposed test cases have not been
+executed on any v3 implementation:
 
 1. Closed v3 request validation including required atomicity, unknown kinds,
    duplicate IDs, contradictory types and invalid expectation digests.
@@ -680,11 +704,14 @@ The following are **not silently resolved** by publishing this draft:
 - Qualification of the required `references: []` schema, stable numeric
   `subject.repository_id` and authenticated reference-object binding.
 - Qualify the [pre-model protocol annex](pre-model-preparation-failure-protocol-draft.md):
-  versioned journal subrecord, exactly one automatic dispatch,
+  **strict versioned journal parser/serializer** (old deployed
+  workers must not downgrade a new claim), one automatic dispatch
+  via a unified discovery/controller entry point, **atomic**
   current-generation/worker fencing at `PREPARED` and `ARMED`,
-  failure receipts, specialized `STOPPED`, manual recovery
-  authorization and PM01–PM20 fault-injection matrix.
-  These v3 paths remain **unimplemented**.
+  shared Codespace ownership before stopping, failure receipts,
+  specialized `STOPPED`, manual recovery authorization and
+  **PM01–PM25** fault-injection matrix. These v3 paths remain
+  **unimplemented**.
 - Exact permission administration and authenticated GitHub Issue/comment
   acquisition; no unauthorized App permission expansion.
 - GitHub PR reference component collections, upload receipts, remote URL
@@ -745,7 +772,9 @@ bind each answer to an executable counterexample fixture:
    permanent/blocked dispositions, one fresh owner authorization per
    subsequent dispatch, worker-generation fencing, and a versioned
    specialized `REQUESTED/ADMITTED → STOPPED` path after actual Shutdown.
-   None is implemented; PM01–PM20 must be fault-tested before adoption.
+   None is implemented; **PM01–PM25** must be fault-tested before
+   adoption, including the observed journal-version downgrade
+   and cross-request Codespace conflict.
    The runbook currently supports bounded same-attempt pre-model recovery;
    it does **not** authorize a later re-review after `ARMED`.
 6. **Testable atomicity contract (#56 F006).** `atomicity=true` is an
