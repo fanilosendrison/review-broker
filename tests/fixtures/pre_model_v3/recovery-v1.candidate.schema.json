@@ -1,0 +1,59 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_type",
+    "request_id",
+    "attempt_id",
+    "previous_generation",
+    "previous_reservation_id",
+    "authorization_nonce",
+    "actor_github_id",
+    "prior_run_observation_id",
+    "authorized_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "evidence_type": {
+      "const": "pre-model-recovery-authorization"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^request:sha256:[0-9a-f]{64}$"
+    },
+    "attempt_id": {
+      "type": "string",
+      "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+    },
+    "previous_generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "previous_reservation_id": {
+      "type": "string",
+      "pattern": "^preparation-dispatch:sha256:[0-9a-f]{64}$"
+    },
+    "authorization_nonce": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "actor_github_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "prior_run_observation_id": {
+      "type": "string",
+      "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+    },
+    "authorized_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fanilosendrison/review-broker/tests/fixtures/pre_model_v3/recovery-v1.candidate.schema.json",
+  "title": "UNACCEPTED NONNORMATIVE experimental candidate recovery-v1.candidate.schema.json"
+}
