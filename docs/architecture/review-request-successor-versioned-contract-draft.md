@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Versioned Successor Review Contracts — Design Draft"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # Versioned Successor Review Contracts — Design Draft
@@ -63,11 +63,11 @@ The complete candidate object has **exactly** these top-level properties:
 | Field | Required | Proposed contract |
 | --- | --- | --- |
 | `schema_version` | Yes | Integer `3` |
-| `subject` | Yes | Existing exact GitHub PR subject with `expected_head_commit` |
+| `subject` | Yes | Exact GitHub PR subject with requested `repository`, stable numeric `repository_id`, `pull_request` and `expected_head_commit` |
 | `mission` | Yes | Existing v2 structure: `id`, `objective`, `instructions`, `criteria` only |
 | `reviewer` | Yes | Existing v2 requested backend/model/effort shape until separately changed |
 | `atomicity` | Yes | JSON boolean `true` / `false` only |
-| `references` | No | Ordered array; absent and empty both mean no *declared* references, not substantive completeness |
+| `references` | **Yes** | Explicit ordered array, possibly `[]`; missing/null is invalid, not a synonym for empty |
 | `review_operation` | Yes | Existing `initial`, `changed_head`, `repeat_same_head` discriminated union |
 
 **No top-level `policy` field** is carried forward as a requester-selected
@@ -92,6 +92,7 @@ ReviewRequest or authorization to create one:
   "subject": {
     "kind": "github_pr",
     "repository": "fanilosendrison/review-broker",
+    "repository_id": 1433701208,
     "pull_request": 52,
     "expected_head_commit": "6118954dd29c330bc5e21c742934e2a39821eb42"
   },
@@ -151,8 +152,11 @@ pass all predecessor, admission, ownership and one-shot gates.
 
 ### V3 field constraints (first candidate)
 
-- `subject`: `kind=github_pr`, exact `owner/repository`, positive PR number,
-  lowercase 40-character expected HEAD; no PR-free subject.
+- `subject`: `kind=github_pr`, exact requested `owner/repository`,
+  **required positive integer `repository_id`**, positive PR number and
+  lowercase 40-character expected HEAD. The numeric ID identifies the
+  intended repository; the name is a mutable requested selector.
+  No PR-independent subject is introduced.
 - `mission`: preserve v2's closed `id/objective/instructions/criteria` grammar,
   size limits and requester ownership. There is no `review_type` or hidden
   mission-template selector.
@@ -161,10 +165,11 @@ pass all predecessor, admission, ownership and one-shot gates.
   attestation not supplied by the runtime.
 - `atomicity`: required true JSON boolean. No implicit `false` default.
   Changing its value changes both the complete request and Review Intent.
-- `references`: ordered; order affects exact request and intent identity.
-  Reject duplicate `id` values, unsupported kinds, malformed selectors and
-  over-limit request/packet sizes. No separate `acquisition_mode` or
-  semantic `document_class`.
+- `references`: **required, ordered and possibly `[]`**; order affects
+  exact request and intent identity. Missing/null `references` is invalid;
+  do not normalize absent into empty. Reject duplicate `id`, unknown
+  kinds, malformed selectors and resource-limit violations. No new
+  `acquisition_mode` or semantic `document_class`.
 - Each `references[]` entry has exactly `id`, `required` and `source`.
   `id` follows the established mission-ID lowercase-hyphen grammar,
   unique in the request. `required` is a mandatory JSON boolean.
@@ -188,11 +193,29 @@ are:
 | `github_issue_body` | `kind`, `repository`, `issue` (positive integer) | `expected_sha256` |
 | `github_issue_comment` | `kind`, `repository`, `comment_id` (positive integer) | `expected_sha256` |
 
-Only repositories already authorized for this requester and read scope are
-admissible; the initial GitHub subset is the **same explicitly authorized
-repository as the PR subject**. A GitHub numeric identifier must resolve to
-the expected object and repository; the broker must not trust an ID in an
-unauthenticated request to prove scope.
+Only authorized sources in the **same immutable numeric GitHub repository
+ID as `subject.repository_id`** are in scope. Reference
+`source.repository` strings must match the requested canonical name,
+but name equality never replaces repository-identity verification.
+
+**First-claim identity gate (candidate):** authenticated GitHub metadata
+must match both exact `full_name` and requested numeric `id` before
+creating a claim. Renames, transfers, redirected aliases, reused names,
+and identity mismatches fail closed; do not silently retarget. Resolve
+the PR object/HEAD and the object IDs/parent Issue membership for
+existing Issue/comment references under this same repo **before claim**,
+and bind the verified IDs, requester and read-authority scope to the
+durable resolved admission. A provably absent optional source gets a
+verified absence record, not a fabricated object identity. Ambiguous
+permission-vs-absence is a refusal, not an optional omission.
+
+**Recovery identity gate:** reverify the exact canonical requested name,
+numeric repository ID, PR ID and admitted reference object IDs before
+reacquisition. A changed object identity is a hard target mismatch;
+only unpinned `body` bytes from the **same immutable object** may drift
+before `PREPARED`. Persist verified IDs and source principal/installation
+scope in packet provenance, without exposing credential material.
+This is a proposed v3 rule, not an existing operational capability.
 
 A pinned `git_file` must preserve exact blob bytes at the exact selected
 commit, and independently verify its Git blob OID. Git file paths must pass
@@ -299,10 +322,12 @@ bases under new meanings**.
 
 `request_id = "request:sha256:" + SHA256(RFC8785(complete_v3_request))`.
 
-The complete request includes `schema_version=3`, every declaration and
-its order, `atomicity`, inline content, remote expectations, subject HEAD
-and `review_operation`. Duplicate canonical bytes share one request ID and
-one claim/attempt, regardless of newly changing remote content.
+The complete request includes `schema_version=3`, both the requested
+repository name and its stable `subject.repository_id`, **required
+`references` (including `[]`)**, order, `atomicity`, inline values,
+remote expectations, subject HEAD and `review_operation`. Missing
+`references` is invalid rather than canonically equivalent to `[]`.
+Duplicate canonical bytes still share exactly one request/claim/attempt.
 
 ### Logical Review Intent identity
 
@@ -314,6 +339,7 @@ Define an exact **version-distinguished** intent basis:
   "subject": {
     "kind": "github_pr",
     "repository": "fanilosendrison/review-broker",
+    "repository_id": 1433701208,
     "pull_request": 52
   },
   "mission": {
@@ -365,7 +391,9 @@ The corresponding `review_intent_id` is the existing
 `review-intent:sha256:` domain plus SHA-256 of this **explicitly versioned**
 intent basis. In this basis:
 
-- Drop only `subject.expected_head_commit` from the logical subject.
+- Drop only `subject.expected_head_commit`; retain the canonical requested
+  name and `subject.repository_id` to bind logical target continuity.
+- Retain the **mandatory ordered `references` array**, even when `[]`.
 - Drop `git_file.commit` and any `expected_sha256` as exact version pins.
 - For `inline`, retain `kind` and reference `id`, **exclude `text`** as
   changing content in a stable logical slot.
