@@ -173,7 +173,7 @@ jobs:
 
           stale = transport.update_ref(update)
           typed_stale_rejection = (stale.errors
-                                    and all(error.startswith("GRAPHQL_TYPED_")
+                                    and all(error == "GRAPHQL_TYPED_UNPROCESSABLE"
                                             for error in stale.errors))
           if (stale.http_status != 200 or not typed_stale_rejection
                   or stale.expected_old_rejected):

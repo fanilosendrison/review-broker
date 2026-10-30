@@ -296,6 +296,18 @@ class LiveTransportMutationTests(unittest.TestCase):
         self.assertIsNone(result.rejection_evidence_id)
         self.assertEqual(self.api.mutation_calls, 1)
 
+    def test_structured_extensions_code_is_sanitized_without_attribution(self):
+        after = self.api.install_successor(PARENT)
+        self.api.graphql_body = {"data": {"updateRefs": None}, "errors": [{
+            "extensions": {"code": "UNPROCESSABLE"}, "message": "opaque backend text"
+        }]}
+        result = self.transport.update_ref(GraphQLRefUpdateV3(
+            NODE_ID, REF, PARENT, after, False
+        ))
+        self.assertEqual(result.errors, ("GRAPHQL_TYPED_UNPROCESSABLE",))
+        self.assertFalse(result.expected_old_rejected)
+        self.assertEqual(self.api.mutation_calls, 1)
+
     def test_opaque_or_malformed_graphql_response_remains_unattributed(self):
         after = self.api.install_successor(PARENT)
         cases = (
