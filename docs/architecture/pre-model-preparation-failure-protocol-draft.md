@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Successor Pre-Model Preparation Failure Protocol"
-version: "0.1.4"
+version: "0.1.5"
 ---
 
 # Successor v3 — durable pre-model preparation outcomes
@@ -394,28 +394,60 @@ before v3 operational enablement.
    and no model-capable transition. A permanent failure receipt
    is already bound by CAS to `REFUSED_PERMANENT`; this
    prevents any later preparation/arming or Codespace start.
-2. Obtain **authenticated and complete workflow-run/step evidence**
-   tied to the exact reservation, generation and worker.
-   Independently establish that **no Codespace-affecting command**
-   was attempted by this worker, that all potentially dispatched
-   workers for the claim are accounted for, and that the mandatory
-   pre-`PREPARED` access gate prevents future late work.
-   A missing run ID, uncertain dispatch acceptance, missing
-   step evidence, crash with unknown start attempt, or unproven
-   worker coverage **fails closed**. Initial qualification
-   covers a registered and fully accounted-for worker; refusal
-   before worker binding needs its own later evidence fixture.
-3. Bind an exact, closed **no-Codespace-access receipt** to the
-   already committed permanent failure. The first isolated
-   candidate appears at
-   [PR #58's test fixture](https://github.com/fanilosendrison/review-broker/pull/58):
-   the receipt contains version/kind, request/attempt/admission IDs,
-   reservation/generation, authenticated workflow run identity,
-   intended Codespace name, independent workflow trace ID,
-   start-gate evidence ID, the backed `codespace_access_attempted=false`
-   finding, and timestamp. A requester-supplied boolean,
-   an absent log line, or an opaque evidence hash **without a
-   verified external source** is not sufficient.
+2. Prefer **a preventive, version-bound gate proof** over
+   attempting to prove a negative from every GitHub step log.
+   Qualify all of the following *together*:
+   - the authenticated immutable **workflow/executor version**
+     actually permitted to process this v3 claim, with an
+     exhaustive list of effectful Codespace command entry points
+     (including trusted CLI and reconciler paths);
+   - a **mandatory trusted pre-side-effect guard** on every such
+     path: the current worker's exact reservation, generation,
+     immutable admission and a durably committed `PREPARED`
+     must be accepted by the same journal authority;
+   - **older/unfenced executable exclusion** during rollout,
+     including already queued or delayed workers, and absence
+     of independently available pre-`PREPARED` Codespace
+     control credentials or bypass routes;
+   - the exact claim's immutable journal history and
+     `REFUSED_PERMANENT` CAS: **no `PREPARED` or `ARMED`
+     was ever committed**, and zero model invocations.
+   Under these **qualified preventive premises**, any late
+   worker executing an effectful Codespace command must be
+   fenced out. Therefore this claim did not acquire Codespace
+   **through the trusted broker**, regardless of how many
+   workflow deliveries were pending. Exhaustively replaying
+   all GitHub step logs is **not necessary** to establish
+   this implication. The authenticated run/jobs API remains
+   useful for *diagnostics and provenance*, but a `skipped`
+   step or absent log line alone proves nothing about
+   bypasses, alternative commands or other workers.
+
+   **If any preventive premise is unverified**—including
+   exact deployed version, code/credential entry-point
+   coverage, old-worker exclusion, journal-fence atomicity
+   or possible unguarded side effects—**do not** infer
+   non-acquisition. Retain the blocked refusal. An
+   individual run trace does not repair an unguarded
+   delayed-worker path. A worker-unbound claim can use
+   this proof **only after** global entry-point/rollout
+   coverage is genuinely qualified; the earlier isolated
+   fixture covers registered workers only.
+3. Bind an exact **no-Codespace-acquisition receipt** to the
+   permanent-refusal CAS. Its eventual minimal basis should be
+   the request/attempt/reservation/generation, immutable journal
+   no-`PREPARED` evidence, and **independently qualified
+   executable/gate/rollout evidence IDs**. Run identity and
+   step observations may be added when genuinely needed for
+   provenance, but no `codespace_access_attempted=false`
+   boolean from requester text can replace the gate proof.
+   [PR #58's original synthetic receipt fixture](https://github.com/fanilosendrison/review-broker/pull/58)
+   still requires complete injected run-trace and registered
+   worker coverage: **that is an earlier, deliberately
+   overconstrained experimental shape, not the accepted
+   minimum**. The receipt's final schema, canonical identity
+   and proof validator must be separately closed before
+   implementation; do not silently promote this fixture.
 4. Use **one specialized, version-gated journal CAS** to enter
    `STOPPED` directly from `REQUESTED` or `ADMITTED`,
    validating both the permanent-refusal receipt and the
@@ -464,17 +496,25 @@ this specialized v3 no-acquisition terminal receipt.
 
 ### 5.4 Qualification boundary
 
-The new [test-only PR #58](https://github.com/fanilosendrison/review-broker/pull/58)
-adds **PM26–PM35** to its reference model and checks the
-present workflow's prepare/start/stop ordering. Those checks
-only exercise an **in-memory** claim plus *injected*
-authenticated run-trace/gate/worker-coverage assumptions.
-They **cannot attest** real GitHub run-step provenance or
-prove that all deployed entry points enforce the resource
-gate. The future implementation must test the exact receipt,
-the journal CAS race, blocked ambiguous access, run coverage
-and delayed-worker fencing **before** treating this route
-as a live terminal guarantee.
+[Test-only PR #58](https://github.com/fanilosendrison/review-broker/pull/58)
+exercises **PM26–PM35** on an in-memory reference with
+injected trace/gate/worker-coverage assumptions. A later
+**source-confronted preventive-gate test** also demonstrates
+the *conditional logical implication*: permanent pre-`PREPARED`
+journal + a universally enforced, version-qualified
+Codespace side-effect gate + exclusion of old executables
+implies no broker-authorized Codespace acquisition. It also
+reproduces present-code gaps: direct `review-request.yml`
+`start` has no v3 gate and `internal-reconcile`/CLI
+expose additional Codespace-affecting entry points.
+
+The real [GitHub Actions run/jobs API](https://docs.github.com/en/rest/actions/workflow-jobs)
+can authenticate run and step metadata, but does **not
+independently attest the absence of arbitrary side effects**
+inside an executing step. Every code-path/gate/credential
+and rollout premise still needs independent evidence before
+v3 can terminalize on the preventive basis. The current
+CI experiments **do not qualify a deployed gate**.
 
 ## 6. Transient refusal, crashes and safe resumption
 
@@ -596,6 +636,8 @@ were modified by this proposal.
 `SHARED_CODESPACE_OWNERSHIP_QUALIFIED=NO`
 `PREMODEL_NO_CODESPACE_TERMINAL=PROPOSED_NOT_IMPLEMENTED`
 `NO_CODESPACE_PROOF_EXTERNAL_AUTHORITY=UNQUALIFIED`
+`PREVENTIVE_GATE_PROOF_CANDIDATE=SOURCE_CONFRONTED_NOT_DEPLOYED`
+`COMPLETE_RUN_STEP_TRACE_AS_MANDATORY=NOT_REQUIRED_IF_PREVENTIVE_GATE_QUALIFIED`
 `NO_RESOURCE_STOP_REQUIRED_FOR_PROVEN_NONACQUISITION=PROPOSED`
 `REAL_JOURNAL_CONCURRENCY_QUALIFIED=NO`
 `INDEPENDENT_REVIEW=NOT_PERFORMED`
