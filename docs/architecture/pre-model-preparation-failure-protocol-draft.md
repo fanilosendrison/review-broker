@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Successor Pre-Model Preparation Failure Protocol"
-version: "0.1.5"
+version: "0.1.6"
 ---
 
 # Successor v3 — durable pre-model preparation outcomes
@@ -466,14 +466,25 @@ the global machine is stopped or unused.
 
 ### 5.3 When no-acquisition cannot be established
 
-If any attempt or outcome of Codespace `start`, `stop`,
-`ssh`, `copy` or remote execution is unknown or observed,
-**do not** use the no-access receipt or mark the claim terminal
-on that basis. Persist the original `REFUSED_PERMANENT`
-disposition, avoid redispatch/inference, and report a blocked
-cleanup/authority incident. An ambiguous external command cannot
-be reclassified as non-acquisition merely because no process
-is currently visible.
+If a Codespace `start`, `stop`, `ssh`, `copy` or
+remote execution was **actually attempted** by this claim
+before its permanent refusal, or its result is unknown
+**and the universal preventive gate is not qualified**,
+do **not** issue the no-access receipt. Retain
+`REFUSED_PERMANENT`, avoid redispatch/inference, and
+report a blocked cleanup/authority incident. An ambiguous
+effectful external command cannot be reclassified as
+non-acquisition because the machine later appears idle.
+
+**However**, missing individual run/step logs are *not by
+themselves* a blocker once an independently qualified
+universal gate, protected credential entry points, deployed
+worker-version exclusion and a no-PREPARED journal jointly
+prove the absence of **broker-authorized** acquisition.
+A skipped step remains diagnostic evidence only. The
+actual current broker has not yet established these
+premises; do not interpret this distinction as live
+authorization to terminalize any existing claim.
 
 If another path genuinely acquired the shared Codespace,
 remote cleanup requires a **separately qualified, exclusive
@@ -575,13 +586,13 @@ executed or independently qualified fixtures:
 
 | PM26 | Refusal before `PREPARED` with complete no-Codespace-access proof | Specialized `STOPPED` without Shutdown observation or Codespace I/O |
 | PM27 | Codespace already Available under independent request B | A's verified non-acquisition terminal has zero start/SSH/copy/stop effect on B |
-| PM28 | Missing authenticated run trace, mandatory start gate or worker coverage | Terminal no-access proof fails closed; attempt remains blocked |
+| PM28 | Unqualified mandatory start gate, executable identity or old-worker path coverage | Terminal no-access proof fails closed; missing step logs alone are not disqualifying once *universal preventive coverage* is independently established |
 | PM29 | Start/SSH/copy/stop observed or outcome ambiguous, despite declared false flag | Reject no-access receipt; no false terminal state |
 | PM30 | Old worker attempts Codespace start before `PREPARED` or after refusal | Mandatory trusted start gate rejects before external command |
 | PM31 | Claim has reached `PREPARED` or `ARMED` | No pre-model non-acquisition terminal shortcut |
 | PM32 | Receipt binds wrong request, worker, admission, reservation, generation or Codespace | Reject before terminal CAS |
 | PM33 | Crash after permanent refusal but before run-evidence collection | No blind cleanup; remain blocked until qualified trace is available |
-| PM34 | Incomplete/unknown dispatch/run coverage | Never infer non-acquisition from a single skipped step |
+| PM34 | Unknown run delivery and incomplete step logs | Never infer no acquisition from a skipped step alone; a separately proven universal preventive gate can make exhaustive run enumeration unnecessary |
 | PM35 | Terminal receipt CAS loses to concurrent state change or is replayed | No stale transition, second terminal receipt or model invocation |
 
 Test GitHub-ref CAS with injected stale parent commits, not only an
