@@ -25,7 +25,7 @@ PATTERNS=tuple(re.compile(x,re.IGNORECASE|re.MULTILINE) for x in (
     r"\bCodespaceLiteralCopier\s*\(",
     r"\bproxycommand\b",
     r"\btransport_factory\s*\(",
-    r"\brun_pilot03_controller\s*\(",
+    r"\brun_(?:pilot03|synthetic_pilot)_controller\s*\(",
     r"\binternal-(?:reconcile|stop-codespace|recover)(?![-A-Za-z0-9_])",
 ))
 
