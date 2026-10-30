@@ -5,7 +5,7 @@ asset_type: "design-qualification-note"
 domain: "independent-review"
 severity: "draft"
 name: "Successor Contract Offline Falsification — Experimental Evidence"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Successor contract — offline falsification (experimental)
@@ -158,6 +158,48 @@ The following gates still require separate, more authoritative evidence:
   checks and honest evidence-retention behavior.
 - An independent reviewer that receives actual #43/#44/#51 and
   governing contract/code snapshots, not only a PR diff.
+
+## 5. Separate fault injection of current real broker modules — PR #57
+
+A subsequent, separately authorized test-only [draft PR #57](https://github.com/fanilosendrison/review-broker/pull/57)
+**imports the real production v1/v2** `GitHubRefJournal`, `InMemoryJournal`,
+`reconciliation.reconcile_repository`, `recovery`, source-reader,
+change-scope and request parser modules. The GitHub API, Codespace
+and transport boundaries are explicitly simulated to avoid live
+privileged side effects. The test file is not in PR #55.
+
+**Exact tested SHA:** `890d4166c1507ef1989c4e2f666d7e683e545561`.
+**CI evidence:** [GitHub Actions run 41037602888](https://github.com/fanilosendrison/review-broker/actions/runs/41037602888).
+**Result:** 500 total unittest cases, `OK (expected failures=2)`.
+The new file contributed **15 cases: 13 PASS and two expected
+failures** explicitly describing *unimplemented successor behavior*.
+
+| Actual-module observation | Reproduced fact | Contract implication |
+| --- | --- | --- |
+| Reconciler over an already `ADMITTED` claim | Three sweeps cause **three pre-model dispatch decisions**, while retaining one request/attempt | Permanent failure needs durable blocked/terminal disposition; current claim state is not sufficient |
+| Queue pre-model terminal path | Real `record_shutdown_transition` rejects direct `REQUESTED/ADMITTED -> STOPPED` as `ILLEGAL_TRANSITION` even with valid Shutdown | Specialized v3 failure receipt and allowed state path need implementation and qualification |
+| `PREPARED` evidence | Mismatched rebuilt packet ID rejected | Preserve existing immutable packet-binding boundary |
+| `ARMED` recovery | No further dispatch/invocation, indeterminate outcome and validated Shutdown | Preserve current separate at-most-once inference boundary |
+| GitHubRefJournal CAS/claim | Failed non-fast-forward ref update and lost create-ref without winner both fail closed | Preserve journal conflict/ambiguity handling |
+| Git objects / PR scope | Real local Git HEAD/B objects are byte-pinned; extra reference source cannot masquerade as a changed PR image | Maintain separation of subject and references in packet-v2 |
+| Request parser and IDs | Current parser rejects v3; v1 resolved PR metadata includes repo ID but canonical v1 subject does not | Stable `repository_id` in v3 remains future, not implemented |
+
+The **initial CI attempt** failed because a test fixture omitted
+`workflow_run_attempt` in two synthetic shutdown receipts; it
+was corrected without changing production source. The final 500-test
+run succeeded with both future-behavior failures correctly marked
+`expectedFailure`.
+
+These tests establish actual present-code behavior under controlled
+I/O injection, **not a qualification of unimplemented v3** and not
+real GitHub API authorization, cloud journal concurrency, or Codex
+effective-policy correctness. The parent 55-case synthetic experiment
+and this 15-case production-module suite must be reported **separately**
+rather than added together as 70 implemented-system passing tests.
+
+**Actual-module disposition:** current safeguards verified on the
+tested boundaries; permanent pre-model refusal and prevention of
+unbounded dispatch remain **demonstrated implementation gaps**.
 
 **Disposition: `EXPERIMENTAL_OFFLINE_FALSIFICATION_PASS_WITH_STRICT_BOUNDS`.**
 This is a research result, not an implementation authorization or
