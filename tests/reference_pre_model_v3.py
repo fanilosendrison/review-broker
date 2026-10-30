@@ -24,6 +24,7 @@ SCHEMA_FILES = {
     "journal": "journal-v2.candidate.schema.json",
     "failure": "failure-v1.candidate.schema.json",
     "recovery": "recovery-v1.candidate.schema.json",
+    "no_codespace": "no-codespace-access-v1.candidate.schema.json",
 }
 SCHEMAS = {
     key: json.loads((SCHEMA_ROOT / filename).read_text(encoding="utf-8"))
@@ -367,6 +368,68 @@ class MemoryClaim:
             self._append(r,"RECOVERY_AUTHORIZED",evid,authorization)
             self._append(r,"DISPATCH_RESERVED")
         return self.cas(self._snapshot_for(expected_revision),change)
+
+    def assert_codespace_start_permitted(self, token: dict[str, Any]) -> None:
+        """Reference v3 start/SSH/copy gate: ONLY after durable PREPARED.
+
+        Model of a mandatory trusted broker entry point, not proof that
+        any deployed worker cannot bypass it. No external call.
+        """
+        _, record = self.read()
+        self._require_worker(record, token)
+        if record["state"] not in {"PREPARED", "ARMED"}:
+            raise ProtocolError("CODESPACE_ACCESS_BEFORE_PREPARED_FORBIDDEN")
+
+    def finish_without_codespace(
+        self, receipt: dict[str, Any], *,
+        authenticated_run_trace_evidence_id: str | None = None,
+        authenticated_start_gate_evidence_id: str | None = None,
+        all_workers_accounted_for: bool = False,
+        observed_codespace_commands: tuple[str, ...] | None = None,
+        expected_revision: int | None = None,
+    ) -> dict[str, Any]:
+        """Experimental v3-only refusal finality without any Codespace I/O.
+
+        Proof parameters are INJECTED assumptions. Real enforcement must
+        obtain independently checked workflow traces and a mandatory start
+        fence; no requester assertion or absent log line establishes them.
+        """
+        _check("no_codespace", receipt)
+        if (authenticated_run_trace_evidence_id != receipt["workflow_trace_evidence_id"]
+                or authenticated_start_gate_evidence_id != receipt["start_gate_evidence_id"]
+                or not all_workers_accounted_for
+                or observed_codespace_commands != ()):
+            raise ProtocolError("NO_CODESPACE_PROOF_UNVERIFIED")
+
+        def change(r):
+            c = r["pre_model_control"]
+            if (r["state"] not in {"REQUESTED", "ADMITTED"}
+                    or c["disposition"] != "REFUSED_PERMANENT"
+                    or r["invocation_count"] != 0
+                    or r["packet_evidence_id"] is not None
+                    or any(e["kind"] in {"PREPARED", "ARMED"} for e in r["history"])):
+                raise ProtocolError("TERMINAL_PREMODEL_REFUSAL_INVALID")
+            expected = {
+                "request_id": r["request_id"],
+                "attempt_id": r["attempt_id"],
+                "admission_evidence_id": self.admission_id,
+                "generation": c["generation"],
+                "reservation_id": c["reservation_id"],
+                "workflow_run_id": c["worker"]["run_id"] if c["worker"] else None,
+                "workflow_run_attempt": c["worker"]["run_attempt"] if c["worker"] else None,
+                "codespace_name": CODESPACE_NAME,
+            }
+            for key, value in expected.items():
+                if receipt.get(key) != value:
+                    raise ProtocolError("NO_CODESPACE_RECEIPT_IDENTITY_MISMATCH")
+            # First candidate covers registered worker only. Generation-0
+            # and unbound dispatch still require separate evidence design.
+            if c["worker"] is None:
+                raise ProtocolError("NO_CODESPACE_WORKER_UNBOUND")
+            eid = identity("artifact", receipt, newline=True)
+            r["state"] = "STOPPED"
+            self._append(r, "STOPPED", eid, receipt)
+        return self.cas(self._snapshot_for(expected_revision), change)
 
     def stop_permanent(self, shutdown_receipt: dict[str,Any], *,
                        observed_owner: dict[str,Any] | None = None,
