@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Successor Pre-Model Preparation Failure Protocol"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # Successor v3 — durable pre-model preparation outcomes
@@ -17,15 +17,20 @@ version: "0.1.1"
 This is a focused companion to draft PR #55 under Issue #51. It addresses
 #56 F001/F005 and the demonstrated current-behavior gaps in
 [test-only draft PR #57](https://github.com/fanilosendrison/review-broker/pull/57)
-at `890d4166c1507ef1989c4e2f666d7e683e545561`, whose
-[CI](https://github.com/fanilosendrison/review-broker/actions/runs/41037602888)
-was `PASS` (500 tests, two explicitly expected future-contract failures).
+at its later exact head `4ef45da3e0de2fe852d2a4a88df0644acbc67d46`,
+whose [CI](https://github.com/fanilosendrison/review-broker/actions/runs/41042188166)
+was `PASS` (501 tests, two explicitly expected future-contract failures).
+The earlier 500-test evidence remains unchanged.
 
-Actual `reconciliation.reconcile_repository` currently dispatches an
-`ADMITTED` claim on every sweep; current `queue.py` prohibits direct
-`REQUESTED/ADMITTED → STOPPED`. A durable request/attempt identity
-prevents an additional attempt but **not repeated pre-model dispatch**.
-No successful v3 behavior is inferred from the historical CI run.
+Actual `reconciliation.reconcile_repository` dispatches an `ADMITTED`
+claim on every sweep; current `queue.py` prohibits direct
+`REQUESTED/ADMITTED → STOPPED`. The additional real
+`GitHubRefJournal._read` counterexample proves that the existing v1
+decoder reads a hypothetical v2 journal but `AttemptRecord.as_dict`
+then **re-serializes it as v1 without `pre_model_control`**.
+These are observed **current-code** boundaries, not passed v3 tests.
+A durable request/attempt identity alone prevents neither repeated
+pre-model dispatch nor a future unsafe version downgrade.
 
 The design goal is **one automatic initial pre-model dispatch**, a
 truthful immutable refusal receipt for permanently impossible requests,
@@ -46,6 +51,20 @@ object. It retains the existing request ID, ordinal-1 attempt ID,
 admission, history, evidence IDs, invocation count, packet identity
 and publication fields under their existing semantics.
 
+**Mandatory decoder/version gate (observed #57 gap):** current
+`AttemptRecord.from_dict` does **not** check `schema_version` or reject
+extra fields, while `as_dict` unconditionally emits `schema_version: 1`.
+The new journal read path MUST validate the **full canonical wire
+object before constructing any attempt record**, dispatch only the
+exact recognized journal version, and preserve every v2 control byte
+and semantic field on read/CAS-write/recovery. Unknown versions, unknown
+fields and missing v2 control fail closed, without silently invoking the
+v1 decoder. Historic v1 records remain interpreted with their original
+semantics. **Rollout must prohibit an older v1-only executable from
+processing or rewriting a v2 claim**; merely changing the new parser
+does not retroactively protect older deployed workers. This version
+migration is a prerequisite before any v3 claim is enabled.
+
 The required `pre_model_control` fields are:
 
 | Field | Type and meaning |
@@ -63,7 +82,14 @@ only at generation 0. `RESERVED` permits initial acquisition by exactly
 the bound generation/worker. `BLOCKED` requires a typed `TRANSIENT` or
 `UNKNOWN` failure receipt. `REFUSED_PERMANENT` requires a typed
 `PERMANENT` refusal receipt. `PREPARED` and later states may not be
-entered from `BLOCKED` or `REFUSED_PERMANENT`.
+entered from `BLOCKED` or `REFUSED_PERMANENT`. On a separately
+authorized generation advance, **clear current `worker` and
+`failure_receipt_id`, set `disposition=RESERVED` and the new
+`reservation_id`/`authorization_id` in the *same CAS*, while preserving
+prior reservation, failure and approval evidence immutably in history.
+A disposition left `RESERVED` after an ambiguous external dispatch
+does not invent a failure receipt or indicate that nothing happened.
+Generation advance is forbidden once the claim is `PREPARED` or later.
 
 **Illustrative component only** (not an executable existing journal):
 
@@ -93,23 +119,37 @@ events on each accepted change.
    pass admission before claim. An invalid request creates no claim.
 2. Create/reuse the deterministic v3 claim with `UNRESERVED,
    generation=0` and the immutable resolved admission evidence.
-3. Reconciler/CLI, using the **same single v3 dispatch path**, CAS-
-   reserves `generation=1, disposition=RESERVED` in the claim
-   **before** invoking GitHub workflow dispatch. This is the sole
-   automatic dispatch authorization for that request.
+3. The trusted v3 controller is the **only** initial-dispatch route.
+   Both the `issues:opened` notification and scheduled/manual reconciler
+   provide *discovery* only and converge on that same controller.
+   A v3 `issues:opened` workflow must not itself prepare, arm or invoke
+   a reviewer. The controller CAS-reserves `generation=1,
+   disposition=RESERVED` in the deterministic claim **before**
+   invoking exactly one externally dispatched worker workflow.
+   A v1/v2 direct-Issue handling path remains unchanged.
 4. `reservation_id` is deterministic:
    `"preparation-dispatch:sha256:" + SHA256(RFC8785({schema_version:1,request_id,attempt_id,generation,authorization_id}))`,
    where the initial authorization ID is the authenticated original
    `request_id`. The future closed schema fixes exact byte encoding.
-5. The workflow receives this reservation ID and must CAS-bind its
-   actual GitHub run ID/attempt as the one current worker **before
-   source acquisition**. Only that worker/generation may commit
-   `PREPARED` or `ARMED`, checking the live claim again immediately
-   before each transition. A delayed older worker becomes ineligible
-   after a newer explicitly authorized generation wins.
-6. Existing direct `issues:opened` handling must **not** independently
-   start a v3 model-capable workflow outside this v3 reservation path.
-   Preserve historical v1/v2 event handling unchanged.
+5. The dispatched workflow must receive `request_id`,
+   `reservation_id` and `generation` as **literal, verified inputs**;
+   the broker revalidates them against the same CAS journal claim and
+   authenticated original request. The worker CAS-binds its exact
+   protected GitHub `run_id/run_attempt` once before any source
+   acquisition. A duplicate worker for the same reservation is an
+   observer, not an executor.
+6. At the **atomic journal CAS that commits `PREPARED`, `ARMED`,
+   and any authorized transition toward model invocation**, the
+   versioned transition itself must check: current generation,
+   reservation ID, worker run identity, unchanged admitted source
+   identities, permitted disposition and prior state. A separate
+   read-before-write check is **insufficient**: another recovery or
+   refusal CAS could win in between. Competing current/stale workers
+   cannot commit from local cached authority.
+7. Prevent all v3 worker paths—including a manually dispatched
+   workflow, event replay, and trusted CLI subcommand—from bypassing
+   this versioned reservation gate. Keep all v1/v2 event and
+   publication semantics unchanged.
 
 A successful reservation CAS is **not evidence that GitHub accepted
 the dispatch**, and an ambiguous response is **not a license to
@@ -127,12 +167,16 @@ There are **zero automatic redeliveries** after that reservation
 No timeout, retry-after duration or hourly sweep count silently
 resets this limit.
 
-A new `generation = previous + 1` reservation on the **same unarmed
-attempt** requires a **fresh authenticated owner/operator recovery
-authorization**, with a 128-bit nonce, exact request/attempt ID,
-previous reservation and generation, verified original admission,
-and an observation that the previous workflow owner can no longer
-proceed. One authorization permits **one** new dispatch reservation.
+A new `generation = previous + 1` reservation is permitted
+**only while the attempt is `REQUESTED` or `ADMITTED` and no
+`PREPARED` packet has ever been committed**. It requires a fresh
+authenticated owner/operator recovery authorization, with a 128-bit
+nonce, exact request/attempt ID, previous reservation and generation,
+verified original admission, and an observation of the previous
+workflow's status and owned resource. One authorization permits
+**one** new dispatch reservation. No `PREPARED`, `ARMED`, terminal
+or indeterminate claim may reset generation to obtain a new source
+capture or model attempt.
 A stale nonce/generation or concurrent owner CAS attempt is rejected.
 
 A previous workflow may be queued or start late. Therefore its
@@ -140,8 +184,15 @@ generation and worker identity must be rechecked at `PREPARED` and
 `ARMED`; an old run cannot arm after another generation is current.
 If previous-run termination or identity cannot be established,
 record `BLOCKED / UNKNOWN` and do not infer that retry is safe.
-An owner may decline recovery; a blocked unarmed attempt is not
-a completed review.
+A historical observation of *no currently running workflow*
+**cannot prove** an ambiguously accepted external dispatch will
+never be delivered later. A new generation may be admitted only
+with the required owner authorization, verified absence of a
+prior `PREPARED`/`ARMED` transition, and enforceable **atomic
+generation fencing** of any late old worker at registration,
+`PREPARED` and `ARMED`. If any of those controls cannot be proven,
+remain blocked. An owner may decline recovery; a blocked unarmed
+attempt is not a completed review.
 
 ### Exact candidate recovery-authorization basis
 
@@ -259,11 +310,22 @@ For a proven `PERMANENT` failure **after claim, before PREPARED**:
    `REFUSED_PERMANENT` before any resource cleanup**. This disposition
    is an admission/armament veto in *every* v3 workflow, journal
    transition, prepare recovery and reconciler path.
-3. Obtain a genuine observation of `Shutdown` for the **correct
-   dedicated Codespace identity**, verifying the caller does not
-   stop another active attempt's resource. A worker that never
-   started its Codespace still needs a valid shutdown observation
-   under the accepted existing cleanup rule. Never synthesize it.
+3. Establish the **current global ownership** of the dedicated
+   Codespace before any `stop` command. A per-request claim
+   cannot by itself exclude an *other* request's active worker
+   on the same Codespace. The existing GitHub Actions concurrency
+   group `review-broker-single-reviewer` across both review and
+   reconciler workflows is a **candidate serialization mechanism**,
+   not yet a qualified resource-owner proof for v3 or out-of-band
+   controllers. Bind the Codespace name, authenticated workflow run,
+   request/attempt/generation and an exclusive owner/lease
+   observation. If another attempt owns it or exclusivity is
+   unestablished, **do not stop the other attempt's resource**;
+   record a blocked cleanup incident for this refused claim.
+   Only after safe resource ownership is established, obtain a
+   genuine `Shutdown` observation for that exact Codespace.
+   A worker that never started its Codespace still needs a real
+   observed Shutdown under the existing rule. Never synthesize it.
 4. Via a **specialized** version-gated journal CAS, move only
    `REQUESTED → STOPPED` or `ADMITTED → STOPPED` if the exact
    already-committed `REFUSED_PERMANENT` receipt, no-`ARMED`
@@ -322,8 +384,8 @@ executed or independently qualified fixtures:
 | PM02 | Two concurrent reconcilers reserve generation 1 | One CAS winner, one losing observer, no second dispatch |
 | PM03 | CAS committed; GitHub dispatch response lost | No blind second dispatch; persisted reserved ambiguity |
 | PM04 | Dispatch delivered late after explicit generation 2 | Generation 1 worker cannot bind, `PREPARED` or `ARMED` |
-| PM05 | Failure after claim but before prepared | CAS permanent-refusal record first; no source acquisition thereafter |
-| PM06 | Permanent-refusal CAS vs competing `PREPARED` CAS | Exactly one winner; losing path stops without side effects |
+| PM05 | Permanent failure while source acquisition might already be in flight | CAS blocks **new authorized** acquisition/packet commit/arm; already-started read may complete but has no permission to advance |
+| PM06 | Permanent-refusal CAS vs competing `PREPARED` CAS | Exactly one CAS winner; losing worker cannot commit or arm, but already-completed external reads are not erased |
 | PM07 | Permanent-refusal CAS committed, cleanup crashes | Reconciler cleans up only; no redispatch or model invocation |
 | PM08 | Invalid/mismatched Shutdown receipt or other attempt's Codespace | Never `STOPPED`; infrastructure incident remains visible |
 | PM09 | Correct permanent failure, valid Shutdown | Specialized `REQUESTED/ADMITTED → STOPPED`, zero invocations |
@@ -338,13 +400,19 @@ executed or independently qualified fixtures:
 | PM18 | Receipt contains raw secret, unsupported code or malformed canonical bytes | Validation rejects and no successful terminal disposition |
 | PM19 | Permanent refusal already `STOPPED` when duplicate event arrives | No new claim, dispatch, or model call |
 | PM20 | Reservation and failure-write endpoint return ambiguous status | Read exact committed claim state; do not assume external success or retry |
+| PM21 | Current journal reader receives canonical v2 record with `pre_model_control` | Future decoder must reject unknown version or preserve v2 control byte-for-byte, **never** downcast to v1 (reproduced current gap in PR #57) |
+| PM22 | Claim A refusal/cleanup overlaps claim B's Codespace ownership | A cannot stop B's Codespace or record falsely owned Shutdown; block without verified exclusivity |
+| PM23 | v3 Issue opening event and reconciler discover the same request concurrently | Both use one reservation controller; only one worker dispatch, no direct `issues:opened` bypass |
+| PM24 | Worker A validates generation, worker B wins recovery/refusal CAS before A commits `PREPARED` or `ARMED` | Versioned transition CAS rechecks worker/generation/disposition **atomically**; A cannot commit with a stale prior read |
+| PM25 | Manual generation advance from `PREPARED`, or failed worker cleanup tries to carry old `worker`/failure fields forward | Refuse advance from `PREPARED`; successful earlier-state advance atomically resets current worker/failure fields and preserves immutable history |
 
 Test GitHub-ref CAS with injected stale parent commits, not only an
 in-memory journal. Test the real reconciler, new result-independent
-refusal receipt validation, model-arm guards and workflow inputs.
+refusal receipt validation, model-arm guards, workflow inputs,
+journal version decoder and **shared Codespace ownership**.
 Inject at every boundary between journal CAS, external dispatch,
 worker registration, source acquisition, failure disposition,
-shutdown observation and `STOPPED`.
+another request's ownership, shutdown observation and `STOPPED`.
 
 ## 8. Acceptance limits and authority
 
@@ -355,11 +423,12 @@ pre-model `STOPPED` transition. Reconciler must never infer liveness
 or permission from a timeout. An ambiguous/unknown outcome is
 explicitly blocked pending authorized recovery or disposition.
 
-**Not resolved by this draft:** implementation API/schema details of
-the v3 journal record, proven GitHub workflow-input correlation,
-real Codespace ownership/shutdown evidence, actual permission
-administration, offline race/fault test results or independent review
-of all governing sources. These require **separately authorized**
+**Not resolved by this draft:** strict dual-version journal reader
+and rollout incompatibility with older deployed workers; implementation
+API/schema details of the v3 claim, proven GitHub worker-input correlation
+and atomic fencing at `PREPARED/ARMED`; global Codespace ownership proof
+across requests, actual permission administration, offline race/fault
+test results or independent review of all governing sources. These require **separately authorized**
 normative-contract acceptance and implementation/qualification.
 
 No existing v1/v2 source files, workflows, package schemas,
@@ -371,6 +440,9 @@ were modified by this proposal.
 `AUTOMATIC_RETRY_AFTER_RESERVATION=ZERO`
 `GENERAL_ATTEMPT_STATE_ADDED=NO`
 `SPECIALIZED_STOPPED_TRANSITION=PROPOSED_NOT_IMPLEMENTED`
+`STRICT_JOURNAL_V2_DECODER_QUALIFIED=NO`
+`WORKER_GENERATION_FENCING_QUALIFIED=NO`
+`SHARED_CODESPACE_OWNERSHIP_QUALIFIED=NO`
 `REAL_JOURNAL_CONCURRENCY_QUALIFIED=NO`
 `INDEPENDENT_REVIEW=NOT_PERFORMED`
 `IMPLEMENTATION_AUTHORIZED=NO`
