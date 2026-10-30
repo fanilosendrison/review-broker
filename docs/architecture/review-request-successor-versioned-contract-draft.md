@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Versioned Successor Review Contracts — Design Draft"
-version: "0.2.0"
+version: "0.2.1"
 ---
 
 # Versioned Successor Review Contracts — Design Draft
@@ -524,10 +524,13 @@ Claim enumeration, creation, reads, updates and reconciliation must therefore
 be version-scoped, and strict journal-version decoding remains mandatory.
 
 Existing v1/v2 behavior and persisted claim records remain unchanged; no
-historical journal conversion is required. The proposed v3 namespace has not
-been created or deployed. Real GitHub ref-creation authority, permissions,
-rulesets and non-force compare-and-swap behavior remain qualification gates.
-Logical claim-discovery isolation does not establish shared Codespace ownership,
+historical journal conversion is required. The proposed v3 namespace is not
+operationally deployed. One separately authorized, explicitly non-operational
+qualification ref now remains as test residue under the prefix; it is not a v3
+claim or journal deployment. Operational ref creation, effective permissions
+and rulesets, and integrated compare-and-swap behavior remain qualification
+gates. Logical claim-discovery isolation does not establish shared Codespace
+ownership,
 cross-request physical exclusivity, future-worker correctness or a preventive
 Codespace-access gate. A no-acquisition receipt or pre-model refusal must still
 satisfy the independently qualified preventive-access conditions below; the
