@@ -2,7 +2,7 @@
 
 **UNACCEPTED / NONNORMATIVE / NOT INSTALLED / NOT EXECUTABLE BY REVIEW BROKER.**
 
-This fixture directory defines **four non-normative closed Draft 2020-12 schema candidates**: the original broad pre-model journal prototype, a smaller v1-compatible journal migration candidate, and two receipt shapes.
+This fixture directory defines **five non-normative closed Draft 2020-12 schema candidates**: the original broad pre-model journal prototype, the smaller v1-compatible journal migration candidate, two existing receipt shapes and a new no-Codespace-access terminal evidence candidate.
 They do **not** live under the root `schemas/` directory and are not loaded by
 `reviewctl`, a running reconciler, a production workflow, or a Codespace.
 
@@ -15,6 +15,7 @@ They do **not** live under the root `schemas/` directory and are not loaded by
 - `recovery-v1.candidate.schema.json`: owner-recovery authorization *shape*
   with nonce, predecessor reservation, authenticated actor-ID claim and
   prior-run evidence pointer. The JSON contents alone never authenticate a user.
+- `no-codespace-access-v1.candidate.schema.json`: **v3-only alternative to shutdown evidence** for permanent refusal before any Codespace access; binds exact worker/run/claim, trace and mandatory start-gate evidence references. The receipt shape alone cannot prove those external facts.
 
 The isolated reference implementation is `tests/reference_pre_model_v3.py`;
 the test suite `tests/test_pre_model_v3_reference.py` uses its model, **not**
@@ -93,6 +94,56 @@ For source evidence:
 **No real GitHub ref race, worker run correlation, external CAS, App
 permission, crash or Codespace ownership is qualified here.** The
 candidate is test-only and not a drop-in production journal parser.
+
+## Follow-up: separate attempt finality from shared Codespace shutdown
+
+The accepted *historical* Review Broker v1/v2 `STOPPED` rule requires
+a genuine `Shutdown` observation. That rule must not silently change.
+The v3 design now explores a **specialized terminal refusal** after
+`REFUSED_PERMANENT` and strictly before `PREPARED`, if the attempt
+**provably never acquired the shared Codespace**.
+
+The current installed workflow calls `internal-prepare` before the
+first Codespace `start` step; its post-run stop is gated on
+`steps.start.outcome != 'skipped'`. Those facts support a
+**possible** no-Codespace-access route, not a live v3 proof.
+Pre-packet GitHub source reads are not Codespace acquisition.
+
+The isolated reference now has:
+
+- `MemoryClaim.assert_codespace_start_permitted`: **effectful
+  Codespace access may be authorized only after `PREPARED`**, from
+  the currently bound worker; old/refused workers are fenced out.
+- `MemoryClaim.finish_without_codespace`: a **test-only v3
+  refusal CAS** that binds a correctly shaped, identity-matching
+  no-acquisition receipt, without calling or stopping Codespace
+  and without fabricating `Shutdown` or a model result.
+- `tests/test_no_codespace_acquisition_reference.py`:
+  **PM26–PM35** (10 cases) plus three static workflow checks.
+  A different request's Codespace may remain `Available`
+  when A is properly terminalized **without touching it**.
+
+**Critical authority limit:** the tests *inject* authenticated
+complete run trace, qualified mandatory start fence and knowledge
+of every potentially dispatched worker. A test's positive boolean
+is **not** an authenticated GitHub Actions run inventory, nor proof
+that every deployed worker or out-of-band path respects the start
+gate. Missing/ambiguous run, start or worker observation must
+remain blocked. A refusal **before any worker is registered**
+has not yet been qualified by the candidate receipt and requires
+separate evidence or remains blocked.
+
+If a Codespace side effect was attempted or its outcome is
+unknown, do not use this receipt or terminalize A as a proven
+non-acquirer. Acquiring-resource cleanup still requires an
+independently qualified exclusive owner/Shutdown boundary.
+No distributed lease is introduced merely to close a refusal
+that never acquired the Codespace.
+
+GitHub Actions CI run 41064672091 first demonstrated
+**559 total PASS** including the ten new PM cases and
+three static workflow checks. The final README-only follow-up
+retains the same test-only scope.
 
 A complete real v3 `AttemptRecord` contract must also close the production
 admission/result/publication/evidence structures, the exact trusted versions
