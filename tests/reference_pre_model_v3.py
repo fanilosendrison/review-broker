@@ -435,6 +435,13 @@ class MemoryClaim:
                        observed_owner: dict[str,Any] | None = None,
                        trusted_resource_observation: bool = False,
                        expected_revision: int | None = None) -> dict[str,Any]:
+        """Older experimental Shutdown variant, retained for NEGATIVE tests.
+
+        It is NOT the proposed v3 pre-PREPARED refusal terminal route.
+        The real resource ownership predicate is injected, not qualified;
+        use finish_without_codespace() for a provably nonacquiring attempt.
+        A resource-acquiring case belongs to separately qualified cleanup.
+        """
         if not trusted_resource_observation:
             raise ProtocolError("RESOURCE_OWNERSHIP_UNVERIFIED")
         def change(r):
