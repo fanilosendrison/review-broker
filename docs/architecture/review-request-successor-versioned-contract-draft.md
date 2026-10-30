@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Versioned Successor Review Contracts — Design Draft"
-version: "0.1.5"
+version: "0.1.6"
 ---
 
 # Versioned Successor Review Contracts — Design Draft
@@ -567,6 +567,22 @@ fencing. **None** is asserted to have passed on v3. PR #57's
 expected future-contract failures; full CI 501 tests) cover v1/v2
 code, not these v3 changes.
 
+**Follow-up minimal-journal and external-authority experiments:**
+[test-only PR #58](https://github.com/fanilosendrison/review-broker/pull/58)
+has now qualified **offline** a smaller journal-v2 candidate that
+retains exactly the serialized v1 AttemptRecord fields/history plus
+versioned `pre_model_control`, with no duplicated top-level
+`packet_evidence_id`. Its 12 migration tests call the actual
+v1 serializer/decoder/transition logic; 15 further tests check
+**injected** GitHub dispatch/run metadata and demonstrate that
+Codespace name/state and Actions concurrency do **not** establish
+an exclusive cross-request owner. CI for that isolated branch
+reports 546 PASS, but real v3 GitHub-ref CAS, effective principal
+authority, owner lease and safe rollout remain **unqualified**.
+The [protocol annex](pre-model-preparation-failure-protocol-draft.md)
+records the precise GitHub Actions 200/204 dispatch distinction and
+why a lost response never permits automatic redelivery.
+
 ## 8. Result publication and applicability
 
 ReviewResult v1 cannot silently acquire a new meaning for its historical
@@ -704,7 +720,7 @@ The following are **not silently resolved** by publishing this draft:
 - Qualification of the required `references: []` schema, stable numeric
   `subject.repository_id` and authenticated reference-object binding.
 - Qualify the [pre-model protocol annex](pre-model-preparation-failure-protocol-draft.md):
-  **strict versioned journal parser/serializer** (old deployed
+  **strict versioned journal parser/serializer** (the minimal v1-compatible candidate passed offline shape tests, but older deployed
   workers must not downgrade a new claim), one automatic dispatch
   via a unified discovery/controller entry point, **atomic**
   current-generation/worker fencing at `PREPARED` and `ARMED`,
