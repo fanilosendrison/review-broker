@@ -258,36 +258,66 @@ candidate unless an explicitly accepted subsequent source contract, format,
 version/capability binding and qualification supports them. Not-yet-qualified
 optional kinds **fail admission**, rather than being reported as `omitted`.
 
-## 3. Request-wide atomicity (exact semantic scope)
+## 3. Request-wide atomicity: Git revision consistency
 
-`atomicity=false` means the broker guarantees each source's exact original
-bytes, selector, authorized provenance to the extent observable, and declared
-capture/omission completeness **without claiming a coherent global cut**
-across independently changing mutable sources. The reviewer receives
-explicit individual observation bounds.
+`atomicity=false` keeps per-source exact bytes, authorization, provenance,
+PR change scope and truthful omission guarantees, **without** promising
+a coherent common instant across independently mutable sources.
 
-`atomicity=true` demands a **qualified source-backed coherent capture**
-of the subject and *all captured references*. The broker must have a
-supported way to prove the required common logical snapshot; timestamps,
-sequential fetches and pagination completeness alone are insufficient. If
-this cannot be established, the request **fails before `PREPARED`** with
-no inference, including if the failure occurs after the journal claim.
+`atomicity=true` requires a **verifiable common immutable Git revision
+basis** covering the PR change basis and every captured reference.
+The first **proposed, not implemented** acceptance matrix is:
 
-Optional references that are legitimately omitted are **not counted as
-captured** for the atomicity claim. An omitted optional reference remains
-explicit; any missing required reference independently blocks preparation.
+| Material covered | Candidate `atomicity=true` behavior |
+| --- | --- |
+| Exact GitHub PR at expected HEAD H with `references: []` | Eligible after offline qualification |
+| PR + bounded `inline` UTF-8 references | Eligible: inline bytes are immutable by canonical request |
+| PR + inline and `git_file` references at **H in the exact same authenticated `repository_id`** | Eligible: all reference blobs are verified in the same immutable HEAD tree |
+| Git file at another commit H2 != H (even if its bytes match) | Reject in the first atomicity profile |
+| GitHub Issue/comment bodies or mutable PR conversations/reviews | Reject under `true`: no qualified common Git version basis |
+| Unqualified `upload`, `web_url`, HTML/PDF or composite kinds | Reject these source kinds under either boolean |
 
-The agent owns the value; the broker validates it mechanically. No exhaustive
-semantic analysis of mission instructions is claimed. `false` never waives
-subject change-scope integrity, credential isolation, authorization, or
-at-most-once execution. For the first implementation, conservative rejection
-of nontrivial `true` combinations is allowed until a mechanism is qualified.
+**Consistency definition:** Let H be `subject.expected_head_commit`
+and B the PR's verified merge-base. The subject's postimages and all
+`atomicity=true` eligible Git reference files must come from **the
+same tree of H** and the same authenticated immutable repository ID.
+The subject's B-preimages and exact B→H diff are inherent comparison
+material; they are not external references required to reside in H.
+Inline bytes are fixed by the canonical request and do not provide
+external historical-time evidence or semantic truth.
+
+**Proof bound to the packet:** authenticated repository ID, H/B
+commit/tree/blob identities, exact Git source bytes/digests, pre-/post-
+image and diff coverage, inline request bytes, source roles, verified
+renderer/prompt identity and declared `atomicity` value. Resolve H
+exactly at admission and reject changed or unverifiable identity
+during qualified preparation. Separate API timestamps, hashes and
+pagination do **not** establish an atomic multi-object GitHub snapshot.
+
+**Counterexamples:** source at H2, different repository ID, substituted
+blob, changed inline text in the prompt, absent PR preimage or incorrect
+B→H diff, mutable Issue/comment body, and changed PR HEAD mid-prepare.
+Every case must fail `atomicity=true` before `PREPARED`.
+Permitted optional omissions stay visible and outside the claim;
+all required sources still must be captured.
+
+This is **Git-version coherence**, not general real-time simultaneity
+across services. The bool remains requester-owned but cannot waive
+technical broker controls. The matrix is a **qualification target**,
+not a live supported capability.
 
 ## 4. Admission, requiredness and source material
 
+Before first **claim** creation, validate the complete closed request,
+authenticate the requester, compare the stable numeric repository ID and
+canonical name, resolve the PR object and expected HEAD, verify any
+existing reference-object IDs and their authorized repository membership,
+and reject determinate invalid/unqualified/unauthorized sources.
+
 Before any packet can be successfully recorded as `PREPARED`:
 
-1. Authenticate and authorize the requester and the exact PR subject.
+1. Revalidate the authenticated admission, immutable GitHub targets and exact
+   PR HEAD, not a repository name alone.
 2. Validate the closed source selector grammar, supported/qualified source kind,
    allowed repository, credential scope and requested byte limits.
 3. Capture each required source, verify its expected hash when present, and
@@ -422,12 +452,14 @@ objects to satisfy subject image coverage. Do **not** relax
 
 The candidate packet-v2 identity basis must bind at least:
 
-- Version discriminator, exact request/subject/intent identities.
+- Version discriminator, exact request/subject/intent identities,
+  including authenticated stable repository/PR object IDs.
 - Ordered subject before/after image source entries, exact diff hash,
   merge base and subject HEAD; no fabricated reference images in change scope.
 - Ordered reference declarations and `captured/omitted` outcomes; actual
-  reference source entries with original byte hashes, byte length, immutable
-  snapshots, observation metadata, source kind and verified provenance.
+  reference source entries with exact bytes/hashes, observation metadata,
+  immutable snapshots, authenticated repository/reference object IDs,
+  verified source principal/installation scope and technical provenance.
 - Declared `atomicity` and any **qualified** coherent-capture evidence when
   true, with explicit omitted material outside that guarantee.
 - Broker-owned effective technical permission policy name/version/digest,
@@ -449,25 +481,62 @@ receipts remain unchanged. Source and packet file/line citations retain
 their supported mechanical meaning, not substantive-truth authority.
 Unsupported binary/PDF anchors have no invented source-line semantics.
 
-## 7. Durable lifecycle and material drift
+## 7. Durable lifecycle, permanent refusal and recoverable failure
 
-The existing lifecycle is retained:
+The normal lifecycle remains:
 `REQUESTED → ADMITTED → PREPARED → ARMED → TERMINAL_CAPTURED →
-VALIDATED → REPORTED → STOPPED` (plus valid indeterminate paths).
+VALIDATED → REPORTED → STOPPED` (plus existing indeterminate paths).
+**The v3 failure paths below are proposed, not implemented today.**
 
-A remote mutable source with no content pin may change **before** its
-snapshot is durably bound to `PREPARED`; the request's identity does not
-claim otherwise. After `PREPARED`, recovery must reproduce the **same exact
-packet bytes** or fail closed. Re-fetching different material cannot
-replace a journal-bound prepared snapshot.
+| Event | Candidate disposition |
+| --- | --- |
+| Invalid request, disallowed kind or unauthorized target proven before claim | Reject without creating a claim |
+| Permanent error after `REQUESTED` or `ADMITTED`: unauthorized source, repository/object identity mismatch, pinned digest mismatch or unsupported requested atomicity | Record typed permanent-refusal evidence, then specialized pre-model terminal `STOPPED` after validated shutdown; never create `PREPARED` |
+| Transient GitHub/network/source-transfer interruption | Persist a CAS-protected **retryable-blocked disposition** under the original unarmed claim; no unbounded redispatch |
+| Crash before failure outcome is committed | Revalidate request/admission and permit only bounded, evidence-backed same-claim recovery |
+| Already `PREPARED` | Exact packet must be reproduced byte-identically; no refresh |
+| Already `ARMED` | At-most-once semantics unchanged; never retry inference |
 
-`ARMED` and `invocation_count=1` must be recorded durably **before**
-Codex transport under the existing execution contract. `PREPARED` is the
-packet-binding boundary, not a substitute for this invocation boundary.
-No automatic model retry after arming; no provider-level exactly-once
-inference guarantee is invented. Never create a new logical request
-solely because a source or PR HEAD has drifted; explicit re-review
-authorization is required.
+### Minimal pre-model journal extension, subject to qualification
+
+The existing `queue.py` permits `REQUESTED/ADMITTED →
+INDETERMINATE`, but **does not** currently permit a direct pre-model
+`REQUESTED → STOPPED` or `ADMITTED → STOPPED`. The candidate adds
+only **specialized receipt-validating transitions** for these two
+source states. Evidence must bind the exact request/attempt and
+admission, failure reason/source/identity, broker-owned policy,
+history without any `ARMED` transition, `invocation_count=0` and
+independently verified Codespace `Shutdown` (even if already shut down).
+A generic state transition must not inherit this permission. If
+shutdown cannot be observed, retain the refusal as durably blocked,
+report an infrastructure incident and **do not fabricate STOPPED**.
+A terminal refused claim cannot be rearmed by ordinary reconciliation.
+
+Transient failure instead persists a typed **retryable-blocked
+preparation record** via an atomic journal compare-and-swap.
+The reconciler must inspect that record and **must not dispatch a
+known failed request every hour**. A corrected cause plus explicit
+recovery authorization can resume the **same** unarmed attempt
+only after revalidation of stable source IDs, admission and version
+pins. For unobserved crashes, use a finite, auditable preparation-
+generation/automatic-dispatch limit; exact budget and crash ordering
+are an offline acceptance gate, **not** an arbitrary hidden timeout.
+No new general AttemptState is proposed.
+
+### Drift and independent re-review
+
+An unpinned mutable source may be re-fetched before a **durably
+committed** `PREPARED` packet under the same authorized unarmed
+claim, but only if its bound repository/object IDs are unchanged.
+No pre-commit read constitutes a committed snapshot. After
+`PREPARED`, require the exact previously bound packet bytes or
+fail closed. A distinct authorized `repeat_same_head` is necessary
+for a **new review** after a committed packet or model-capable
+attempt, not for reacquiring an uncommitted source.
+
+`ARMED` and `invocation_count=1` remain independently durable
+**before** model transport. Never retry after arming or assert
+provider-level exactly-once. No v1/v2 journal is reinterpreted.
 
 ## 8. Result publication and applicability
 
