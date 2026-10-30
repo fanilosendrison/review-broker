@@ -22,6 +22,8 @@ import unittest
 
 from review_broker.admission import resolve_request
 from review_broker.changes import ChangeScopeError, validate_change_scope
+from review_broker.codespace import CodespaceController
+from review_broker.execution_recovery import stop_and_observe_shutdown
 from review_broker.evidence import build_shutdown_observation
 from review_broker.github_journal import GitHubRefJournal
 from review_broker.identity import attempt_identity, request_identity
@@ -308,6 +310,79 @@ class ActualMechanismFaultTests(unittest.TestCase):
         self.assertEqual(rewritten["schema_version"], 1)
         self.assertNotIn("pre_model_control", rewritten)
         self.assertEqual(got.request_id, self.req_id)
+
+    def test_current_real_controller_stop_has_no_request_ownership_check(self):
+        """CodespaceController.stop is name-scoped, not request/attempt-scoped.
+
+        Fake runner intercepts every gh command; NO real resource is contacted.
+        """
+        observed = {"state": "Available", "commands": []}
+
+        def fake_runner(command, **kwargs):
+            self.assertFalse(kwargs["shell"])
+            observed["commands"].append(list(command))
+            if command[:3] == ["gh", "codespace", "stop"]:
+                observed["state"] = "Shutdown"
+                return subprocess.CompletedProcess(command, 0, "", "")
+            if command[:3] == ["gh", "codespace", "view"]:
+                return subprocess.CompletedProcess(
+                    command, 0, json.dumps({"state": observed["state"]}), "",
+                )
+            raise AssertionError("UNEXPECTED_GH_COMMAND:" + repr(command))
+
+        controller = CodespaceController(
+            "qualification-fake-shared", runner=fake_runner,
+            sleep=lambda _: None,
+        )
+        controller.stop(attempts=2, interval_seconds=0)
+        self.assertEqual(observed["state"], "Shutdown")
+        stop_commands = [
+            c for c in observed["commands"] if c[:3] == ["gh", "codespace", "stop"]
+        ]
+        self.assertEqual(len(stop_commands), 1)
+        self.assertEqual(
+            stop_commands[0],
+            ["gh", "codespace", "stop", "-c", "qualification-fake-shared"],
+        )
+        self.assertNotIn(self.req_id, stop_commands[0])
+
+    def test_current_real_shutdown_receipt_binds_caller_claim_not_codespace_owner(self):
+        """A valid Shutdown receipt does not attest exclusive request ownership.
+
+        Real stop_and_observe_shutdown and validator run, but gh transport
+        is entirely stubbed. This is CURRENT v1 behavior, not a production
+        Codespace owner conflict having been observed.
+        """
+        observed = {"state": "Available", "stop_calls": 0}
+
+        def fake_runner(command, **_kwargs):
+            if command[:3] == ["gh", "codespace", "view"]:
+                return subprocess.CompletedProcess(
+                    command, 0, json.dumps({"state": observed["state"]}), "",
+                )
+            if command[:3] == ["gh", "codespace", "stop"]:
+                observed["state"] = "Shutdown"
+                observed["stop_calls"] += 1
+                return subprocess.CompletedProcess(command, 0, "", "")
+            raise AssertionError("UNEXPECTED_GH_COMMAND:" + repr(command))
+
+        controller = CodespaceController(
+            "qualification-fake-shared", runner=fake_runner,
+            sleep=lambda _: None,
+        )
+        with tempfile.TemporaryDirectory(prefix="rb-no-owner-proof-") as tmp:
+            receipt = stop_and_observe_shutdown(
+                controller, Path(tmp),
+                request_id=self.req_id,
+                attempt_id=attempt_identity(self.req_id, 1),
+                context={"workflow_run_id": "synthetic",
+                         "workflow_run_attempt": "1"},
+            )
+        self.assertEqual(observed["stop_calls"], 1)
+        self.assertEqual(receipt["request_id"], self.req_id)
+        self.assertEqual(receipt["observed_state"], "Shutdown")
+        self.assertNotIn("owner_proof", receipt)
+        self.assertNotIn("exclusive_codespace_owner", receipt)
 
     def test_actual_request_parser_rejects_future_v3_not_yet_supported(self):
         candidate = dict(self.request, schema_version=3)
