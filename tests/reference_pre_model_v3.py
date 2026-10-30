@@ -96,6 +96,9 @@ def validate_record(record: dict[str, Any]) -> None:
     _check("journal", record)
     c = record["pre_model_control"]
     g = c["generation"]
+    if any(e["evidence_id"] is None or e["evidence_id"] not in record["evidence_ids"]
+           for e in record["history"]):
+        raise ProtocolError("JOURNAL_EVENT_EVIDENCE_MISSING")
     if record["attempt_id"] != attempt_identity(record["request_id"], 1):
         raise ProtocolError("ATTEMPT_ID_MISMATCH")
     if c["disposition"] in {"BLOCKED", "REFUSED_PERMANENT"}:
@@ -111,6 +114,8 @@ def validate_record(record: dict[str, Any]) -> None:
         f = matching[0]["receipt"]
         if f["request_id"] != record["request_id"] or f["attempt_id"] != record["attempt_id"]:
             raise ProtocolError("FAILURE_ATTEMPT_MISMATCH")
+        if f["admission_evidence_id"] != record["admission"]["admission_evidence_id"]:
+            raise ProtocolError("FAILURE_ADMISSION_MISMATCH")
         if f["generation"] != g or f["reservation_id"] != c["reservation_id"]:
             raise ProtocolError("FAILURE_GENERATION_MISMATCH")
         required_class = "PERMANENT" if c["disposition"] == "REFUSED_PERMANENT" else None
@@ -191,6 +196,13 @@ class MemoryClaim:
     @staticmethod
     def _append(r: dict[str, Any], kind: str, evidence_id: str | None = None,
                 receipt: dict[str, Any] | None = None) -> None:
+        if evidence_id is None:
+            evidence_id = identity("artifact", {
+                "event": kind, "request_id": r["request_id"],
+                "attempt_id": r["attempt_id"],
+                "generation": r["pre_model_control"]["generation"],
+                "prior_history_count": len(r["history"]),
+            }, newline=True)
         r["history"].append({
             "kind": kind, "generation": r["pre_model_control"]["generation"],
             "evidence_id": evidence_id, "receipt": deepcopy(receipt),
