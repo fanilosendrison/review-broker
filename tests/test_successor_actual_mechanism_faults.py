@@ -287,7 +287,7 @@ class ActualMechanismFaultTests(unittest.TestCase):
             "failure_receipt_id": "artifact:sha256:" + "b" * 64,
         }
         from review_broker.identity import canonical_bytes
-        wire = base64.b64encode(canonical_bytes(future) + b"\\n").decode("ascii")
+        wire = base64.b64encode(canonical_bytes(future) + b"\n").decode("ascii")
         commit = "c" * 40
 
         def runner(command, **_kwargs):
