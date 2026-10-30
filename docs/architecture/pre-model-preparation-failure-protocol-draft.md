@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Successor Pre-Model Preparation Failure Protocol"
-version: "0.1.3"
+version: "0.1.4"
 ---
 
 # Successor v3 — durable pre-model preparation outcomes
@@ -35,8 +35,11 @@ pre-model dispatch nor a future unsafe version downgrade.
 The design goal is **one automatic initial pre-model dispatch**, a
 truthful immutable refusal receipt for permanently impossible requests,
 explicitly authorized *same-attempt* recovery for transient faults,
-and no second model invocation. No clock timeout, new service, or general
-`AttemptState` is required as the starting design.
+and no second model invocation. **A v3 attempt that never acquired
+the shared Codespace need not stop that Codespace merely to terminate
+its own claim**. This narrows the original blanket Shutdown requirement.
+No clock timeout, new service, or general `AttemptState` is required
+as the starting design.
 
 ## 2. Version boundary and strict state ownership
 
@@ -347,73 +350,131 @@ the winner; do not assume the failure was stored. A worker may not
 proceed from a rejected/blocked generation simply because its local
 memory still says `ADMITTED`.
 
-## 5. Terminal refusal and shutdown transaction ordering
+## 5. Terminal refusal: attempt finality is not Codespace shutdown
 
-For a proven `PERMANENT` failure **after claim, before PREPARED**:
+**Normative-direction correction (v3 proposal only):** terminality of a
+ReviewRequest is not a claim that the *globally shared* Codespace is
+`Shutdown`. The historical v1/v2 `STOPPED` contract **remains
+unchanged**; the successor may introduce a narrowly specialized
+v3-only `STOPPED` receipt for a permanently refused, **unarmed,
+pre-`PREPARED`, Codespace-non-acquiring** attempt.
 
-1. Read the current claim. Require `REQUESTED` or `ADMITTED`,
-   the current reservation/generation, a bound resolved admission,
-   and `invocation_count=0`. Reject any record with `PREPARED`,
-   `ARMED`, prior model invocation or contradictory history.
-2. Validate the bounded permanent-failure receipt and **CAS-commit
-   `REFUSED_PERMANENT` before any resource cleanup**. This disposition
-   is an admission/armament veto in *every* v3 workflow, journal
-   transition, prepare recovery and reconciler path.
-3. Establish the **current global ownership** of the dedicated
-   Codespace before any `stop` command. A per-request claim
-   cannot by itself exclude an *other* request's active worker
-   on the same Codespace. The existing GitHub Actions concurrency
-   group `review-broker-single-reviewer` across both review and
-   reconciler workflows is a **candidate serialization mechanism**,
-   not yet a qualified resource-owner proof for v3 or out-of-band
-   controllers. Bind the Codespace name, authenticated workflow run,
-   request/attempt/generation and an exclusive owner/lease
-   observation. If another attempt owns it or exclusivity is
-   unestablished, **do not stop the other attempt's resource**;
-   record a blocked cleanup incident for this refused claim.
-   Only after safe resource ownership is established, obtain a
-   genuine `Shutdown` observation for that exact Codespace.
-   A worker that never started its Codespace still needs a real
-   observed Shutdown under the existing rule. Never synthesize it.
+### 5.1 Minimal resource-acquisition boundary
 
-   **Qualification result/limit of #58:** simulated metadata tests
-   reject a different run, workflow, repository, source HEAD and
-   reservation, and reject a mismatched injected resource owner.
-   However the [GitHub Codespaces REST resource
-   information](https://docs.github.com/en/rest/codespaces/codespaces)
-   provides a name, state, owner and repository context, **not**
-   an automatically authenticated exclusive *ReviewRequest/worker
-   generation* lease. The [Actions concurrency
-   group](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
-   governs scheduled workflows (including pending cancellations)
-   but does not by itself prove the absence of out-of-band
-   Codespace controllers. A matching *injected* owner record in a
-   test is a conditional assumption, **not qualified ownership**.
-   No stop operation may become permissible in v3 until that
-   external authority is independently established, or the
-   protocol must retain a blocked cleanup disposition.
-4. Via a **specialized** version-gated journal CAS, move only
-   `REQUESTED → STOPPED` or `ADMITTED → STOPPED` if the exact
-   already-committed `REFUSED_PERMANENT` receipt, no-`ARMED`
-   history, `invocation_count=0` and matching Codespace Shutdown
-   receipt are validated. This is **not** enabled through the
-   generic `transition_record`/`record_shutdown_transition` API.
-5. Preserve both immutable evidence IDs and a terminal reason
-   `PREPARATION_REFUSED` in the version-2 journal. Emit a truthful
-   pre-model refusal disposition, **not** a fake `ReviewResult`
-   claiming Codex `COMPLETED`/`GO`/`NO_GO`.
+The [current workflow](https://github.com/fanilosendrison/review-broker/blob/f9e902ee577d3a22330c3bf2fb04dcae28ed3034/.github/workflows/review-request.yml)
+runs `internal-prepare` **before** the first Codespace
+`start` step. Its stop step is conditional on
+`steps.start.outcome != 'skipped'`. Hence a failure before
+preparation can occur without this worker touching the Codespace.
 
-If the process crashes after the refusal CAS but before shutdown,
-the reconciler performs **cleanup only**; it must not resume
-acquisition, dispatch or arm. If it cannot verify shutdown, leave
-the blocked refusal durably visible and report an infrastructure
-incident. A late worker loses its attempt/generation CAS, and
-cannot overwrite a permanent refusal with `PREPARED`.
+For future v3, all **effectful Codespace operations**, including
+`start`, `stop`, remote `ssh/exec`, copy/transfer and other
+Codespace lifecycle mutations, MUST be reachable **only after**
+the exact attempt's journal is durably `PREPARED`, from a worker
+whose reservation/generation/identity is checked through the
+trusted broker. Access to remote GitHub source APIs during
+preparation does **not** count as Codespace acquisition; the
+no-acquisition claim is strictly about the Codespace and does
+not claim zero network activity.
 
-The narrower proposed `STOPPED` route changes future v3-only
-semantics. Existing v1/v2 post-publication and indeterminate cleanup
-remain exactly as they were. No global expansion of arbitrary
-STOPPED transitions is approved.
+A stale or queued worker must be denied **before any Codespace
+side effect**, even if it is launched after a permanent-refusal
+CAS. The journal-side guard must enforce the current v3
+reservation, committed `PREPARED` state and worker identity.
+A log indicating that `start` was skipped is **not enough**
+to establish this guarantee in the presence of unknown work,
+alternative CLI entry points, old deployed workers or an
+ambiguous start request. All such bypasses must be excluded
+before v3 operational enablement.
+
+### 5.2 Zero-Codespace-access permanent refusal
+
+1. Verify the original exact admission and `REQUESTED`/`ADMITTED`
+   claim, with `invocation_count=0`, no `PREPARED` history
+   and no model-capable transition. A permanent failure receipt
+   is already bound by CAS to `REFUSED_PERMANENT`; this
+   prevents any later preparation/arming or Codespace start.
+2. Obtain **authenticated and complete workflow-run/step evidence**
+   tied to the exact reservation, generation and worker.
+   Independently establish that **no Codespace-affecting command**
+   was attempted by this worker, that all potentially dispatched
+   workers for the claim are accounted for, and that the mandatory
+   pre-`PREPARED` access gate prevents future late work.
+   A missing run ID, uncertain dispatch acceptance, missing
+   step evidence, crash with unknown start attempt, or unproven
+   worker coverage **fails closed**. Initial qualification
+   covers a registered and fully accounted-for worker; refusal
+   before worker binding needs its own later evidence fixture.
+3. Bind an exact, closed **no-Codespace-access receipt** to the
+   already committed permanent failure. The first isolated
+   candidate appears at
+   [PR #58's test fixture](https://github.com/fanilosendrison/review-broker/pull/58):
+   the receipt contains version/kind, request/attempt/admission IDs,
+   reservation/generation, authenticated workflow run identity,
+   intended Codespace name, independent workflow trace ID,
+   start-gate evidence ID, the backed `codespace_access_attempted=false`
+   finding, and timestamp. A requester-supplied boolean,
+   an absent log line, or an opaque evidence hash **without a
+   verified external source** is not sufficient.
+4. Use **one specialized, version-gated journal CAS** to enter
+   `STOPPED` directly from `REQUESTED` or `ADMITTED`,
+   validating both the permanent-refusal receipt and the
+   no-acquisition receipt, with no `PREPARED`, `ARMED`
+   or inference. Preserve evidence IDs and terminal reason
+   `PREPARATION_REFUSED_NO_CODESPACE_ACCESS`.
+   **Do not call `controller.state()`, `stop()` or
+   `start()` on the shared Codespace.** Do not create a
+   synthetic Shutdown receipt or a fabricated ReviewResult.
+
+The Codespace may legitimately remain `Available` under
+**another** request's ownership. This has no bearing on the
+terminal refusal of A if A provably never touched it. The
+new receipt proves bounded **non-acquisition by A**, not that
+the global machine is stopped or unused.
+
+### 5.3 When no-acquisition cannot be established
+
+If any attempt or outcome of Codespace `start`, `stop`,
+`ssh`, `copy` or remote execution is unknown or observed,
+**do not** use the no-access receipt or mark the claim terminal
+on that basis. Persist the original `REFUSED_PERMANENT`
+disposition, avoid redispatch/inference, and report a blocked
+cleanup/authority incident. An ambiguous external command cannot
+be reclassified as non-acquisition merely because no process
+is currently visible.
+
+If another path genuinely acquired the shared Codespace,
+remote cleanup requires a **separately qualified, exclusive
+cross-request resource-owner boundary** held continuously
+through the stop operation, followed by authentic observation
+of `Shutdown`. A per-request claim and the shared GitHub
+Actions concurrency string do not alone prove that ownership.
+If another request owns the Codespace, **do not stop it**.
+Any attempt that reached `PREPARED` or `ARMED` remains
+under its normal packet/at-most-once recovery path, not the
+preparation-refusal shortcut.
+
+A crash after `REFUSED_PERMANENT` before terminal receipt
+causes the reconciler to **assess non-acquisition proof or
+report BLOCKED**. It must not automatically stop the shared
+Codespace. The old blanket `STOPPED`-requires-`Shutdown`
+rule applies to **historical v1/v2 attempts** and to v3
+cleanup paths that actually acquired the resource, not to
+this specialized v3 no-acquisition terminal receipt.
+
+### 5.4 Qualification boundary
+
+The new [test-only PR #58](https://github.com/fanilosendrison/review-broker/pull/58)
+adds **PM26–PM35** to its reference model and checks the
+present workflow's prepare/start/stop ordering. Those checks
+only exercise an **in-memory** claim plus *injected*
+authenticated run-trace/gate/worker-coverage assumptions.
+They **cannot attest** real GitHub run-step provenance or
+prove that all deployed entry points enforce the resource
+gate. The future implementation must test the exact receipt,
+the journal CAS race, blocked ambiguous access, run coverage
+and delayed-worker fencing **before** treating this route
+as a live terminal guarantee.
 
 ## 6. Transient refusal, crashes and safe resumption
 
@@ -452,9 +513,9 @@ executed or independently qualified fixtures:
 | PM04 | Dispatch delivered late after explicit generation 2 | Generation 1 worker cannot bind, `PREPARED` or `ARMED` |
 | PM05 | Permanent failure while source acquisition might already be in flight | CAS blocks **new authorized** acquisition/packet commit/arm; already-started read may complete but has no permission to advance |
 | PM06 | Permanent-refusal CAS vs competing `PREPARED` CAS | Exactly one CAS winner; losing worker cannot commit or arm, but already-completed external reads are not erased |
-| PM07 | Permanent-refusal CAS committed, cleanup crashes | Reconciler cleans up only; no redispatch or model invocation |
-| PM08 | Invalid/mismatched Shutdown receipt or other attempt's Codespace | Never `STOPPED`; infrastructure incident remains visible |
-| PM09 | Correct permanent failure, valid Shutdown | Specialized `REQUESTED/ADMITTED → STOPPED`, zero invocations |
+| PM07 | Permanent-refusal CAS committed, terminal-evidence processing crashes | Reconciler only verifies no-Codespace-access proof or blocks; no blind Codespace stop, redispatch or model invocation |
+| PM08 | Invalid/mismatched terminal proof, or unknown Codespace acquisition | Never `STOPPED` without the appropriate verified evidence; do not stop another request's Codespace |
+| PM09 | Pre-`PREPARED` permanent failure with verified no-Codespace-access receipt | Specialized `REQUESTED/ADMITTED → STOPPED` **without any global Codespace operation**, zero invocations |
 | PM10 | Temporary API failure with saved blocked receipt | No automatic retry; one fresh owner recovery authorizes one generation |
 | PM11 | Ambiguous permission/404 or unknown dispatch ownership | `BLOCKED/UNKNOWN`; never optional omission or unverified resume |
 | PM12 | Crash before failure/disposition CAS | Reserved generation is ambiguous, not automatically re-dispatched |
@@ -467,10 +528,21 @@ executed or independently qualified fixtures:
 | PM19 | Permanent refusal already `STOPPED` when duplicate event arrives | No new claim, dispatch, or model call |
 | PM20 | Reservation and failure-write endpoint return ambiguous status | Read exact committed claim state; do not assume external success or retry |
 | PM21 | Current journal reader receives canonical v2 record with `pre_model_control` | Future decoder must reject unknown version or preserve v2 control byte-for-byte, **never** downcast to v1 (reproduced current gap in PR #57) |
-| PM22 | Claim A refusal/cleanup overlaps claim B's Codespace ownership | A cannot stop B's Codespace or record falsely owned Shutdown; block without verified exclusivity |
+| PM22 | Refused A has not acquired Codespace, while B legitimately owns an Available Codespace | A may terminate **without touching B** only with verified no-access proof; otherwise block; never stop B's resource |
 | PM23 | v3 Issue opening event and reconciler discover the same request concurrently | Both use one reservation controller; only one worker dispatch, no direct `issues:opened` bypass |
 | PM24 | Worker A validates generation, worker B wins recovery/refusal CAS before A commits `PREPARED` or `ARMED` | Versioned transition CAS rechecks worker/generation/disposition **atomically**; A cannot commit with a stale prior read |
 | PM25 | Manual generation advance from `PREPARED`, or failed worker cleanup tries to carry old `worker`/failure fields forward | Refuse advance from `PREPARED`; successful earlier-state advance atomically resets current worker/failure fields and preserves immutable history |
+
+| PM26 | Refusal before `PREPARED` with complete no-Codespace-access proof | Specialized `STOPPED` without Shutdown observation or Codespace I/O |
+| PM27 | Codespace already Available under independent request B | A's verified non-acquisition terminal has zero start/SSH/copy/stop effect on B |
+| PM28 | Missing authenticated run trace, mandatory start gate or worker coverage | Terminal no-access proof fails closed; attempt remains blocked |
+| PM29 | Start/SSH/copy/stop observed or outcome ambiguous, despite declared false flag | Reject no-access receipt; no false terminal state |
+| PM30 | Old worker attempts Codespace start before `PREPARED` or after refusal | Mandatory trusted start gate rejects before external command |
+| PM31 | Claim has reached `PREPARED` or `ARMED` | No pre-model non-acquisition terminal shortcut |
+| PM32 | Receipt binds wrong request, worker, admission, reservation, generation or Codespace | Reject before terminal CAS |
+| PM33 | Crash after permanent refusal but before run-evidence collection | No blind cleanup; remain blocked until qualified trace is available |
+| PM34 | Incomplete/unknown dispatch/run coverage | Never infer non-acquisition from a single skipped step |
+| PM35 | Terminal receipt CAS loses to concurrent state change or is replayed | No stale transition, second terminal receipt or model invocation |
 
 Test GitHub-ref CAS with injected stale parent commits, not only an
 in-memory journal. Test the real reconciler, new result-independent
@@ -485,8 +557,10 @@ another request's ownership, shutdown observation and `STOPPED`.
 **Decisions proposed for #51/PR #55:** keep existing attempt states
 and journal-ref CAS; introduce only a versioned preparation-control
 record, a tightly bounded dispatch reservation and a specialized
-pre-model `STOPPED` transition. Reconciler must never infer liveness
-or permission from a timeout. An ambiguous/unknown outcome is
+pre-model `STOPPED` transition with **two evidence-bound contexts**:
+verified no-Codespace-acquisition refusal (no global stop required),
+versus resource-owning cleanup after real acquisition. Reconciler
+must never infer liveness or permission from a timeout. An ambiguous/unknown outcome is
 explicitly blocked pending authorized recovery or disposition.
 
 **Not resolved by this draft:** acceptance of the new minimal
@@ -496,10 +570,13 @@ preference**, not a normative artifact), strict dual-version decoder
 rollout isolation against **older deployed workers**, actual
 GitHub-ref CAS and external dispatch 200/204 evidence recovery,
 authenticated worker/run and owner-approval sources, and
-atomic worker fencing at `PREPARED/ARMED`. **Cross-request shared
-Codespace ownership is still unproven** even when simulated
-metadata comparisons pass; no operational stop authorization
-derives from those tests. Live external fault injection and
+atomic worker fencing at `PREPARED/ARMED` and **before any
+Codespace side effect**. Proof of no Codespace acquisition
+from authenticated complete workflow traces remains **unqualified**
+outside injected tests. **Cross-request shared Codespace ownership
+is still unproven**, but it is not a prerequisite for terminalizing
+an attempt that provably never acquired that resource. No
+operational stop authorization derives from those tests. Live external fault injection and
 source-complete independent review also remain missing. These require **separately authorized**
 normative-contract acceptance and implementation/qualification.
 
@@ -517,6 +594,9 @@ were modified by this proposal.
 `ACTUAL_GITHUB_DISPATCH_AUTHORITY_QUALIFIED=NO`
 `WORKER_GENERATION_FENCING_QUALIFIED=NO`
 `SHARED_CODESPACE_OWNERSHIP_QUALIFIED=NO`
+`PREMODEL_NO_CODESPACE_TERMINAL=PROPOSED_NOT_IMPLEMENTED`
+`NO_CODESPACE_PROOF_EXTERNAL_AUTHORITY=UNQUALIFIED`
+`NO_RESOURCE_STOP_REQUIRED_FOR_PROVEN_NONACQUISITION=PROPOSED`
 `REAL_JOURNAL_CONCURRENCY_QUALIFIED=NO`
 `INDEPENDENT_REVIEW=NOT_PERFORMED`
 `IMPLEMENTATION_AUTHORIZED=NO`
