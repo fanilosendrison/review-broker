@@ -5,7 +5,7 @@ asset_type: "design-qualification-note"
 domain: "independent-review"
 severity: "draft"
 name: "Successor Contract Offline Falsification — Experimental Evidence"
-version: "0.1.4"
+version: "0.2.0"
 ---
 
 # Successor contract — offline falsification (experimental)
@@ -224,9 +224,54 @@ inspection. The source-confronted tests confirm the current
 `review-request.yml` lacks this new v3 gate and
 `internal-reconcile`/CLI are additional effectful routes. All positive
 deployment/gate/exclusion assumptions in the reference tests are injected and
-remain unqualified. The 616-test result does not establish deployed v3,
+remain unqualified. The 616-test result does not itself establish deployed v3,
 real GitHub-ref creation or CAS, effective shared-resource exclusivity, or
 complete external authorization.
+
+## 6. Separate real GitHub ref and GraphQL CAS qualification
+
+Two later infrastructure experiments used the isolated, non-operational ref
+`refs/heads/review-claims-v3/qualification-20261030T200256Z-513925f0bf09`.
+They are separate from the 55-case synthetic model, the 18-case current-module
+suite and PR #58's 616-test evidence.
+
+The [first experiment](https://github.com/fanilosendrison/review-broker/issues/51#issuecomment-6532395000)
+used the GitHub REST Git Database API. Ref creation and exact readback passed,
+as did one non-force fast-forward update and rejection
+of stale sibling and rollback updates. That evidence established creation
+capability and fast-forward safety only. REST update-ref supplied no atomic
+expected-current-SHA argument, so explicit expected-old CAS and concurrent
+writer ownership remained unqualified.
+
+The [follow-up experiment](https://github.com/fanilosendrison/review-broker/issues/51#issuecomment-6532620314)
+used GitHub GraphQL `updateRefs` with one ref update, explicit `beforeOid`,
+`afterOid` and `force=false`. Under the owner's authenticated
+GitHub identity, it passed observed wrong-predecessor rejection, correct
+expected-old update, stale same-target replay rejection, stale competing-sibling
+rejection, one barrier-released concurrent distinct-writer single-winner case,
+and non-fast-forward rejection. Every response was checked for GraphQL
+`errors` and reconciled by exact ref readback. The concurrent case is one
+observed interleaving, not exhaustive proof of every runtime schedule.
+
+Local fault injection, not a deliberate live outage, verified that an ambiguous
+response causes no automatic mutation or model-dispatch retry and is reconciled
+against intended commit and identity evidence plus exact readback. Readback
+equality alone does not prove which actor originated an identical target.
+
+The qualification ref remains as non-operational test residue at final observed
+SHA `8570d4064f422dbccb6d972f4bb0e2fff44bbf2f`. Neither experiment created an
+operational request or journal. The GraphQL experiment did not exercise the
+future GitHub Actions `GITHUB_TOKEN`; declared `contents: write` is not proof of
+effective mutation capability. Integrated v3 state-transition validation,
+concurrent initial claim creation, workflow-actor authority and full journal
+correctness remain unqualified and unimplemented.
+
+`REST_FAST_FORWARD_AS_EXPECTED_OLD_CAS=REJECTED`
+`GRAPHQL_UPDATE_REFS_EXPECTED_OLD_CAS=BOUNDED_REAL_EXPERIMENT_PASS`
+`GRAPHQL_CONCURRENT_SINGLE_WINNER=ONE_OBSERVED_SCENARIO_PASS`
+`AMBIGUOUS_ACK_HANDLING=PASS_WITH_LOCAL_FAULT_BOUNDS`
+`V3_WORKFLOW_ACTOR_GRAPHQL_CAS_AUTHORITY=UNQUALIFIED`
+`INTEGRATED_V3_JOURNAL_IMPLEMENTED=NO`
 
 **Disposition: `EXPERIMENTAL_OFFLINE_FALSIFICATION_PASS_WITH_STRICT_BOUNDS`.**
 This is a research result, not an implementation authorization or

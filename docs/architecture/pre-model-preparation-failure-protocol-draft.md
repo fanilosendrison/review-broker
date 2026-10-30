@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Successor Pre-Model Preparation Failure Protocol"
-version: "0.1.6"
+version: "0.2.0"
 ---
 
 # Successor v3 — durable pre-model preparation outcomes
@@ -143,11 +143,28 @@ Generation advance is forbidden once the claim is `PREPARED` or later.
 }
 ```
 
-This object is stored and updated **inside the single deterministic
-Git-ref claim**, using the existing non-force fast-forward compare-and-
-swap (CAS); there is no second cross-ref transaction or external
-database. The journal history appends immutable versioned evidence-ID
-events on each accepted change.
+This object is stored and updated **inside the single deterministic v3
+Git-ref claim**; there is no second cross-ref transaction or external database.
+For every future transition on an existing claim, the selected non-normative
+candidate commit primitive is GitHub GraphQL `updateRefs` with exactly one ref
+update: authenticated broker `repositoryId`, exact
+`refs/heads/review-claims-v3/<digest>` `name`, mandatory predecessor
+`beforeOid`, successor `afterOid`, and `force=false`. The successor commit must
+name the observed predecessor as its direct parent. REST non-force fast-forward
+updates do not satisfy the mandatory explicit expected-old-SHA condition.
+
+Before constructing the successor, the writer must strictly decode the exact
+predecessor snapshot and validate the state transition together with current
+generation, reservation, worker and disposition. GraphQL CAS commits that
+already-validated transition; it does not perform semantic validation. A
+successful transport response is insufficient if the GraphQL response contains
+`errors` or exact identity-bound readback does not reconcile to the intended
+successor. Failed or ambiguous updates cause no automatic mutation retry, no
+second model dispatch and no assumption that the transition committed.
+Readback equality alone does not prove which actor originated an identical
+commit. The journal history appends immutable versioned evidence-ID events on
+each accepted change. The mutation has no cross-ref transaction semantics and
+introduces no additional lock, database, service or ledger.
 
 ## 3. Dispatch reservation, winner and bounded retry policy
 
@@ -614,15 +631,24 @@ versus resource-owning cleanup after real acquisition. Reconciler
 must never infer liveness or permission from a timeout. An ambiguous/unknown outcome is
 explicitly blocked pending authorized recovery or disposition.
 
+**Qualification boundary:** the real GitHub experiment completed bounded
+qualification of GraphQL `updateRefs` as an explicit-`beforeOid`, single-ref,
+non-force CAS primitive. It observed wrong-predecessor rejection, stale replay
+rejection, one competing-writer single-winner case and non-fast-forward
+rejection. It did not test every runtime interleaving. The experiment used the
+owner's authenticated GitHub identity, not the future GitHub Actions journal
+writer token.
+
 **Not resolved by this draft:** acceptance of the new minimal
 v1-compatible journal-v2 wire candidate (its earlier overwide
 alternative remains explicitly superseded only as a **design
 preference**, not a normative artifact), strict dual-version decoder
-rollout isolation against **older deployed workers**, actual
-GitHub-ref CAS and external dispatch 200/204 evidence recovery,
-authenticated worker/run and owner-approval sources, and
-atomic worker fencing at `PREPARED/ARMED` and **before any
-Codespace side effect**. Proof of no Codespace acquisition
+rollout isolation against **older deployed workers**, integration of GraphQL
+CAS with real v3 journal transition validation, concurrent initial claim
+creation, effective GraphQL mutation authority for the intended GitHub Actions
+`GITHUB_TOKEN`, external dispatch 200/204 evidence recovery, authenticated
+worker/run and owner-approval sources, and atomic worker fencing at
+`PREPARED`/`ARMED` and **before any Codespace side effect**. Proof of no Codespace acquisition
 from authenticated complete workflow traces remains **unqualified**
 outside injected tests. **Cross-request shared Codespace ownership
 is still unproven**, but it is not a prerequisite for terminalizing
@@ -650,6 +676,10 @@ were modified by this proposal.
 `PREVENTIVE_GATE_PROOF_CANDIDATE=SOURCE_CONFRONTED_NOT_DEPLOYED`
 `COMPLETE_RUN_STEP_TRACE_AS_MANDATORY=NOT_REQUIRED_IF_PREVENTIVE_GATE_QUALIFIED`
 `NO_RESOURCE_STOP_REQUIRED_FOR_PROVEN_NONACQUISITION=PROPOSED`
+`GRAPHQL_EXPECTED_OLD_CAS_PRIMITIVE=BOUNDED_REAL_EXPERIMENT_PASS`
+`V3_WORKFLOW_ACTOR_GRAPHQL_CAS_AUTHORITY=UNQUALIFIED`
+`CONCURRENT_INITIAL_CLAIM_CREATION_QUALIFIED=NO`
+`INTEGRATED_V3_JOURNAL_TRANSITIONS_IMPLEMENTED=NO`
 `REAL_JOURNAL_CONCURRENCY_QUALIFIED=NO`
 `INDEPENDENT_REVIEW=NOT_PERFORMED`
 `IMPLEMENTATION_AUTHORIZED=NO`

@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Versioned Successor Review Contracts — Design Draft"
-version: "0.2.1"
+version: "0.3.0"
 ---
 
 # Versioned Successor Review Contracts — Design Draft
@@ -530,11 +530,49 @@ qualification ref now remains as test residue under the prefix; it is not a v3
 claim or journal deployment. Operational ref creation, effective permissions
 and rulesets, and integrated compare-and-swap behavior remain qualification
 gates. Logical claim-discovery isolation does not establish shared Codespace
-ownership,
-cross-request physical exclusivity, future-worker correctness or a preventive
-Codespace-access gate. A no-acquisition receipt or pre-model refusal must still
-satisfy the independently qualified preventive-access conditions below; the
-namespace alone proves none of them.
+ownership, cross-request physical exclusivity, future-worker correctness or a
+preventive Codespace-access gate. A no-acquisition receipt or pre-model refusal
+must still satisfy the independently qualified preventive-access conditions
+below; the namespace alone proves none of them.
+
+### Selected GraphQL expected-old transition primitive
+
+For a future v3 transition on an existing claim ref, the selected
+**non-normative candidate** commit primitive is GitHub GraphQL `updateRefs`.
+Each mutation contains exactly one `refUpdates` entry with all of the following:
+
+- `repositoryId`: the authenticated broker repository's GraphQL node ID.
+- `name`: the exact `refs/heads/review-claims-v3/<digest>` claim ref.
+- `beforeOid`: the mandatory SHA of the predecessor journal commit whose
+  decoded state was validated.
+- `afterOid`: the SHA of the newly constructed successor journal commit.
+- `force`: the JSON boolean `false`.
+
+The successor commit must have `beforeOid` as its direct parent. Before
+constructing it, the trusted journal writer must strictly decode the exact
+predecessor snapshot and validate the requested state transition together with
+its current generation, reservation, worker and disposition. GraphQL CAS is
+the commit primitive; it does not replace semantic journal validation.
+`updateRefs` must reject a stale writer or stale replay when the live ref no
+longer equals `beforeOid`. A REST non-force fast-forward update is not a
+substitute for this explicit expected-old-SHA condition.
+
+A mutation is successful only when transport completes, the GraphQL response
+contains no `errors`, and exact ref readback reconciles the resulting target
+with the intended request, attempt, reservation, worker and successor commit.
+An ambiguous response causes no automatic mutation retry or model dispatch.
+Readback equality establishes the current target but does not alone prove which
+actor originated an identical commit; identity-bound evidence remains required
+before further journal advancement.
+
+One mutation updates one v3 claim ref only. This design provides no cross-ref
+transaction guarantee and introduces no distributed lock, database, service or
+second ledger. Initial claim-ref creation remains a separate operation; its
+concurrent duplicate-creator behavior is not fully qualified by the GraphQL
+transition experiment. The real experiment used the owner's authenticated
+GitHub identity, not the intended GitHub Actions `GITHUB_TOKEN`; therefore
+`V3_WORKFLOW_ACTOR_GRAPHQL_CAS_AUTHORITY=UNQUALIFIED` even though workflow YAML
+may declare `contents: write`.
 
 [Draft test PR #58](https://github.com/fanilosendrison/review-broker/pull/58)
 at `631cce062b5bfe4f92f0ab90ad85fa371242e403` records the bounded legacy
@@ -638,8 +676,11 @@ v1 serializer/decoder/transition logic; 15 further tests check
 **injected** GitHub dispatch/run metadata and demonstrate that
 Codespace name/state and Actions concurrency do **not** establish
 an exclusive cross-request owner. CI for that isolated branch
-reports 546 PASS, but real v3 GitHub-ref CAS, effective principal
-authority, owner lease and safe rollout remain **unqualified**.
+reports 546 PASS, but that experiment did not qualify real GitHub-ref CAS,
+effective principal authority, owner lease or safe rollout. The later bounded
+GraphQL experiment qualified the expected-old primitive under the owner's
+identity only; integrated journal semantics and workflow-token authority remain
+unqualified.
 The [protocol annex](pre-model-preparation-failure-protocol-draft.md)
 records the precise GitHub Actions 200/204 dispatch distinction,
 the new no-Codespace-access terminal evidence alternative, and
