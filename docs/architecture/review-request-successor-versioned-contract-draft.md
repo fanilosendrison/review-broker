@@ -604,6 +604,23 @@ The first candidate must qualify **without model invocation**:
    labeled synthetic—not today's mutable #43/#44 pretending to be past.
 10. Historical v1/v2 request/attempt/packet/result/publishing evidence
     remains interpretable without recomputing or reinterpreting old identities.
+11. Missing `references` is invalid while explicit `references: []`
+    has one exact canonical request/intent identity; changing array order
+    or any ID changes the corresponding canonical basis.
+12. Wrong `subject.repository_id`, transferred/renamed/reused repository
+    name, wrong PR/Issue/comment stable object ID, or insufficient source-App
+    installation scope fails claim/recovery.
+13. `atomicity=true` PR B/H + frozen inline + same-H/same-repository Git
+    references passes only with full Git object/diff identity proof; H2,
+    another repository, changed inline source, missing preimage or mutable
+    Issue/comment source fails before `PREPARED`.
+14. A permanent post-claim source refusal binds typed reason and genuine
+    Shutdown observation before specialized terminal `STOPPED`; no
+    `PREPARED`, `ARMED` or inference occurs.
+15. A transient source failure keeps the same claim blocked for explicit
+    recovery; repeated reconciler passes cannot loop automatically. Inject
+    crashes between claim, blocked-disposition commit, prepared snapshot
+    commitment, and shutdown receipt.
 
 Only after the versioned contract, source permission model, and exact offline
 tests are accepted may any implementation or live operation be separately
@@ -615,14 +632,25 @@ from the abandoned high-assurance track as a default prerequisite.
 The following are **not silently resolved** by publishing this draft:
 
 - Final closed Draft 2020-12 executable schemas and precise size/selection
-  thresholds for the first supported reference kinds.
+  thresholds for the first supported reference kinds. Proposed `references`
+  cardinality begins at zero, with an explicit mandatory field.
+- Stable repository and reference-object identity fixtures must include
+  both pre-claim target resolution and crash/recovery revalidation, not
+  just post-acquisition byte hashing.
 - Justified placement and deterministic derivation of effective technical
   `policy/program` provenance in packet/result; no reinterpretation of
   historical `policy_id` or `program_id`.
 - Exact result-v2 field names, verified packet-manifest retrieval and
   historical evidence availability/retention behavior.
-- Qualifiable `atomicity=true` coherent snapshot mechanisms for a given
-  source combination; unsupported cases must reject.
+- Offline qualification of the newly proposed **Git-HEAD consistency
+  profile** for `atomicity=true`: exact PR B/H + frozen inline + same-H
+  Git references in the same immutable repository ID. Unsupported
+  heterogeneous mutable GitHub sources still reject.
+- Qualification of the required `references: []` schema, stable numeric
+  `subject.repository_id` and authenticated reference-object binding.
+- Evidence-backed specialized pre-model `STOPPED` transitions, typed
+  permanent/transient dispositions, bounded reconciler dispatch and
+  fault-injection checks. None are implemented in this document.
 - Exact permission administration and authenticated GitHub Issue/comment
   acquisition; no unauthorized App permission expansion.
 - GitHub PR reference component collections, upload receipts, remote URL
@@ -659,9 +687,10 @@ bind each answer to an executable counterexample fixture:
    merely a name and the captured content digest. If a name resolves to a
    different repository ID on recovery, **fail closed**. Decide whether the
    canonical v3 selector requires a requester-supplied expected repository
-   ID or obtains and durably binds one before claiming a new identity;
-   do not accept an unprovable original target. This is a pending schema
-   question, not a silently inserted field.
+   ID or obtains and durably binds one before claiming a new identity.
+   **Proposed answer:** require numeric `subject.repository_id` in the
+   v3 request, verify canonical name+ID before claim, and durably bind
+   the authenticated object IDs. Test rename/transfer/reuse.
 3. **Inline/upload logical slot continuity (#56 F003).** Reusing the same
    requester-selected reference ID can express continuity of a question,
    **not** substantive evidence equivalence. A different content value
@@ -677,20 +706,20 @@ bind each answer to an executable counterexample fixture:
    unsupported selector, unauthorized access, disallowed repository,
    failed expected digest or unestablished required atomicity must not
    accidentally become a recoverable `REQUESTED/ADMITTED` retry loop.
-   Differentiate permanent refusal from a qualified transient transfer
-   error. Explicitly map both to the **existing journal transitions**,
-   event/evidence obligations, and no-inference cleanup semantics, or
-   demonstrate by counterexample why a new state is unavoidable.
+   **Proposed answer:** extend only the two specialized, receipt-validated
+   `REQUESTED/ADMITTED → STOPPED` paths for permanent pre-model refusals;
+   persist a separate CAS-bound retryable-blocked disposition for
+   transient errors. These changes are *not implemented*. Fault-inject
+   dispatch, failure evidence, shutdown and recovery before adoption.
    The runbook currently supports bounded same-attempt pre-model recovery;
    it does **not** authorize a later re-review after `ARMED`.
 6. **Testable atomicity contract (#56 F006).** `atomicity=true` is an
    obligation, not a claim of general cross-provider snapshot isolation.
-   Define which **exact combinations of mutable/immutable sources** have
-   a qualified common consistency basis, which authenticated facts prove
-   the cut, and what a failing fixture looks like. Do not infer coherence
-   from same clock times, separate hashes or completed pagination.
-   All unsupported source combinations must fail before `PREPARED`; avoid
-   treating perpetual rejection as proof that useful atomicity is supported.
+   **Proposed answer:** qualify immutable PR B/H comparison, frozen inline
+   values and same-repository/same-H Git blobs as the first profile for
+   `atomicity=true`. Reject other commits and independently mutable API
+   bodies under `true`. Prove both pass and counterexample failures using
+   verified Git objects and byte-exact packet construction.
 7. **Source-complete independent qualification (#56 F007).** The v2 broker
    packet examines only PR-changed material. A later independent review
    claiming conformity to #43/#44/#51 and governing contracts must **actually
