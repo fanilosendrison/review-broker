@@ -145,6 +145,68 @@ GitHub Actions CI run 41064672091 first demonstrated
 three static workflow checks. The final README-only follow-up
 retains the same test-only scope.
 
+## Follow-up: preventive gate proof, not exhaustive skipped-step inspection
+
+The [source-confronted conditional gate tests](../../test_codespace_nonacquisition_gate_basis.py)
+read the **actual existing** `review-request.yml`,
+`review-reconciler.yml`, `orchestration.prepare_issue`,
+`reconciliation.py` and `codespace.py`. They confirm that the current
+main review workflow prepares before its first Codespace start,
+that the dedicated Codespace token is absent from the
+`internal-prepare` step, and that the present Codespace start
+step has **no v3 journal-side access gate**. The reconciler
+and the independent `internal-stop-codespace` CLI entry point
+are additional effectful routes. Therefore **the deployed broker
+does not yet meet the candidate universal gate premise**.
+
+For a *future* v3, there is a simpler, narrowly scoped proof:
+
+1. All deployed, eligible **trusted** worker/executor revisions
+   and Codespace-affecting entry points enforce the same mandatory,
+   durable `PREPARED` + current reservation/worker/generation
+   guard **before every Codespace side effect**.
+2. The exact workflow/executable version, old-worker exclusion,
+   transitive entry-point closure and pre-preparation Codespace
+   credential confinement are independently qualified.
+3. The exact journal permanently refused this attempt while
+   still `REQUESTED/ADMITTED`, with zero invocations and
+   **no past `PREPARED` transition**.
+
+Given **all** these premises, no trusted broker-owned path can
+have acquired Codespace for that refused attempt. A late worker
+will also fail at the side-effect gate. An exhaustive enumeration
+of `skipped` workflow steps is therefore **not a necessary
+separate proof obligation**, although authenticated Actions
+run/step records remain useful diagnostic evidence.
+
+All of these positive "gate qualification" premises are
+**injected Booleans and placeholder SHA values in the tests**:
+they are not established by green CI or by a GitHub jobs API
+response. A single unchecked CLI/reconciler path, unisolated
+older worker, mismatched executing code identity, or missing
+credential confinement makes the inference fail closed.
+Out-of-band/third-party access to the **global** Codespace
+is not ruled out, but is irrelevant to the scope of *this*
+attempt's no-access terminal; no shared-machine stop occurs.
+
+The earlier first-stage
+`no-codespace-access-v1.candidate.schema.json` receipt requires
+a run trace and registered worker. It remains a historical
+experimental candidate that is **too strong as a default** if
+the preventive gate is actually proven. Its final minimal
+receipt basis needs a separately reviewed revision binding
+immutable journal/refusal evidence and the audited gate/
+executable/rollout basis; **no normative schema is adopted**.
+
+**Actual code comparison, separate from these tests:** draft
+PR #57 also exercises real `CodespaceController.stop` and
+`stop_and_observe_shutdown` with wholly fake `gh` transport.
+The former stops by Codespace name only; the latter binds
+the returned `Shutdown` observation to the caller's request
+ID without authenticating exclusive request-level ownership.
+This is the current bounded behavior, not an observed live
+cross-request incident.
+
 A complete real v3 `AttemptRecord` contract must also close the production
 admission/result/publication/evidence structures, the exact trusted versions
 of those schemas and its migration path. This journal fixture deliberately
