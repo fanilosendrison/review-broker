@@ -5,7 +5,7 @@ asset_type: "design-qualification-note"
 domain: "independent-review"
 severity: "draft"
 name: "Successor Contract Offline Falsification — Experimental Evidence"
-version: "0.1.3"
+version: "0.1.4"
 ---
 
 # Successor contract — offline falsification (experimental)
@@ -211,17 +211,22 @@ hazard**. It must not be treated as an existing v1/v2 production
 regression; the v3 decoder is not yet implemented. PR #55's focused
 protocol v0.1.5 now lists PM01–PM35 future real-v3
 qualification cases. The [isolated PR #58](https://github.com/fanilosendrison/review-broker/pull/58)
-has 567 passing current-suite and reference tests, including
-**eight preventive-gate conditional tests**, not an
-operational v3 proof. A qualified deployed **pre-side-effect
-Codespace gate** plus immutable no-PREPARED journal and old-worker
-exclusion can logically establish no *broker-authorized*
-Codespace acquisition without exhaustive per-run step-log
+at `631cce062b5bfe4f92f0ab90ad85fa371242e403` has
+[CI run 41080324759](https://github.com/fanilosendrison/review-broker/actions/runs/41080324759)
+with **616 passing tests, including 131 additional tests over `dev`**.
+This latest total preserves the earlier 567-test preventive-gate evidence and
+adds historical-parser replay, source-level credential/rollout checks and
+isolated sibling-namespace tests. It is not an operational v3 proof. A
+qualified deployed **pre-side-effect Codespace gate** plus immutable
+no-PREPARED journal and old-worker exclusion can logically establish no
+*broker-authorized* Codespace acquisition without exhaustive per-run step-log
 inspection. The source-confronted tests confirm the current
 `review-request.yml` lacks this new v3 gate and
-`internal-reconcile`/CLI are additional effectful routes.
-All positive deployment/gate/exclusion assumptions in the
-reference tests are injected and remain unqualified.
+`internal-reconcile`/CLI are additional effectful routes. All positive
+deployment/gate/exclusion assumptions in the reference tests are injected and
+remain unqualified. The 616-test result does not establish deployed v3,
+real GitHub-ref creation or CAS, effective shared-resource exclusivity, or
+complete external authorization.
 
 **Disposition: `EXPERIMENTAL_OFFLINE_FALSIFICATION_PASS_WITH_STRICT_BOUNDS`.**
 This is a research result, not an implementation authorization or

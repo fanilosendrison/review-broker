@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Versioned Successor Review Contracts — Design Draft"
-version: "0.1.8"
+version: "0.2.0"
 ---
 
 # Versioned Successor Review Contracts — Design Draft
@@ -487,8 +487,8 @@ The exact proposed journal wire, failure receipts, dispatch transaction
 and crash/competing-worker cases are specified in the
 **[pre-model preparation protocol annex](pre-model-preparation-failure-protocol-draft.md)**.
 This non-normative v3 design is not implemented. [Draft test PR #57](https://github.com/fanilosendrison/review-broker/pull/57)
-at `4ef45da3e0de2fe852d2a4a88df0644acbc67d46`
-([CI PASS, 501 tests](https://github.com/fanilosendrison/review-broker/actions/runs/41042188166))
+at `fa75eb324f5c8a34eb466bf75a2a916787cf17c5`
+([CI PASS, 503 tests](https://github.com/fanilosendrison/review-broker/actions/runs/41069927185))
 has directly reproduced **three current-code gaps**: repeated
 `ADMITTED` dispatch, absence of a specialized receipt-backed
 `REQUESTED/ADMITTED → STOPPED` transition, and a current
@@ -505,6 +505,42 @@ wire-version decoding; current `AttemptRecord.from_dict` ignores
 fields on round-trip. Older deployed workers must not touch v3
 claims. Historical v1/v2 journal serialization and semantics are
 preserved, not rewritten.
+
+### Version-scoped claim namespaces
+
+The product-owner-accepted **non-normative candidate design** assigns claims
+to disjoint, version-scoped Git ref namespaces:
+
+```text
+refs/heads/review-claims/<digest>       # existing v1/v2 claims
+refs/heads/review-claims-v3/<digest>    # proposed v3 claims
+```
+
+The v3 namespace is a sibling of the historical namespace. The nested form
+`refs/heads/review-claims/v3/<digest>` is prohibited because observed legacy
+reconcilers enumerate `refs/heads/review-claims/` directly and could discover
+a nested claim whose journal fields they cannot safely interpret or preserve.
+Claim enumeration, creation, reads, updates and reconciliation must therefore
+be version-scoped, and strict journal-version decoding remains mandatory.
+
+Existing v1/v2 behavior and persisted claim records remain unchanged; no
+historical journal conversion is required. The proposed v3 namespace has not
+been created or deployed. Real GitHub ref-creation authority, permissions,
+rulesets and non-force compare-and-swap behavior remain qualification gates.
+Logical claim-discovery isolation does not establish shared Codespace ownership,
+cross-request physical exclusivity, future-worker correctness or a preventive
+Codespace-access gate. A no-acquisition receipt or pre-model refusal must still
+satisfy the independently qualified preventive-access conditions below; the
+namespace alone proves none of them.
+
+[Draft test PR #58](https://github.com/fanilosendrison/review-broker/pull/58)
+at `631cce062b5bfe4f92f0ab90ad85fa371242e403` records the bounded legacy
+scanner and sibling-namespace evidence. Its
+[CI run 41080324759](https://github.com/fanilosendrison/review-broker/actions/runs/41080324759)
+reports 616 passing tests, including 131 additional tests over `dev`. These
+are source-level, historical-parser and isolated candidate-model tests, not
+deployed-v3, live GitHub-ref CAS, effective resource-exclusivity or complete
+external-authorization qualification.
 
 **Initial automatic dispatch limit is exactly one.** The v3
 controller CAS-reserves generation 1 before external GitHub workflow
@@ -585,8 +621,8 @@ injections**. PM26–PM35 focus on certified no-Codespace-access
 termination versus ambiguous acquisition, late worker entry,
 claim identity and CAS races. **None** is asserted to have
 passed on deployed v3. PR #57's
-**16 tests against real current modules** (14 ordinary PASS and two
-expected future-contract failures; full CI 501 tests) cover v1/v2
+**18 tests against real current modules** (16 ordinary PASS and two
+explicitly expected future-contract failures; full CI 503 tests) cover v1/v2
 code, not these v3 changes.
 
 **Follow-up minimal-journal and external-authority experiments:**
@@ -880,8 +916,9 @@ non-normative design of PR #52**:
   evidence authority, result provenance, required/optional admission and
   minimum possible representation. They must include all **three**
   companion annexes, especially the pre-model protocol and PM01–PM35,
-  and source-check both the 55-case synthetic report and 15-case
-  current-module test evidence rather than misrepresenting either
+  and source-check both the 55-case synthetic report and 18-case
+  current-module test evidence (16 ordinary PASS and two explicitly expected
+  failures; 503-test complete CI suite) rather than misrepresenting either
   as v3 qualification.
 - A favorable review is **not** automatic adoption as normative contract,
   approval to change executable schemas, expansion of GitHub permissions,
