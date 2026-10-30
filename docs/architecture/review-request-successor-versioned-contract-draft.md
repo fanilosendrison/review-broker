@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Versioned Successor Review Contracts — Design Draft"
-version: "0.1.6"
+version: "0.1.7"
 ---
 
 # Versioned Successor Review Contracts — Design Draft
@@ -533,22 +533,31 @@ worker remains fenced even after a manual retry. There are zero
 automatic redeliveries after the initial reservation: **no timeout
 heuristic** is needed to enforce this bound.
 
-**Terminal permanent refusal:** once the refusal CAS suppresses
-every future preparation/armament path, **prove that the shared
-Codespace is not currently owned by another active request**
-before issuing any stop command. The existing shared GitHub Actions
-concurrency group is a candidate source of exclusivity, not by
-itself a durable cross-request ownership certificate. If ownership
-is unproven, block cleanup rather than stop another attempt.
-Then validate independently observed `Shutdown` for that owner.
-A narrowly specialized v3-only receipt-validation operation may
-transition `REQUESTED → STOPPED` or `ADMITTED → STOPPED`
-when it proves the same request/attempt, permanent failure,
-zero invocations, no `ARMED` history and actual Shutdown.
-Never accept generic STOPPED or create a fake ReviewResult.
-An unverified shutdown leaves the refusal durably blocked;
-reconciler performs cleanup only. A competing or stale worker
-cannot arm after its reservation is no longer current.
+**Terminal permanent refusal — revised minimal rule:** the
+specialized v3-only `REQUESTED/ADMITTED → STOPPED` route does
+**not** require a global Codespace `Shutdown` when the
+exact attempt has **provably never acquired the Codespace**.
+The current trusted workflow prepares the packet before its
+first Codespace `start`; future v3 must enforce a mandatory
+`PREPARED`/current-worker/generation gate **before every
+Codespace start/SSH/copy/stop effect**, including late workers.
+After a durable `REFUSED_PERMANENT` CAS, a trusted, complete
+workflow trace and qualified start gate can support an exact
+`pre-model-no-codespace-access` receipt. The journal then
+terminalizes that attempt with **zero Codespace operations**,
+zero invocations, and no fabricated `Shutdown` or ReviewResult.
+Another request's Codespace may legitimately remain Available.
+
+If a start or other Codespace access may have occurred, if
+the worker/run inventory is incomplete, or if the mandatory
+gate is unqualified, **do not infer non-acquisition**.
+Keep the refusal blocked, perform no blind stop, and require
+explicit recovery/authority investigation. Only **actual
+resource-acquiring** cleanup requires continuous exclusive
+cross-request Codespace ownership and a genuine Shutdown
+observation. A shared GitHub Actions concurrency string
+alone does not prove an external resource lease.
+The historical v1/v2 `STOPPED` semantics remain unchanged.
 
 **Keep packet and inference boundaries separate.** Before durable
 `PREPARED`, a permitted mutable source may be reacquired only
@@ -559,10 +568,11 @@ remain before any model-capable transport; provider exactly-
 once is not claimed. No new general attempt state or service
 is justified by this proposal.
 
-The revised annex lists **PM01–PM25 future executable fault
-injections**, including journal-version downgrades, cross-request
-Codespace conflicts, duplicate entry points and atomic worker
-fencing. **None** is asserted to have passed on v3. PR #57's
+The revised annex lists **PM01–PM35 future executable fault
+injections**. PM26–PM35 focus on certified no-Codespace-access
+termination versus ambiguous acquisition, late worker entry,
+claim identity and CAS races. **None** is asserted to have
+passed on deployed v3. PR #57's
 **16 tests against real current modules** (14 ordinary PASS and two
 expected future-contract failures; full CI 501 tests) cover v1/v2
 code, not these v3 changes.
@@ -580,8 +590,12 @@ an exclusive cross-request owner. CI for that isolated branch
 reports 546 PASS, but real v3 GitHub-ref CAS, effective principal
 authority, owner lease and safe rollout remain **unqualified**.
 The [protocol annex](pre-model-preparation-failure-protocol-draft.md)
-records the precise GitHub Actions 200/204 dispatch distinction and
-why a lost response never permits automatic redelivery.
+records the precise GitHub Actions 200/204 dispatch distinction,
+the new no-Codespace-access terminal evidence alternative, and
+why a lost response never permits automatic redelivery. The
+[isolated PM26–PM35 tests](https://github.com/fanilosendrison/review-broker/pull/58)
+exercise that alternative with **injected** workflow evidence,
+not a verified production start-gate attestation.
 
 ## 8. Result publication and applicability
 
@@ -646,10 +660,11 @@ of the unimplemented successor, real GitHub permissions, full RFC 8785,
 production crash/replay semantics, or an independent model review**.
 
 The first executable candidate must still independently qualify
-**without model invocation**, including the annex's **PM01–PM25**
-dispatch, refusal, CAS race, journal-version and shared-Codespace
-ownership scenarios. Those proposed test cases have not been
-executed on any v3 implementation:
+**without model invocation**, including the annex's **PM01–PM35**
+dispatch, refusal, CAS race, no-Codespace-acquisition evidence,
+journal-version and shared-Codespace ownership scenarios. Their
+passing isolated-model fixtures do not qualify a deployed
+v3 implementation:
 
 1. Closed v3 request validation including required atomicity, unknown kinds,
    duplicate IDs, contradictory types and invalid expectation digests.
@@ -682,9 +697,13 @@ executed on any v3 implementation:
     references passes only with full Git object/diff identity proof; H2,
     another repository, changed inline source, missing preimage or mutable
     Issue/comment source fails before `PREPARED`.
-14. A permanent post-claim source refusal binds typed reason and genuine
-    Shutdown observation before specialized terminal `STOPPED`; no
-    `PREPARED`, `ARMED` or inference occurs.
+14. A permanent post-claim pre-`PREPARED` refusal binds its
+    typed failure receipt and either a **trusted no-Codespace-access
+    receipt** (no global Shutdown or Codespace operation required)
+    or remains blocked if access is ambiguous. No `PREPARED`,
+    `ARMED` or inference occurs. Real resource cleanup, when
+    applicable, still requires independently verified ownership
+    and Shutdown.
 15. A transient source failure keeps the same claim blocked for explicit
     recovery; repeated reconciler passes cannot loop automatically. Inject
     crashes between claim, blocked-disposition commit, prepared snapshot
@@ -720,14 +739,18 @@ The following are **not silently resolved** by publishing this draft:
 - Qualification of the required `references: []` schema, stable numeric
   `subject.repository_id` and authenticated reference-object binding.
 - Qualify the [pre-model protocol annex](pre-model-preparation-failure-protocol-draft.md):
-  **strict versioned journal parser/serializer** (the minimal v1-compatible candidate passed offline shape tests, but older deployed
+  **strict versioned journal parser/serializer** (the minimal
+  v1-compatible candidate passed offline shape tests; old deployed
   workers must not downgrade a new claim), one automatic dispatch
-  via a unified discovery/controller entry point, **atomic**
-  current-generation/worker fencing at `PREPARED` and `ARMED`,
-  shared Codespace ownership before stopping, failure receipts,
-  specialized `STOPPED`, manual recovery authorization and
-  **PM01–PM25** fault-injection matrix. These v3 paths remain
-  **unimplemented**.
+  via a unified discovery/controller path, **atomic**
+  generation/worker fencing at `PREPARED` and `ARMED`, and a
+  mandatory Codespace-access gate. Pre-model `STOPPED` requires
+  a trustworthy non-acquisition receipt, **not** automatic
+  shutdown of the global Codespace. Only genuinely acquired
+  resource cleanup requires exclusive ownership and Shutdown.
+  Manual recovery authorization and **PM01–PM35** live
+  fault-injection remain unqualified. These v3 paths are
+  **not implemented**.
 - Exact permission administration and authenticated GitHub Issue/comment
   acquisition; no unauthorized App permission expansion.
 - GitHub PR reference component collections, upload receipts, remote URL
@@ -787,10 +810,13 @@ bind each answer to an executable counterexample fixture:
    fixes a single automatic dispatch CAS reservation, journal-bound
    permanent/blocked dispositions, one fresh owner authorization per
    subsequent dispatch, worker-generation fencing, and a versioned
-   specialized `REQUESTED/ADMITTED → STOPPED` path after actual Shutdown.
-   None is implemented; **PM01–PM25** must be fault-tested before
-   adoption, including the observed journal-version downgrade
-   and cross-request Codespace conflict.
+   specialized `REQUESTED/ADMITTED → STOPPED` path using a
+   verified **no-Codespace-access** receipt when this refused
+   attempt provably never touched the shared Codespace. An
+   ambiguous prior start keeps the claim blocked, never causing
+   a blind stop. None is implemented; **PM01–PM35** require
+   future actual-broker qualification, including journal
+   versioning and cross-request Codespace safety.
    The runbook currently supports bounded same-attempt pre-model recovery;
    it does **not** authorize a later re-review after `ARMED`.
 6. **Testable atomicity contract (#56 F006).** `atomicity=true` is an
@@ -830,7 +856,7 @@ non-normative design of PR #52**:
   mutable-source recovery, atomicity scope, permission boundaries, mission
   evidence authority, result provenance, required/optional admission and
   minimum possible representation. They must include all **three**
-  companion annexes, especially the pre-model protocol and PM01–PM20,
+  companion annexes, especially the pre-model protocol and PM01–PM35,
   and source-check both the 55-case synthetic report and 15-case
   current-module test evidence rather than misrepresenting either
   as v3 qualification.
