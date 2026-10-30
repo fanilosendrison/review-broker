@@ -34,7 +34,7 @@ class LiveTransportIsolationTests(unittest.TestCase):
         self.assertIn("github.triggering_actor == 'fanilosendrison'", text)
         self.assertIn("class RejectRedirects", text)
         self.assertIn("consecutive_matches == 2", text)
-        self.assertIn('stale.errors != ("GRAPHQL_UNPROCESSABLE",)', text)
+        self.assertIn('error.startswith("GRAPHQL_TYPED_")', text)
         self.assertNotIn("reviewctl", text)
 
 

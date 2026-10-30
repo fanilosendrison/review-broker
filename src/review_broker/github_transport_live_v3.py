@@ -26,7 +26,6 @@ _QUALIFICATION = re.compile(
 )
 _JOURNAL_PATH = ".review-broker/attempt.json"
 
-
 class GitHubTransportLiveV3Error(RuntimeError):
     """Fail-closed transport or authenticated observation failure."""
 
@@ -381,9 +380,10 @@ class GitHubTransportLiveV3:
                 errors = ("GRAPHQL_RESPONSE_INVALID",)
             else:
                 errors = tuple(
-                    "GRAPHQL_UNPROCESSABLE"
-                    if (isinstance(error, dict) and error.get("type") == "UNPROCESSABLE"
-                        and error.get("path") == ["updateRefs"])
+                    f"GRAPHQL_TYPED_{error['type']}"
+                    if (isinstance(error, dict) and isinstance(error.get("type"), str)
+                        and re.fullmatch(r"[A-Z][A-Z0-9_]*", error["type"])
+                        and isinstance(error.get("path"), list) and "updateRefs" in error["path"])
                     else "GRAPHQL_APPLICATION_ERROR"
                     for error in raw_errors
                 )

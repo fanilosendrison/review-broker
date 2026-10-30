@@ -285,12 +285,13 @@ class LiveTransportMutationTests(unittest.TestCase):
     def test_typed_unprocessable_graphql_error_is_sanitized_but_unattributed(self):
         after = self.api.install_successor(PARENT)
         self.api.graphql_body = {"data": {"updateRefs": None}, "errors": [{
-            "type": "UNPROCESSABLE", "path": ["updateRefs"], "message": "opaque backend text"
+            "type": "UNPROCESSABLE", "path": ["mutation", "updateRefs"],
+            "message": "opaque backend text"
         }]}
         result = self.transport.update_ref(GraphQLRefUpdateV3(
             NODE_ID, REF, PARENT, after, False
         ))
-        self.assertEqual(result.errors, ("GRAPHQL_UNPROCESSABLE",))
+        self.assertEqual(result.errors, ("GRAPHQL_TYPED_UNPROCESSABLE",))
         self.assertFalse(result.expected_old_rejected)
         self.assertIsNone(result.rejection_evidence_id)
         self.assertEqual(self.api.mutation_calls, 1)

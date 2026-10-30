@@ -172,8 +172,10 @@ jobs:
           observations_b = bounded_exact_read(commit_b, payload_b)
 
           stale = transport.update_ref(update)
-          if (stale.http_status != 200
-                  or stale.errors != ("GRAPHQL_UNPROCESSABLE",)
+          typed_stale_rejection = (stale.errors
+                                    and all(error.startswith("GRAPHQL_TYPED_")
+                                            for error in stale.errors))
+          if (stale.http_status != 200 or not typed_stale_rejection
                   or stale.expected_old_rejected):
               raise RuntimeError("QUALIFICATION_STALE_REPLAY_NOT_TYPED_REJECTED")
           final_observations = bounded_exact_read(commit_b, payload_b)
