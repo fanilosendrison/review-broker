@@ -5,7 +5,7 @@ asset_type: "design-qualification-note"
 domain: "independent-review"
 severity: "draft"
 name: "Successor Contract Offline Falsification — Experimental Evidence"
-version: "0.1.2"
+version: "0.1.3"
 ---
 
 # Successor contract — offline falsification (experimental)
@@ -168,11 +168,11 @@ change-scope and request parser modules. The GitHub API, Codespace
 and transport boundaries are explicitly simulated to avoid live
 privileged side effects. The test file is not in PR #55.
 
-**Exact latest tested SHA:** `4ef45da3e0de2fe852d2a4a88df0644acbc67d46`.
-**CI evidence:** [GitHub Actions run 41042188166](https://github.com/fanilosendrison/review-broker/actions/runs/41042188166).
-**Result:** 501 total unittest cases, `OK (expected failures=2)`.
-The new file contributed **16 cases: 14 PASS and two expected
-failures** explicitly describing *unimplemented successor behavior*.
+**Exact latest tested SHA:** `fa75eb324f5c8a34eb466bf75a2a916787cf17c5`.
+**CI evidence:** [GitHub Actions run 41069927185](https://github.com/fanilosendrison/review-broker/actions/runs/41069927185).
+**Result:** 503 total unittest cases, `OK (expected failures=2)`.
+The new file contributed **18 cases: 16 ordinary PASS and two
+expected failures** explicitly describing *unimplemented successor behavior*.
 
 | Actual-module observation | Reproduced fact | Contract implication |
 | --- | --- | --- |
@@ -184,19 +184,22 @@ failures** explicitly describing *unimplemented successor behavior*.
 | Git objects / PR scope | Real local Git HEAD/B objects are byte-pinned; extra reference source cannot masquerade as a changed PR image | Maintain separation of subject and references in packet-v2 |
 | Request parser and IDs | Current parser rejects v3; v1 resolved PR metadata includes repo ID but canonical v1 subject does not | Stable `repository_id` in v3 remains future, not implemented |
 | **Journal-version downgrade** | **Actual `GitHubRefJournal._read`** accepts a synthetic canonical v2-shaped claim containing `pre_model_control`; current `AttemptRecord.from_dict` ignores the version/unknown field, while `as_dict` emits v1 and discards the control | Strict dual-version journal decoder/serializer is **mandatory** before v3. [Exact test report](https://github.com/fanilosendrison/review-broker/pull/57#issuecomment-6520766815) |
+| **Codespace controller stop ownership** | The real `CodespaceController.stop()` uses only the Codespace name in `gh codespace stop`, no request/attempt owner argument. Test uses fake subprocess runner, no remote API | Shutdown is a resource-state operation, **not** proof of request-level stop authorization |
+| **Shutdown receipt's owner meaning** | Real `stop_and_observe_shutdown` produces an actual validated Shutdown receipt with the **caller-provided request/attempt IDs** but no independent exclusive Codespace-owner proof. All `gh` calls are intercepted | Never use a receipt as proof the caller was entitled to stop **another** request's shared Codespace |
 
 The **initial CI attempt** failed because a test fixture omitted
 `workflow_run_attempt` in two synthetic shutdown receipts; it
-was corrected without changing production source. The final 501-test
+was corrected without changing production source. The final **503-test**
 run succeeded with both future-behavior failures correctly marked
-`expectedFailure`. The third observed current-module gap was added
-in a separate test-only commit, with no runtime behavior change.
+`expectedFailure`. Two additional current-controller/Shutdown
+ownership-boundary tests were added in a later test-only commit,
+with **no actual Codespace operation or runtime behavior change**.
 
 These tests establish actual present-code behavior under controlled
 I/O injection, **not a qualification of unimplemented v3** and not
 real GitHub API authorization, cloud journal concurrency, or Codex
 effective-policy correctness. The parent 55-case synthetic experiment
-and this 16-case production-module suite must be reported **separately**
+and this 18-case production-module suite must be reported **separately**
 rather than combined into an implemented-system v3 PASS.
 
 **Actual-module disposition:** current safeguards verified on the
@@ -206,9 +209,19 @@ The current journal's inability to preserve an unrecognized future
 preparation-control field is a **newly reproduced version-boundary
 hazard**. It must not be treated as an existing v1/v2 production
 regression; the v3 decoder is not yet implemented. PR #55's focused
-protocol v0.1.2 now lists PM01–PM25 future unexecuted qualification
-cases for dispatch, atomic worker fencing, journal decoding and
-shared Codespace ownership.
+protocol v0.1.5 now lists PM01–PM35 future real-v3
+qualification cases. The [isolated PR #58](https://github.com/fanilosendrison/review-broker/pull/58)
+has 567 passing current-suite and reference tests, including
+**eight preventive-gate conditional tests**, not an
+operational v3 proof. A qualified deployed **pre-side-effect
+Codespace gate** plus immutable no-PREPARED journal and old-worker
+exclusion can logically establish no *broker-authorized*
+Codespace acquisition without exhaustive per-run step-log
+inspection. The source-confronted tests confirm the current
+`review-request.yml` lacks this new v3 gate and
+`internal-reconcile`/CLI are additional effectful routes.
+All positive deployment/gate/exclusion assumptions in the
+reference tests are injected and remain unqualified.
 
 **Disposition: `EXPERIMENTAL_OFFLINE_FALSIFICATION_PASS_WITH_STRICT_BOUNDS`.**
 This is a research result, not an implementation authorization or
