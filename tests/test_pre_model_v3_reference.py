@@ -59,6 +59,37 @@ class PreModelV3ReferenceTests(unittest.TestCase):
             observed_at=FIXED_NOW,
         )
 
+    def finalize_no_access(self, c):
+        """Injected trusted workflow evidence; never an actual run attestation."""
+        _, r = c.read()
+        info = r["pre_model_control"]
+        worker = info["worker"]
+        trace = "artifact:sha256:" + "4" * 64
+        start_gate = "artifact:sha256:" + "5" * 64
+        receipt = {
+            "schema_version": 1,
+            "evidence_type": "pre-model-no-codespace-access",
+            "request_id": r["request_id"],
+            "attempt_id": r["attempt_id"],
+            "admission_evidence_id": c.admission_id,
+            "generation": info["generation"],
+            "reservation_id": info["reservation_id"],
+            "workflow_run_id": worker["run_id"],
+            "workflow_run_attempt": worker["run_attempt"],
+            "codespace_name": CODESPACE_NAME,
+            "workflow_trace_evidence_id": trace,
+            "start_gate_evidence_id": start_gate,
+            "codespace_access_attempted": False,
+            "observed_at": FIXED_NOW,
+        }
+        return c.finish_without_codespace(
+            receipt,
+            authenticated_run_trace_evidence_id=trace,
+            authenticated_start_gate_evidence_id=start_gate,
+            all_workers_accounted_for=True,
+            observed_codespace_commands=(),
+        )
+
     def test_pm01_one_initial_automatic_reservation(self):
         c=MemoryClaim()
         results=[c.sweep() for _ in range(4)]
@@ -150,12 +181,14 @@ class PreModelV3ReferenceTests(unittest.TestCase):
                              trusted_resource_observation=True)
         self.assertEqual(c.read()[1]["state"],"ADMITTED")
 
-    def test_pm09_permanent_refusal_stops_after_verified_shutdown(self):
+    def test_pm09_refused_prepared_never_acquired_codespace_terminal_without_shutdown(self):
         c,w=self.ready()
         self.failure(c,w)
-        r=c.stop_permanent(self.shutdown(c),trusted_resource_observation=True)
+        r=self.finalize_no_access(c)
         self.assertEqual(r["state"],"STOPPED")
         self.assertEqual(r["invocation_count"],0)
+        self.assertEqual(r["history"][-1]["receipt"]["evidence_type"],
+                         "pre-model-no-codespace-access")
         self.assertFalse(any(e["kind"]=="ARMED" for e in r["history"]))
 
     def test_pm10_transient_explicit_recovery_generates_one_new_reservation(self):
@@ -246,7 +279,7 @@ class PreModelV3ReferenceTests(unittest.TestCase):
     def test_pm19_replayed_issue_after_terminal_refusal_does_not_dispatch(self):
         c,w=self.ready()
         self.failure(c,w)
-        c.stop_permanent(self.shutdown(c),trusted_resource_observation=True)
+        self.finalize_no_access(c)
         self.assertEqual(c.sweep(),"NO_ACTION")
         with self.assertRaisesRegex(ProtocolError,"AUTO_DISPATCH_ALREADY_RESERVED"):
             c.reserve_initial()
@@ -271,7 +304,7 @@ class PreModelV3ReferenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ProtocolError,"SCHEMA_JOURNAL_INVALID"):
             strict_decode_v2(canonical_bytes(extra)+b"\n")
 
-    def test_pm22_cross_request_codespace_owner_refused(self):
+    def test_pm22_cross_request_codespace_owner_not_stopped_by_nonacquiring_A(self):
         c,w=self.ready()
         self.failure(c,w)
         other={"request_id":"request:sha256:"+"f"*64,
@@ -280,6 +313,11 @@ class PreModelV3ReferenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ProtocolError,"CROSS_REQUEST_CODESPACE_OWNER_MISMATCH"):
             c.stop_permanent(self.shutdown(c),observed_owner=other,
                              trusted_resource_observation=True)
+        # A's positive terminal outcome does not require stopping B.
+        outcome=self.finalize_no_access(c)
+        self.assertEqual(outcome["state"],"STOPPED")
+        self.assertEqual(outcome["history"][-1]["receipt"]["evidence_type"],
+                         "pre-model-no-codespace-access")
 
     def test_pm23_issue_event_and_reconciler_one_reservation_controller(self):
         c=MemoryClaim()
