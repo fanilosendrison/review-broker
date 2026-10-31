@@ -6,7 +6,7 @@ from typing import Mapping
 from .github_journal_transport_v3 import VerifiedJournalSnapshotV3
 from .identity import artifact_identity,canonical_bytes
 from .journal_record_v3 import WorkerIdentityV3
-from .packet_retention_v3 import load_packet_evidence_v3
+from .packet_retention_v3 import load_packet_evidence_v3,packet_retention_locator_v3
 from .packet_v2 import verify_packet_v2_candidate
 from .queue import AttemptState
 
@@ -16,6 +16,7 @@ _ID=re.compile(r"(?:artifact|packet):sha256:[0-9a-f]{64}\Z")
 def _files(root:Path):
  for path in sorted(root.rglob("*"),key=lambda item:item.relative_to(root).as_posix()):
   if path.is_symlink(): raise PacketPreparationAuthorityV3Error("RETAINED_SYMLINK_FORBIDDEN")
+  if path.stat().st_mode&0o077: raise PacketPreparationAuthorityV3Error("RETAINED_MODE_NOT_PRIVATE")
   if path.is_file() and path.relative_to(root).as_posix()!="evidence/preparation-receipt.json": yield path
 def retained_inventory_id_v3(root:Path)->str:
  entries=[];seen=set()
@@ -37,10 +38,13 @@ def _receipt(snapshot:VerifiedJournalSnapshotV3,manifest:Mapping[str,object],inv
   "subject_capture_evidence_id":manifest["subject"]["subject_capture_evidence_id"],
   "technical_policy_id":manifest["technical_policy"]["technical_policy_id"],
   "retained_inventory_id":inventory_id}
-def prepare_packet_receipt_v3(retention_root:Path,snapshot:VerifiedJournalSnapshotV3)->str:
+def prepare_packet_receipt_v3(retention_base:Path,snapshot:VerifiedJournalSnapshotV3,
+ expected_technical_policy_id:str)->str:
  """Verify retained evidence and exclusively persist its ADMITTED transition receipt."""
  if snapshot.record.attempt.state is not AttemptState.ADMITTED: raise PacketPreparationAuthorityV3Error("ADMITTED_SNAPSHOT_REQUIRED")
+ retention_root=packet_retention_locator_v3(retention_base,snapshot.claim_ref)
  admission,capture,profile,manifest=load_packet_evidence_v3(retention_root,snapshot.record.attempt.admission)
+ if manifest["technical_policy"]["technical_policy_id"]!=expected_technical_policy_id: raise PacketPreparationAuthorityV3Error("TECHNICAL_POLICY_IDENTITY_MISMATCH")
  verify_packet_v2_candidate(retention_root/"packet",admission,capture,profile)
  receipt=_receipt(snapshot,manifest,retained_inventory_id_v3(retention_root));raw=canonical_bytes(receipt)+b"\n"
  path=retention_root/"evidence/preparation-receipt.json"
@@ -51,7 +55,7 @@ def prepare_packet_receipt_v3(retention_root:Path,snapshot:VerifiedJournalSnapsh
  return artifact_identity(raw)
 def _load_receipt(root:Path)->tuple[dict[str,object],bytes]:
  path=root/"evidence/preparation-receipt.json"
- if path.is_symlink() or not path.is_file(): raise PacketPreparationAuthorityV3Error("PREPARATION_RECEIPT_MISSING")
+ if path.is_symlink() or not path.is_file() or path.stat().st_mode&0o077: raise PacketPreparationAuthorityV3Error("PREPARATION_RECEIPT_MISSING")
  raw=path.read_bytes()
  try: value=json.loads(raw)
  except (UnicodeError,json.JSONDecodeError) as exc: raise PacketPreparationAuthorityV3Error("PREPARATION_RECEIPT_INVALID") from exc
@@ -59,21 +63,24 @@ def _load_receipt(root:Path)->tuple[dict[str,object],bytes]:
  return value,raw
 class RetainedPacketAuthorityV3:
  """Reload and confront exact retained evidence before allowing journal prepare."""
- def __init__(self,retention_root:Path): self.retention_root=retention_root
+ def __init__(self,retention_base:Path,expected_technical_policy_id:str): self.retention_base=retention_base;self.expected_technical_policy_id=expected_technical_policy_id
  def permits(self,*,snapshot:VerifiedJournalSnapshotV3,packet_evidence_id:str,reservation_id:str,generation:int,worker:WorkerIdentityV3)->bool:
   try:
    if snapshot.record.attempt.state is not AttemptState.ADMITTED: return False
-   admission,capture,profile,manifest=load_packet_evidence_v3(self.retention_root,snapshot.record.attempt.admission)
-   receipt,raw=_load_receipt(self.retention_root);control=snapshot.record.control
-   expected=_receipt(snapshot,manifest,retained_inventory_id_v3(self.retention_root))
+   retention_root=packet_retention_locator_v3(self.retention_base,snapshot.claim_ref)
+   admission,capture,profile,manifest=load_packet_evidence_v3(retention_root,snapshot.record.attempt.admission)
+   receipt,raw=_load_receipt(retention_root);control=snapshot.record.control
+   expected=_receipt(snapshot,manifest,retained_inventory_id_v3(retention_root))
    return (receipt==expected and artifact_identity(raw)==packet_evidence_id and _ID.fullmatch(packet_evidence_id) is not None
     and control.reservation_id==reservation_id and control.generation==generation and control.worker==worker
     and admission.request_id==snapshot.record.attempt.request_id
-    and verify_packet_v2_candidate(self.retention_root/"packet",admission,capture,profile)["packet_id"]==receipt["packet_id"])
+    and receipt["technical_policy_id"]==self.expected_technical_policy_id
+    and verify_packet_v2_candidate(retention_root/"packet",admission,capture,profile)["packet_id"]==receipt["packet_id"])
   except Exception: return False
-def verify_prepared_readback_v3(retention_root:Path,snapshot:VerifiedJournalSnapshotV3)->dict[str,object]:
+def verify_prepared_readback_v3(retention_base:Path,snapshot:VerifiedJournalSnapshotV3)->dict[str,object]:
  """Read-only cold verification of one committed direct PREPARED successor."""
  if snapshot.record.attempt.state is not AttemptState.PREPARED: raise PacketPreparationAuthorityV3Error("PREPARED_READBACK_REQUIRED")
+ retention_root=packet_retention_locator_v3(retention_base,snapshot.claim_ref)
  receipt,raw=_load_receipt(retention_root);evidence_id=artifact_identity(raw)
  if (receipt["predecessor_commit_sha"]!=snapshot.parent_sha or snapshot.record.attempt.evidence_ids[-1]!=evidence_id): raise PacketPreparationAuthorityV3Error("PREPARED_JOURNAL_BINDING_MISMATCH")
  admission,capture,profile,manifest=load_packet_evidence_v3(retention_root,snapshot.record.attempt.admission)
