@@ -13,6 +13,11 @@ from .queue import AttemptState
 class PacketPreparationAuthorityV3Error(ValueError): pass
 _RECEIPT_FIELDS={"schema_version","evidence_type","repository","repository_node_id","claim_ref","predecessor_commit_sha","request_id","review_intent_id","attempt_id","admission_evidence_id","reservation_id","generation","worker","packet_id","subject_capture_evidence_id","technical_policy_id","retained_inventory_id"}
 _ID=re.compile(r"(?:artifact|packet):sha256:[0-9a-f]{64}\Z")
+_REQUEST_ID=re.compile(r"request:sha256:[0-9a-f]{64}\Z")
+_INTENT_ID=re.compile(r"review-intent:sha256:[0-9a-f]{64}\Z")
+_ATTEMPT_ID=re.compile(r"attempt:sha256:[0-9a-f]{64}\Z")
+_RESERVATION_ID=re.compile(r"preparation-dispatch:sha256:[0-9a-f]{64}\Z")
+_SHA=re.compile(r"[0-9a-f]{40}\Z")
 def _files(root:Path):
  for path in sorted(root.rglob("*"),key=lambda item:item.relative_to(root).as_posix()):
   if path.is_symlink(): raise PacketPreparationAuthorityV3Error("RETAINED_SYMLINK_FORBIDDEN")
@@ -60,7 +65,22 @@ def _load_receipt(root:Path)->tuple[dict[str,object],bytes]:
  raw=path.read_bytes()
  try: value=json.loads(raw)
  except (UnicodeError,json.JSONDecodeError) as exc: raise PacketPreparationAuthorityV3Error("PREPARATION_RECEIPT_INVALID") from exc
- if not isinstance(value,dict) or set(value)!=_RECEIPT_FIELDS or raw!=canonical_bytes(value)+b"\n": raise PacketPreparationAuthorityV3Error("PREPARATION_RECEIPT_INVALID")
+ worker=value.get("worker") if isinstance(value,dict) else None
+ valid=(isinstance(value,dict) and set(value)==_RECEIPT_FIELDS
+  and type(value.get("schema_version")) is int and value["schema_version"]==1
+  and value.get("evidence_type")=="offline-v3-prepared-packet-binding"
+  and all(isinstance(value.get(field),str) and value[field] for field in ("repository","repository_node_id","claim_ref","technical_policy_id"))
+  and _SHA.fullmatch(str(value.get("predecessor_commit_sha"))) is not None
+  and _REQUEST_ID.fullmatch(str(value.get("request_id"))) is not None
+  and _INTENT_ID.fullmatch(str(value.get("review_intent_id"))) is not None
+  and _ATTEMPT_ID.fullmatch(str(value.get("attempt_id"))) is not None
+  and _RESERVATION_ID.fullmatch(str(value.get("reservation_id"))) is not None
+  and type(value.get("generation")) is int and value["generation"]==1
+  and isinstance(worker,dict) and set(worker)=={"run_id","run_attempt"}
+  and all(type(worker[field]) is int and worker[field]>0 for field in worker)
+  and all(isinstance(value.get(field),str) and _ID.fullmatch(value[field]) is not None for field in ("admission_evidence_id","packet_id","subject_capture_evidence_id","retained_inventory_id"))
+  and raw==canonical_bytes(value)+b"\n")
+ if not valid: raise PacketPreparationAuthorityV3Error("PREPARATION_RECEIPT_INVALID")
  return value,raw
 class RetainedPacketAuthorityV3:
  """Reload and confront exact retained evidence before allowing journal prepare."""
@@ -72,7 +92,7 @@ class RetainedPacketAuthorityV3:
    admission,capture,profile,manifest=load_packet_evidence_v3(retention_root,snapshot.record.attempt.admission)
    receipt,raw=_load_receipt(retention_root);control=snapshot.record.control
    expected=_receipt(snapshot,manifest,retained_inventory_id_v3(retention_root))
-   return (receipt==expected and artifact_identity(raw)==packet_evidence_id and _ID.fullmatch(packet_evidence_id) is not None
+   return (raw==canonical_bytes(expected)+b"\n" and artifact_identity(raw)==packet_evidence_id and packet_evidence_id.startswith("artifact:sha256:")
     and control.reservation_id==reservation_id and control.generation==generation and control.worker==worker
     and admission.request_id==snapshot.record.attempt.request_id
     and receipt["technical_policy_id"]==self.expected_technical_policy_id
