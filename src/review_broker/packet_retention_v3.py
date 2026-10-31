@@ -9,6 +9,7 @@ from .admission_v3 import PreclaimAdmissionV3
 from .github_git_file_v3 import GitHubGitFileObservationV3
 from .github_issue_reference_v3 import GitHubIssueReferenceObservationV3
 from .github_journal_transport_v3 import VerifiedJournalSnapshotV3
+from .github_journal_v3 import GitHubJournalV3
 from .identity import artifact_identity,canonical_bytes
 from .queue import AttemptState
 from .packet_v2 import (SubjectCaptureV2,TechnicalProfileSnapshotV2,build_packet_v2_candidate,
@@ -31,11 +32,14 @@ def _private_tree(root:Path)->None:
   os.chmod(path,0o700 if path.is_dir() else 0o600)
 def persist_packet_evidence_v3(admission:PreclaimAdmissionV3,capture:SubjectCaptureV2,
  profile:TechnicalProfileSnapshotV2,retention_base:Path,snapshot:VerifiedJournalSnapshotV3,
- issue_reference_readers:Mapping|None=None)->dict[str,object]:
+ journal:GitHubJournalV3,issue_reference_readers:Mapping|None=None)->dict[str,object]:
  """Build and verify the unique ADMITTED claim locator, then expose it atomically."""
  if (snapshot.record.attempt.state is not AttemptState.ADMITTED
   or snapshot.record.attempt.admission!=admission.journal_admission()):
   raise PacketRetentionV3Error("RETENTION_ADMITTED_SNAPSHOT_REQUIRED")
+ current=journal.read(admission.request_id)
+ if current.commit_sha!=snapshot.commit_sha or current.record.attempt.state is not AttemptState.ADMITTED:
+  raise PacketRetentionV3Error("RETENTION_CURRENT_ADMITTED_SNAPSHOT_REQUIRED")
  retention_root=packet_retention_locator_v3(retention_base,snapshot.claim_ref)
  if retention_base.is_symlink() or retention_root.is_symlink() or retention_root.exists(): raise PacketRetentionV3Error("RETENTION_TARGET_EXISTS")
  retention_base.mkdir(mode=0o700,parents=True,exist_ok=True);os.chmod(retention_base,0o700)
