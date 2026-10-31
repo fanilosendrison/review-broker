@@ -1,4 +1,4 @@
-import json,os,shutil,subprocess,sys,tempfile,unittest
+import base64,json,os,shutil,subprocess,sys,tempfile,unittest
 from pathlib import Path
 from tests.issue68_test_support import IntegratedScenario
 class Issue68RecoveryTests(unittest.TestCase):
@@ -29,4 +29,6 @@ class Issue68RecoveryTests(unittest.TestCase):
   missing=self.root/"missing";result=self.probe(missing);self.assertNotEqual(result.returncode,0)
   value=json.loads(self.transport.read_bytes());claim=next(iter(value["refs"]));sha=value["refs"][claim];value["commits"][sha]["parent_sha"]="0"*40
   altered=self.root/"altered.json";altered.write_text(json.dumps(value));self.assertNotEqual(self.probe(transport=altered).returncode,0)
+  value=json.loads(self.transport.read_bytes());sha=value["refs"][claim];journal=json.loads(base64.b64decode(value["commits"][sha]["journal_bytes"]));prepared=next(x for x in journal["history"] if x.get("state")=="PREPARED");prepared["evidence_ids"]=[journal["admission"]["admission_evidence_id"]];value["commits"][sha]["journal_bytes"]=base64.b64encode(json.dumps(journal,sort_keys=True,separators=(",",":")).encode()+b"\n").decode()
+  mismatch=self.root/"mismatched-prepared-evidence.json";mismatch.write_text(json.dumps(value));self.assertNotEqual(self.probe(transport=mismatch).returncode,0)
 if __name__=="__main__":unittest.main()

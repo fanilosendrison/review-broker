@@ -116,7 +116,8 @@ only serialized synthetic refs/commits and a configured retention base. It
 derives the packet locator from the journal claim, reads the journal through
 `GitHubJournalV3`, reconstructs admission/capture/profile objects from retained
 bytes, runs the actual packet verifier, recomputes inventory and receipt
-identities, and confronts the committed direct parent and PREPARED evidence.
+identities, and confronts the committed direct parent, the unique PREPARED
+history entry, and its exact packet-evidence identity.
 No original admission, capture, profile, reader, or packet object crosses the
 process boundary. No HTTP or Git-source reacquisition interface is available.
 

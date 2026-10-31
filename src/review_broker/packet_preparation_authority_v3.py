@@ -107,7 +107,11 @@ def verify_prepared_readback_v3(retention_base:Path,snapshot:VerifiedJournalSnap
  if snapshot.record.attempt.state is not AttemptState.PREPARED: raise PacketPreparationAuthorityV3Error("PREPARED_READBACK_REQUIRED")
  retention_root=packet_retention_locator_v3(retention_base,snapshot.claim_ref)
  receipt,raw=_load_receipt(retention_root);evidence_id=artifact_identity(raw)
- if (receipt["predecessor_commit_sha"]!=snapshot.parent_sha or snapshot.record.attempt.evidence_ids[-1]!=evidence_id): raise PacketPreparationAuthorityV3Error("PREPARED_JOURNAL_BINDING_MISMATCH")
+ prepared_entries=[entry for entry in snapshot.record.attempt.history if entry.get("state")=="PREPARED"]
+ if (receipt["predecessor_commit_sha"]!=snapshot.parent_sha
+  or snapshot.record.attempt.evidence_ids[-1]!=evidence_id
+  or len(prepared_entries)!=1 or prepared_entries[0].get("evidence_ids")!=[evidence_id]):
+  raise PacketPreparationAuthorityV3Error("PREPARED_JOURNAL_BINDING_MISMATCH")
  admission,capture,profile,manifest=load_packet_evidence_v3(retention_root,snapshot.record.attempt.admission)
  inventory=retained_inventory_id_v3(retention_root)
  expected=dict(receipt);expected["retained_inventory_id"]=inventory
