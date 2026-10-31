@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -57,6 +58,15 @@ class PacketV2IntegrityTests(unittest.TestCase):
             contradictory = admitted(request_for_capture(capture), head=capture.head_sha)
             with self.assertRaisesRegex(PacketV2CandidateError, "ADMITTED_SUBJECT_CONTRADICTION"):
                 build_packet_v2_candidate(contradictory, capture, profile(), root / "packet")
+
+    def test_local_git_proof_ignores_repository_replacement_objects(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); capture = git_capture(root)
+            subprocess.run(["git", "-C", str(capture.repository_root), "replace",
+                            capture.head_sha, capture.base_sha], check=True)
+            admission = admitted(request_for_capture(capture), capture=capture)
+            manifest = build_packet_v2_candidate(admission, capture, profile(), root / "packet")
+            self.assertEqual(manifest["subject"]["head_sha"], capture.head_sha)
 
     def test_local_git_proof_rejects_arbitrary_diff_and_unsafe_injected_path(self):
         with tempfile.TemporaryDirectory() as temporary:

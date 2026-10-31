@@ -10,9 +10,7 @@ import re
 import shutil
 import tempfile
 from typing import Any, Mapping
-
 from jsonschema import Draft202012Validator
-
 from .admission_evidence_v3 import validate_journal_admission_v3
 from .admission_v3 import PreclaimAdmissionV3
 from .changes import ChangeScopeError, build_change_basis, validate_change_scope
@@ -133,7 +131,9 @@ def _validate_capture(capture: SubjectCaptureV2, admission: PreclaimAdmissionV3,
     if not prove_local_git:
         return
     try:
-        reader = GitSourceReader(capture.repository_root)
+        git_environment = {"PATH": os.environ.get("PATH", ""), "GIT_NO_REPLACE_OBJECTS": "1",
+                           "GIT_CONFIG_NOSYSTEM": "1"}
+        reader = GitSourceReader(capture.repository_root, environment=git_environment)
         reread = tuple(reader.read(SourceSpec(item.repository, item.commit, item.path))
                        for item in capture.records)
         exact = reader.diff(capture.merge_base_sha, capture.head_sha)
