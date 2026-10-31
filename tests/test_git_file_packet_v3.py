@@ -72,6 +72,18 @@ class GitFilePacketIntegrationTests(unittest.TestCase):
             with self.assertRaisesRegex(PacketV2CandidateError, "ADMISSION_INVALID"):
                 build_packet_v2_candidate(forged, capture, profile(), root / "packet")
 
+    def test_reader_subclass_cannot_cross_trusted_acquisition_boundary(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); capture = git_capture(root); request = request_for_capture(capture, [git_ref()])
+            class ForgedReader(type(reader(Api()))):
+                def observe(self, *args, **kwargs): return reader(Api()).observe(*args, **kwargs)
+            trusted = reader(Api())
+            forged = ForgedReader("token", trusted.repository, trusted.repository_id,
+                authority_evidence_id=trusted.authority_evidence_id, expected_installation_id=123,
+                executor=Api())
+            with self.assertRaisesRegex(AdmissionV3CandidateError, "TRUSTED_READER_REQUIRED"):
+                admitted(request, capture=capture, git_file_readers={"contract": forged})
+
     def test_missing_optional_git_file_is_not_omitted(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); capture = git_capture(root)

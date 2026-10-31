@@ -17,7 +17,7 @@ def acquire_git_file_admissions_v3(request: Mapping[str, object], subject: Mappi
     for reference in request["references"]:
         if reference["source"]["kind"] != "git_file": continue
         reader = None if readers is None else readers.get(reference["id"])
-        if not isinstance(reader, GitHubGitFileReaderV3):
+        if type(reader) is not GitHubGitFileReaderV3:
             raise GitFileAdmissionV3Error("GIT_FILE_TRUSTED_READER_REQUIRED")
         selector = reference["source"]
         try: observed = reader.observe(selector["commit"], selector["path"], selector.get("expected_sha256"))
