@@ -53,14 +53,17 @@ technical policy, and retained inventory.
 
 ## Retained artifacts and integrity
 
-The retained `packet/` directory is the unmodified Reviewer Packet v2 artifact
-inventory. The auxiliary `evidence/` directory contains the original request
+The configured retention base deterministically derives one locator from the
+64-hex claim-ref digest. The retained `packet/` directory at that locator is the
+unmodified Reviewer Packet v2 artifact inventory. The auxiliary `evidence/`
+directory contains the original request
 body, technical-profile bytes, admission-time remote-reference bytes, and the
 exclusive preparation receipt. Construction occurs in a private staging tree,
 verification precedes publication, and one same-filesystem rename exposes the
-complete tree. Existing targets, symlinks, unsafe identifiers, non-owner file
-modes, missing entries, extra entries, changed bytes, and receipt rewrites fail
-closed.
+complete tree. Existing claim locators, symlinks, unsafe identifiers, non-owner file modes,
+missing entries, extra entries, changed bytes, and receipt rewrites fail closed.
+The packet authority is configured with both the retention base and the expected
+technical-policy identity; neither is selected from packet-controlled metadata.
 
 Admission-time mutable-reference bytes remain separate from preparation-time
 packet snapshots. Cold reconstruction verifies admission receipts from the
@@ -82,17 +85,27 @@ The nominal injected journal sequence is:
 6. `read`: exact committed `PREPARED` journal readback.
 7. Fresh-process read and packet reconstruction: same packet and evidence identities.
 
-The deterministic ADMITTED predecessor is
-`ed81208bc103d61df6c1322d9baf00636054c5ae`; its direct PREPARED successor is
-`bc5f07ed56371281ace74f963267f3c1bee2b8fc`. These are synthetic transport Git
-identities, not GitHub writer attestations. Every mutation records its starting
-commit, expected-old commit, intended successor, outcome, committed readback,
-and permitted continuation in test instrumentation.
+The deterministic nominal transition record is:
+
+| Operation | Expected old | Committed successor | Readback | Evidence | Permitted next operation |
+| --------- | ------------ | ------------------- | -------- | -------- | ------------------------ |
+| claim | none | `28c0f3cfd585f4b50b9480a09a75a8591b8536ac` | REQUESTED | admission authority and synthetic writer evidence | authority-gated reservation |
+| reserve_initial | `28c0f3cfd585f4b50b9480a09a75a8591b8536ac` | `3417a4fde0670ef4ff7777a98801188b3b8bf2af` | REQUESTED | synthetic expected-old writer evidence | one dispatch and worker binding |
+| register_worker | `3417a4fde0670ef4ff7777a98801188b3b8bf2af` | `975b862e108fd1204511e76746d316b146dab6c5` | REQUESTED | worker authority and synthetic writer evidence | admission recording |
+| record_admission | `975b862e108fd1204511e76746d316b146dab6c5` | `ed81208bc103d61df6c1322d9baf00636054c5ae` | ADMITTED | admission evidence and synthetic writer evidence | verified packet preparation |
+| prepare | `ed81208bc103d61df6c1322d9baf00636054c5ae` | `bc5f07ed56371281ace74f963267f3c1bee2b8fc` | PREPARED | packet evidence `artifact:sha256:b62e4627462bf9d0a489834baaa40e61afbe7674bb3f4d4b069775c32a23e8e7` | read-only recovery only |
+
+These are synthetic transport Git identities, not GitHub writer attestations.
+Every mutation records its starting commit, expected-old commit, intended
+successor, outcome, committed readback, writer/authorization evidence, and
+permitted continuation in test instrumentation. Rejected and unresolved
+injections additionally assert their exact outcome and prohibit blind retry.
 
 ## Fresh-process recovery
 
 `tests.issue68_reload_probe` runs in a separate Python interpreter. It restores
-only serialized synthetic refs/commits, reads the journal through
+only serialized synthetic refs/commits and a configured retention base. It
+derives the packet locator from the journal claim, reads the journal through
 `GitHubJournalV3`, reconstructs admission/capture/profile objects from retained
 bytes, runs the actual packet verifier, recomputes inventory and receipt
 identities, and confronts the committed direct parent and PREPARED evidence.
@@ -100,8 +113,8 @@ No original admission, capture, profile, reader, or packet object crosses the
 process boundary. No HTTP or Git-source reacquisition interface is available.
 
 Corrupted source, missing profile, changed request, changed admission-time
-reference, forged receipt, changed manifest, altered journal readback, and a
-missing packet all fail closed. Repeated recovery causes no journal update.
+reference, forged receipt, changed manifest, altered journal readback, public
+file modes, and a missing packet all fail closed. Repeated recovery causes no journal update.
 Later mutable remote bytes cannot replace the committed packet because recovery
 has no remote reader and the retained target cannot be overwritten.
 
@@ -129,7 +142,7 @@ has no remote reader and the retained target cannot be overwritten.
 | I68-F13 | PASS | Stale expected-old update is rejected. |
 | I68-F14 | PASS | Wrong reservation, generation, or worker is fenced. |
 | I68-F15 | PASS | Concurrent/stale reservation has one winner and no redispatch. |
-| I68-F16 | PASS | Duplicate discovery reuses the claim without another dispatch. |
+| I68-F16 | PASS | Duplicate discovery reuses the claim; the integrated reservation controller dispatch counter remains one. |
 | I68-F17 | PASS | Interruption before materialization remains ADMITTED. |
 | I68-F18 | PASS | Materialized packet without CAS remains ADMITTED. |
 | I68-F19 | PASS | Applied mutation with ambiguous response remains UNRESOLVED without retry. |
