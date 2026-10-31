@@ -9,6 +9,8 @@ from typing import Mapping, Protocol
 from .github_issue_origin_v3 import GitHubIssueOriginObservationV3, GitHubIssueOriginReaderV3
 from .github_git_file_v3 import GitHubGitFileObservationV3, GitHubGitFileReaderV3
 from .git_file_admission_v3 import GitFileAdmissionV3Error, acquire_git_file_admissions_v3
+from .github_issue_reference_v3 import GitHubIssueReferenceObservationV3, GitHubIssueReferenceReaderV3
+from .issue_reference_admission_v3 import IssueReferenceAdmissionV3Error, acquire_issue_reference_admissions_v3
 from .identity import artifact_identity, canonical_bytes
 from .physical import decode_physical_lines
 from .request_v3 import (
@@ -41,20 +43,14 @@ class RequesterAuthorizationV3:
     requester_id: int
     broker_issue_id: int
     evidence_id: str
-
-
 class RequesterAuthorizationAuthorityV3(Protocol):
     def authorize(self, requester_id: int, broker_issue_id: int,
                   origin_evidence_id: str) -> RequesterAuthorizationV3 | None: ...
-
-
 @dataclass(frozen=True)
 class SubjectSourceFeasibilityV3:
     source_id: str
     original_bytes: int
     rendered_bytes: int
-
-
 @dataclass(frozen=True)
 class PullRequestObservationV3:
     repository: str
@@ -65,13 +61,9 @@ class PullRequestObservationV3:
     base_sha: str
     subject_sources: tuple[SubjectSourceFeasibilityV3, ...]
     evidence_id: str
-
-
 class PullRequestObservationAuthorityV3(Protocol):
     def observe(self, repository: str, repository_id: int,
                 pull_request: int) -> PullRequestObservationV3 | None: ...
-
-
 @dataclass(frozen=True)
 class SourceRepositoryAuthorizationV3:
     repository: str
@@ -79,13 +71,9 @@ class SourceRepositoryAuthorizationV3:
     principal_id: str
     installation_id: int
     evidence_id: str
-
-
 class SourceRepositoryAuthorityV3(Protocol):
     def authorize(self, repository: str,
                   repository_id: int) -> SourceRepositoryAuthorizationV3 | None: ...
-
-
 @dataclass(frozen=True)
 class InitialHistoryDecisionV3:
     request_id: str
@@ -95,13 +83,9 @@ class InitialHistoryDecisionV3:
     complete: bool
     matching_request_ids: tuple[str, ...]
     evidence_id: str
-
-
 class InitialHistoryAuthorityV3(Protocol):
     def decide(self, request_id: str, review_intent_id: str,
                namespace: str) -> InitialHistoryDecisionV3 | None: ...
-
-
 @dataclass(frozen=True)
 class PreclaimAdmissionV3:
     canonical_request_bytes: bytes
@@ -128,6 +112,7 @@ class PreclaimAdmissionV3:
     history_scan_boundary: str
     admission_evidence_id: str
     git_file_observations: tuple[GitHubGitFileObservationV3, ...] = ()
+    issue_reference_observations: tuple[GitHubIssueReferenceObservationV3, ...] = ()
 
     @property
     def request(self) -> dict[str, object]:
@@ -161,10 +146,14 @@ class PreclaimAdmissionV3:
         if self.git_file_observations:
             value["reference_admissions"] = [item.provenance_basis() | {"evidence_id": item.evidence_id}
                                                 for item in self.git_file_observations]
+        if self.issue_reference_observations:
+            value["issue_reference_admissions"] = [item.provenance_basis() | {"evidence_id": item.evidence_id}
+                                                    for item in self.issue_reference_observations]
         return value
 
 
-def _validate_admitted_subset(request: Mapping[str, object], *, allow_git_file: bool = False) -> None:
+def _validate_admitted_subset(request: Mapping[str, object], *, allow_git_file: bool = False,
+                              allow_issue_reference: bool = False) -> None:
     operation = request["review_operation"]["kind"]
     if operation == "changed_head":
         raise AdmissionV3CandidateError("CHANGED_HEAD_ADMISSION_NOT_YET_QUALIFIED")
@@ -176,7 +165,8 @@ def _validate_admitted_subset(request: Mapping[str, object], *, allow_git_file: 
         {"github_issue_body", "github_issue_comment"}
     ):
         raise AdmissionV3CandidateError("ATOMICITY_MUTABLE_REFERENCE_FORBIDDEN")
-    if remote - ({"git_file"} if allow_git_file else set()):
+    allowed = ({"git_file"} if allow_git_file else set()) | ({"github_issue_body", "github_issue_comment"} if allow_issue_reference else set())
+    if remote - allowed:
         raise AdmissionV3CandidateError("REMOTE_SOURCE_ADMISSION_NOT_YET_QUALIFIED")
 
 
@@ -193,6 +183,7 @@ def admit_initial_inline_v3(
     source_authority: SourceRepositoryAuthorityV3,
     history_authority: InitialHistoryAuthorityV3,
     git_file_readers: Mapping[str, GitHubGitFileReaderV3] | None = None,
+    issue_reference_readers: Mapping[str, GitHubIssueReferenceReaderV3] | None = None,
 ) -> PreclaimAdmissionV3:
     """Admit no claim; return retained evidence for the bounded candidate subset."""
     if type(origin_reader) is not GitHubIssueOriginReaderV3:
@@ -241,7 +232,8 @@ def admit_initial_inline_v3(
     }
     request = parse_issue_envelope_v3(origin.body)
     request_id, intent_id = request_identity_v3(request), review_intent_identity_v3(request)
-    _validate_admitted_subset(request, allow_git_file=git_file_readers is not None)
+    _validate_admitted_subset(request, allow_git_file=git_file_readers is not None,
+                              allow_issue_reference=issue_reference_readers is not None)
     try:
         authorization = requester_authority.authorize(
             origin.requester_id, origin.issue_id, origin_evidence)
@@ -369,6 +361,13 @@ def admit_initial_inline_v3(
                        for item in observations)
     if eventual + git_rendered > 8_000_000:
         raise AdmissionV3CandidateError("EVENTUAL_RENDERED_PACKET_EXCEEDED")
+    try: issue_observations = acquire_issue_reference_admissions_v3(
+        request, subject, issue_reference_readers, source_evidence, source.installation_id)
+    except IssueReferenceAdmissionV3Error as exc: raise AdmissionV3CandidateError(str(exc)) from None
+    issue_rendered=sum(sum(len(line.encode("utf-8"))+9 for line in decode_physical_lines(item.original_bytes)[1]) for item in issue_observations)
+    if eventual+git_rendered+issue_rendered>8_000_000: raise AdmissionV3CandidateError("EVENTUAL_RENDERED_PACKET_EXCEEDED")
+    issue_admissions = [item.provenance_basis() | {"evidence_id": item.evidence_id}
+                        for item in issue_observations]
     reference_admissions = [item.provenance_basis() | {"evidence_id": item.evidence_id}
                             for item in observations]
     evidence_basis = {
@@ -382,8 +381,8 @@ def admit_initial_inline_v3(
         "history_scan_boundary": history.scan_boundary,
         "reference_ids": list(reference_ids),
     }
-    if reference_admissions:
-        evidence_basis["reference_admissions"] = reference_admissions
+    if reference_admissions: evidence_basis["reference_admissions"] = reference_admissions
+    if issue_admissions: evidence_basis["issue_reference_admissions"] = issue_admissions
     return PreclaimAdmissionV3(
         canonical_bytes(request), request_id, intent_id, origin.issue_id,
         origin.requester_id, origin.requester_login, pr.repository,
@@ -392,4 +391,5 @@ def admit_initial_inline_v3(
         canonical_bytes(source_basis), canonical_bytes(requester_receipt),
         canonical_bytes(history_receipt), origin_evidence, requester_evidence,
         history_evidence, history.scan_boundary, _receipt_id(evidence_basis), observations,
+        issue_observations,
     )
