@@ -18,7 +18,8 @@ from review_broker.packet_v2 import (
 from review_broker.packets import GitSourceReader, SourceSpec
 
 
-def admitted(request_value=None, *, capture=None, head=None, git_file_readers=None):
+def admitted(request_value=None, *, capture=None, head=None, git_file_readers=None,
+             issue_reference_readers=None):
     authority = PrAuthority(head=head or "a" * 40)
     if capture is not None:
         sources = tuple(SubjectSourceFeasibilityV3(
@@ -43,7 +44,7 @@ def admitted(request_value=None, *, capture=None, head=None, git_file_readers=No
         expected_broker_issue_id=6106789428, expected_requester_id=30498238,
         requester_authority=RequesterAuthority(), pr_authority=authority,
         source_authority=SourceAuthority(), history_authority=HistoryAuthority(),
-        git_file_readers=git_file_readers,
+        git_file_readers=git_file_readers, issue_reference_readers=issue_reference_readers,
     )
 
 
