@@ -62,8 +62,12 @@ exclusive preparation receipt. Construction occurs in a private staging tree,
 verification precedes publication, and one same-filesystem rename exposes the
 complete tree. Existing claim locators, symlinks, unsafe identifiers, non-owner file modes,
 missing entries, extra entries, changed bytes, and receipt rewrites fail closed.
-The packet authority is configured with both the retention base and the expected
-technical-policy identity; neither is selected from packet-controlled metadata.
+The packet authority is configured with the retention base, expected technical-
+policy identity, and independently captured subject-evidence identity; none is
+selected from packet-controlled metadata. A coordinated pre-receipt rewrite of
+the diff, manifest, prompt, packet ID, and recomputed capture evidence therefore
+cannot authorize PREPARED because it cannot match the external expected capture
+identity.
 
 Admission-time mutable-reference bytes remain separate from preparation-time
 packet snapshots. Cold reconstruction verifies admission receipts from the
