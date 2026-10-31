@@ -99,12 +99,12 @@
         "selector_id": {"type": "integer", "minimum": 1}, "issue_id": {"type": "integer", "minimum": 1},
         "issue_number": {"type": "integer", "minimum": 1}, "comment_id": {"type": ["integer", "null"]},
         "author_id": {"type": "integer", "minimum": 1}, "updated_at": {"type": "string", "minLength": 1},
-        "observed_at": {"type": "string", "minLength": 1}, "qualification": {"enum": ["AUTHENTICATED_READ_ONLY", "SAME_REPOSITORY_ACTIONS_QUALIFICATION"]},
+        "observed_at": {"type": "string", "minLength": 1}, "api_source": {"type": "string", "minLength": 1}, "qualification": {"enum": ["AUTHENTICATED_READ_ONLY", "SAME_REPOSITORY_ACTIONS_QUALIFICATION"]},
         "authority_evidence_id": {"$ref": "#/$defs/artifactId"}, "installation_id": {"type": "integer", "minimum": 1}
       },
       "allOf": [
         {"if": {"properties": {"source_kind": {"const": "git_file"}}}, "then": {"required": ["repository", "repository_id", "commit", "path", "root_tree_sha", "git_blob_oid", "provenance_evidence_id"]}},
-        {"if": {"properties": {"source_kind": {"enum": ["github_issue_body", "github_issue_comment"]}}}, "then": {"required": ["repository", "repository_id", "selector_id", "issue_id", "issue_number", "comment_id", "author_id", "updated_at", "observed_at", "qualification", "authority_evidence_id", "installation_id", "provenance_evidence_id"]}}
+        {"if": {"properties": {"source_kind": {"enum": ["github_issue_body", "github_issue_comment"]}}}, "then": {"required": ["repository", "repository_id", "selector_id", "issue_id", "issue_number", "comment_id", "author_id", "updated_at", "observed_at", "api_source", "qualification", "authority_evidence_id", "installation_id", "provenance_evidence_id"]}}
       ]
     },
     "referenceOutcome": {

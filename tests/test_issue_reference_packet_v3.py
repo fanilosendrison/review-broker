@@ -14,8 +14,7 @@ class Tests(unittest.TestCase):
    root=Path(t); cap=git_capture(root); refs=[inline("note","inline"),git_ref(),issue_ref(),comment_ref()]; req=request_for_capture(cap,refs)
    ir={"requirement":reader(Api()),"decision":reader(Api())}; adm=admitted(req,capture=cap,git_file_readers={"contract":git_reader(GitApi())},issue_reference_readers=ir)
    out=root/"packet"; m=build_packet_v2_candidate(adm,cap,profile(),out,ir)
-   fresh=(reader(Api()).observe_issue_body(43),reader(Api()).observe_issue_comment(99))
-   self.assertEqual(verify_packet_v2_candidate(out,adm,cap,profile(),fresh)["packet_id"],m["packet_id"])
+   self.assertEqual(verify_packet_v2_candidate(out,adm,cap,profile())["packet_id"],m["packet_id"])
    self.assertEqual([x["source_kind"] for x in m["reference_sources"]],["inline","git_file","github_issue_body","github_issue_comment"])
    self.assertIn("SOURCE_KIND=github_issue_comment",(out/"input.txt").read_text())
  def test_mutable_body_may_change_before_capture_but_identity_must_not(self):

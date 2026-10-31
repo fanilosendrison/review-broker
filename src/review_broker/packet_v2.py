@@ -17,6 +17,7 @@ from .changes import ChangeScopeError, build_change_basis, validate_change_scope
 from .github_issue_reference_v3 import GitHubIssueReferenceReaderV3
 from .identity import artifact_identity, canonical_bytes, packet_identity, subject_identity
 from .issue_reference_preparation_v3 import prepare_ordered_remote_observations_v3, retained_ordered_remote_observations_v3
+from .issue_reference_reconstruction_v3 import reconstruct_issue_observations_v3
 from .packet_v2_reference import build_reference_entries_v2
 from .packet_v2_renderer import RENDERER_ID, render_packet_v2_prompt
 from .packets import (
@@ -333,6 +334,9 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
         _fail("PACKET_V2_SOURCE_INVENTORY_INVALID")
     request, _ = _admission(admission); _validate_capture(
         capture, admission, request, prove_local_git=False)
+    if not issue_reference_observations:
+        issue_reference_observations=reconstruct_issue_observations_v3(
+            output_directory,manifest["reference_sources"],_read_snapshot)
     expected_subject, expected_changes = _subject_entries(capture)
     remote=retained_ordered_remote_observations_v3(request,admission,issue_reference_observations)
     expected_references, expected_outcomes, _ = build_reference_entries_v2(
