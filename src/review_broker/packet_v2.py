@@ -1,6 +1,5 @@
 """Offline construction and full verification of candidate Reviewer Packet v2."""
 from __future__ import annotations
-
 from dataclasses import dataclass
 import hashlib
 from importlib import resources
@@ -102,7 +101,7 @@ def subject_capture_evidence_id_v2(capture: SubjectCaptureV2) -> str:
              "verification": capture.verification}
     return artifact_identity(canonical_bytes(basis) + b"\n")
 def _validate_capture(capture: SubjectCaptureV2, admission: PreclaimAdmissionV3,
-                      request: Mapping[str, object]) -> None:
+                      request: Mapping[str, object], *, prove_local_git: bool) -> None:
     subject = request["subject"]
     if (not isinstance(capture, SubjectCaptureV2)
             or capture.verification != "SYNTHETIC_OFFLINE_VERIFIED"
@@ -131,6 +130,8 @@ def _validate_capture(capture: SubjectCaptureV2, admission: PreclaimAdmissionV3,
                 for index, record in enumerate(capture.records, 1)]
     if admitted_source.get("base_sha") != capture.base_sha or observed != captured:
         _fail("PACKET_V2_ADMITTED_SUBJECT_CONTRADICTION")
+    if not prove_local_git:
+        return
     try:
         reader = GitSourceReader(capture.repository_root)
         reread = tuple(reader.read(SourceSpec(item.repository, item.commit, item.path))
@@ -250,7 +251,7 @@ def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCa
                               output_directory: Path) -> dict[str, object]:
     """Build atomically without network, execution, inference, or publication."""
     request, _ = _admission(admission)
-    _validate_capture(capture, admission, request)
+    _validate_capture(capture, admission, request, prove_local_git=True)
     subject_sources, changes = _subject_entries(capture)
     reference_sources, outcomes, reference_data = _reference_entries(
         request, len(subject_sources) + 1)
@@ -267,7 +268,7 @@ def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCa
     manifest = {
         "schema_version": 2, "request_id": admission.request_id,
         "review_intent_id": admission.review_intent_id,
-        "subject_id": subject_identity(_subject_basis(capture)),
+        "subject_id": subject_identity({"identity_schema_version": 2, **_subject_basis(capture)}),
         "admission_evidence_id": admission.admission_evidence_id,
         "subject": {**_subject_basis(capture), "source_admission_id": admission.source_admission_id,
                     "subject_capture_evidence_id": capture.evidence_id,
@@ -307,8 +308,6 @@ def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCa
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True); raise
     return manifest
-
-
 def _read_snapshot(directory: Path, entry: Mapping[str, object], *, git: bool) -> tuple[bytes, tuple[str, ...]]:
     expected = f"sources/{entry['source_id']}.bin"
     if entry.get("snapshot") != expected or Path(expected).is_absolute() or ".." in Path(expected).parts:
@@ -329,8 +328,7 @@ def _read_snapshot(directory: Path, entry: Mapping[str, object], *, git: bool) -
             _fail("PACKET_V2_GIT_BLOB_MISMATCH")
     return data, lines
 def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmissionV3,
-                               capture: SubjectCaptureV2,
-                               profile: TechnicalProfileSnapshotV2) -> dict[str, object]:
+                               capture: SubjectCaptureV2, profile: TechnicalProfileSnapshotV2) -> dict[str, object]:
     """Independently reconstruct every candidate packet identity and byte."""
     manifest_path, prompt_path = output_directory / "input-manifest.json", output_directory / "input.txt"
     if (output_directory.is_symlink() or (output_directory / "sources").is_symlink()
@@ -347,7 +345,8 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
                           manifest["subject_sources"] + manifest["reference_sources"]}
     if {item.name for item in (output_directory / "sources").iterdir()} != expected_snapshots:
         _fail("PACKET_V2_SOURCE_INVENTORY_INVALID")
-    request, _ = _admission(admission); _validate_capture(capture, admission, request)
+    request, _ = _admission(admission); _validate_capture(
+        capture, admission, request, prove_local_git=False)
     expected_subject, expected_changes = _subject_entries(capture)
     expected_references, expected_outcomes, _ = _reference_entries(request, len(expected_subject) + 1)
     expected_change, _ = build_change_basis(expected_changes, expected_subject,
@@ -359,7 +358,8 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
     if (manifest["request_id"] != admission.request_id
             or manifest["review_intent_id"] != admission.review_intent_id
             or manifest["admission_evidence_id"] != admission.admission_evidence_id
-            or manifest["subject_id"] != subject_identity(_subject_basis(capture))
+            or manifest["subject_id"] != subject_identity(
+                {"identity_schema_version": 2, **_subject_basis(capture)})
             or manifest["subject"] != expected_subject_group
             or manifest["atomicity"] is not request["atomicity"]
             or manifest["change_scope"] != expected_change

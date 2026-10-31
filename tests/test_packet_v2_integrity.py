@@ -2,12 +2,13 @@ from dataclasses import replace
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 from unittest import mock
 
 from tests.packet_v2_test_support import admitted, git_capture, inline, profile, request_for_capture
-from review_broker.identity import canonical_bytes
+from review_broker.identity import canonical_bytes, subject_identity
 from review_broker.packet_v2 import (
     PacketV2CandidateError, build_packet_v2_candidate, verify_packet_v2_candidate,
 )
@@ -33,6 +34,22 @@ class PacketV2IntegrityTests(unittest.TestCase):
     def verify_fails(self, output, admission, capture, technical, marker):
         with self.assertRaisesRegex(PacketV2CandidateError, marker):
             verify_packet_v2_candidate(output, admission, capture, technical)
+
+    def test_subject_identity_uses_versioned_successor_basis(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            _, manifest, _, capture, _ = self.packet(Path(temporary))
+            basis = {"identity_schema_version": 2, "repository": capture.repository,
+                "repository_id": capture.repository_id, "pull_request": capture.pull_request,
+                "pull_request_id": capture.pull_request_id, "head_sha": capture.head_sha,
+                "base_sha": capture.base_sha, "merge_base_sha": capture.merge_base_sha}
+            self.assertEqual(manifest["subject_id"], subject_identity(basis))
+
+    def test_verification_survives_removal_of_transient_local_git_capture(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output, manifest, admission, capture, technical = self.packet(Path(temporary))
+            shutil.rmtree(capture.repository_root)
+            self.assertEqual(verify_packet_v2_candidate(
+                output, admission, capture, technical)["packet_id"], manifest["packet_id"])
 
     def test_admitted_subject_base_and_feasibility_must_match_capture(self):
         with tempfile.TemporaryDirectory() as temporary:
