@@ -35,6 +35,9 @@ class LiveTransportIsolationTests(unittest.TestCase):
         self.assertIn("class RejectRedirects", text)
         self.assertIn("consecutive_matches == 2", text)
         self.assertIn('error == "GRAPHQL_TYPED_UNPROCESSABLE"', text)
+        self.assertIn('"stale_replay_qualified": stale_replay_qualified', text)
+        self.assertGreater(text.index("QUALIFICATION_STALE_REPLAY_UNRESOLVED_AFTER_POSTFLIGHT"),
+                           text.index("QUALIFICATION_REF_INVENTORY_CHANGED"))
         self.assertNotIn("reviewctl", text)
 
 

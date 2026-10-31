@@ -179,9 +179,10 @@ jobs:
           typed_stale_rejection = (stale.errors
                                     and all(error == "GRAPHQL_TYPED_UNPROCESSABLE"
                                             for error in stale.errors))
-          if (stale.http_status != 200 or not typed_stale_rejection
-                  or stale.expected_old_rejected):
-              raise RuntimeError("QUALIFICATION_STALE_REPLAY_NOT_TYPED_REJECTED")
+          stale_replay_qualified = bool(
+              stale.http_status == 200 and typed_stale_rejection
+              and not stale.expected_old_rejected
+          )
           final_observations = bounded_exact_read(commit_b, payload_b)
           branches_after = ref_inventory("heads/")
           tags_after = ref_inventory("tags/")
@@ -210,6 +211,7 @@ jobs:
               "update_http_status": updated.http_status,
               "stale_http_status": stale.http_status,
               "stale_errors": list(stale.errors),
+              "stale_replay_qualified": stale_replay_qualified,
               "observations_a": observations_a,
               "observations_b": observations_b,
               "final_observations": final_observations,
@@ -218,4 +220,6 @@ jobs:
               "synthetic_non_operational": True,
           }
           print(json.dumps(evidence, sort_keys=True))
+          if not stale_replay_qualified:
+              raise RuntimeError("QUALIFICATION_STALE_REPLAY_UNRESOLVED_AFTER_POSTFLIGHT")
           PY
