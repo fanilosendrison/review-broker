@@ -308,6 +308,26 @@ class LiveTransportMutationTests(unittest.TestCase):
         self.assertFalse(result.expected_old_rejected)
         self.assertEqual(self.api.mutation_calls, 1)
 
+    def test_conflicting_graphql_type_metadata_fails_closed(self):
+        after = self.api.install_successor(PARENT)
+        for extension_code in ("FORBIDDEN", "INTERNAL"):
+            with self.subTest(extension_code=extension_code):
+                api = FakeGitHubApi()
+                api.install_successor(PARENT, after)
+                api.graphql_body = {"data": {"updateRefs": None}, "errors": [{
+                    "type": "UNPROCESSABLE", "extensions": {"code": extension_code}
+                }]}
+                transport = GitHubTransportLiveV3(
+                    "secret-token", REPOSITORY, executor=api
+                )
+                result = transport.update_ref(GraphQLRefUpdateV3(
+                    NODE_ID, REF, PARENT, after, False
+                ))
+                self.assertEqual(result.errors, ("GRAPHQL_APPLICATION_ERROR",))
+                self.assertFalse(result.expected_old_rejected)
+                self.assertEqual(transport.mutation_attempt_count, 1)
+                self.assertEqual(api.mutation_calls, 1)
+
     def test_opaque_or_malformed_graphql_response_remains_unattributed(self):
         after = self.api.install_successor(PARENT)
         cases = (
