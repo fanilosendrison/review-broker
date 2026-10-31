@@ -1,6 +1,7 @@
 from dataclasses import replace
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -13,7 +14,7 @@ from review_broker.identity import canonical_bytes, subject_identity
 from review_broker.packet_v2 import (
     PacketV2CandidateError, build_packet_v2_candidate, verify_packet_v2_candidate,
 )
-from review_broker.packets import build_packet, verify_packet
+from review_broker.packets import GitSourceReader, build_packet, verify_packet
 
 
 class PacketV2IntegrityTests(unittest.TestCase):
@@ -58,6 +59,20 @@ class PacketV2IntegrityTests(unittest.TestCase):
             contradictory = admitted(request_for_capture(capture), head=capture.head_sha)
             with self.assertRaisesRegex(PacketV2CandidateError, "ADMITTED_SUBJECT_CONTRADICTION"):
                 build_packet_v2_candidate(contradictory, capture, profile(), root / "packet")
+
+    def test_local_git_proof_uses_exact_allowlisted_environment(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); capture = git_capture(root)
+            admission = admitted(request_for_capture(capture), capture=capture)
+            poison = {"GIT_OBJECT_DIRECTORY": "/hostile", "GIT_CONFIG_COUNT": "1",
+                      "GIT_CONFIG_KEY_0": "core.useReplaceRefs",
+                      "GIT_CONFIG_VALUE_0": "true"}
+            with mock.patch.dict(os.environ, poison), mock.patch(
+                    "review_broker.packet_v2.GitSourceReader", wraps=GitSourceReader) as reader:
+                build_packet_v2_candidate(admission, capture, profile(), root / "packet")
+            self.assertEqual(reader.call_args.kwargs["environment"], {
+                "PATH": os.environ.get("PATH", ""), "GIT_NO_REPLACE_OBJECTS": "1",
+                "GIT_CONFIG_NOSYSTEM": "1"})
 
     def test_local_git_proof_ignores_repository_replacement_objects(self):
         with tempfile.TemporaryDirectory() as temporary:
