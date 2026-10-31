@@ -44,13 +44,15 @@ def _receipt(snapshot:VerifiedJournalSnapshotV3,manifest:Mapping[str,object],inv
   "technical_policy_id":manifest["technical_policy"]["technical_policy_id"],
   "retained_inventory_id":inventory_id}
 def prepare_packet_receipt_v3(retention_base:Path,snapshot:VerifiedJournalSnapshotV3,
- expected_technical_policy_id:str,expected_subject_capture_evidence_id:str)->str:
+ expected_technical_policy_id:str,expected_subject_capture_evidence_id:str,
+ expected_packet_id:str)->str:
  """Verify retained evidence and exclusively persist its ADMITTED transition receipt."""
  if snapshot.record.attempt.state is not AttemptState.ADMITTED: raise PacketPreparationAuthorityV3Error("ADMITTED_SNAPSHOT_REQUIRED")
  retention_root=packet_retention_locator_v3(retention_base,snapshot.claim_ref)
  admission,capture,profile,manifest=load_packet_evidence_v3(retention_root,snapshot.record.attempt.admission)
  if manifest["technical_policy"]["technical_policy_id"]!=expected_technical_policy_id: raise PacketPreparationAuthorityV3Error("TECHNICAL_POLICY_IDENTITY_MISMATCH")
  if manifest["subject"]["subject_capture_evidence_id"]!=expected_subject_capture_evidence_id: raise PacketPreparationAuthorityV3Error("SUBJECT_CAPTURE_IDENTITY_MISMATCH")
+ if manifest["packet_id"]!=expected_packet_id: raise PacketPreparationAuthorityV3Error("PACKET_IDENTITY_MISMATCH")
  verify_packet_v2_candidate(retention_root/"packet",admission,capture,profile)
  receipt=_receipt(snapshot,manifest,retained_inventory_id_v3(retention_root));raw=canonical_bytes(receipt)+b"\n"
  path=retention_root/"evidence/preparation-receipt.json"
@@ -84,7 +86,7 @@ def _load_receipt(root:Path)->tuple[dict[str,object],bytes]:
  return value,raw
 class RetainedPacketAuthorityV3:
  """Reload and confront exact retained evidence before allowing journal prepare."""
- def __init__(self,retention_base:Path,expected_technical_policy_id:str,expected_subject_capture_evidence_id:str): self.retention_base=retention_base;self.expected_technical_policy_id=expected_technical_policy_id;self.expected_subject_capture_evidence_id=expected_subject_capture_evidence_id
+ def __init__(self,retention_base:Path,expected_technical_policy_id:str,expected_subject_capture_evidence_id:str,expected_packet_id:str): self.retention_base=retention_base;self.expected_technical_policy_id=expected_technical_policy_id;self.expected_subject_capture_evidence_id=expected_subject_capture_evidence_id;self.expected_packet_id=expected_packet_id
  def permits(self,*,snapshot:VerifiedJournalSnapshotV3,packet_evidence_id:str,reservation_id:str,generation:int,worker:WorkerIdentityV3)->bool:
   try:
    if snapshot.record.attempt.state is not AttemptState.ADMITTED: return False
@@ -97,6 +99,7 @@ class RetainedPacketAuthorityV3:
     and admission.request_id==snapshot.record.attempt.request_id
     and receipt["technical_policy_id"]==self.expected_technical_policy_id
     and receipt["subject_capture_evidence_id"]==self.expected_subject_capture_evidence_id
+    and receipt["packet_id"]==self.expected_packet_id
     and verify_packet_v2_candidate(retention_root/"packet",admission,capture,profile)["packet_id"]==receipt["packet_id"])
   except Exception: return False
 def verify_prepared_readback_v3(retention_base:Path,snapshot:VerifiedJournalSnapshotV3)->dict[str,object]:
@@ -111,9 +114,13 @@ def verify_prepared_readback_v3(retention_base:Path,snapshot:VerifiedJournalSnap
  control=snapshot.record.control
  if (receipt!=expected or receipt["repository"]!=snapshot.repository or receipt["repository_node_id"]!=snapshot.repository_node_id
   or receipt["claim_ref"]!=snapshot.claim_ref or receipt["request_id"]!=snapshot.record.attempt.request_id
+  or receipt["review_intent_id"]!=snapshot.record.attempt.admission["review_intent_id"]
+  or receipt["admission_evidence_id"]!=snapshot.record.attempt.admission["admission_evidence_id"]
   or receipt["attempt_id"]!=snapshot.record.attempt.attempt_id or receipt["reservation_id"]!=control.reservation_id
   or receipt["generation"]!=1 or control.generation!=1 or control.worker is None or receipt["worker"]!=control.worker.as_dict()
-  or receipt["packet_id"]!=manifest["packet_id"] or receipt["technical_policy_id"]!=manifest["technical_policy"]["technical_policy_id"]):
+  or receipt["packet_id"]!=manifest["packet_id"]
+  or receipt["subject_capture_evidence_id"]!=manifest["subject"]["subject_capture_evidence_id"]
+  or receipt["technical_policy_id"]!=manifest["technical_policy"]["technical_policy_id"]):
   raise PacketPreparationAuthorityV3Error("PREPARED_READBACK_IDENTITY_MISMATCH")
  verify_packet_v2_candidate(retention_root/"packet",admission,capture,profile)
  return {"outcome":"PASS","packet_id":manifest["packet_id"],"packet_evidence_id":evidence_id,"request_id":receipt["request_id"],"attempt_id":receipt["attempt_id"],"retained_inventory_id":inventory}
