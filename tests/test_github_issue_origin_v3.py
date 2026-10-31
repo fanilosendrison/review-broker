@@ -23,13 +23,19 @@ class IssueApi:
         self.body: object = "exact private body\n"
         self.status = 200
         self.pull_request = False
+        self.repository_calls = 0
+        self.repository_drift_after: int | None = None
         self.calls: list[tuple[str, str]] = []
 
     def __call__(self, request: Request) -> HttpResponseV3:
         self.calls.append((request.get_method(), request.full_url))
         self.assert_auth(request)
         if request.full_url.endswith("/repos/fanilosendrison/review-broker"):
-            return self.response(200, {"id": self.repository_id, "full_name": REPOSITORY})
+            self.repository_calls += 1
+            repository_id = (1 if self.repository_drift_after is not None
+                             and self.repository_calls > self.repository_drift_after
+                             else self.repository_id)
+            return self.response(200, {"id": repository_id, "full_name": REPOSITORY})
         value: dict[str, object] = {
             "id": self.issue_id, "number": 51, "body": self.body,
             "user": {"id": self.requester_id, "login": "owner"},
@@ -63,7 +69,7 @@ class GitHubIssueOriginV3Tests(unittest.TestCase):
         self.assertEqual(observation.body, "exact private body\n")
         self.assertEqual(len(observation.body_sha256 or ""), 64)
         self.assertTrue(observation.evidence_id.startswith("artifact:sha256:"))
-        self.assertEqual([method for method, _ in api.calls], ["GET", "GET"])
+        self.assertEqual([method for method, _ in api.calls], ["GET", "GET", "GET"])
 
     def test_null_and_empty_body_remain_distinct(self) -> None:
         null_api, empty_api = IssueApi(), IssueApi()
@@ -88,6 +94,14 @@ class GitHubIssueOriginV3Tests(unittest.TestCase):
         api.repository_id = 1
         with self.assertRaisesRegex(GitHubIssueOriginV3Error, "REPOSITORY_IDENTITY_MISMATCH"):
             self.reader(api).observe(51)
+
+    def test_repository_identity_drift_after_issue_read_fails_closed(self) -> None:
+        api = IssueApi()
+        api.repository_drift_after = 1
+        with self.assertRaisesRegex(GitHubIssueOriginV3Error, "IDENTITY_MISMATCH"):
+            self.reader(api).observe(51)
+        self.assertEqual(api.repository_calls, 2)
+        self.assertEqual([method for method, _ in api.calls], ["GET", "GET", "GET"])
 
     def test_issue_and_requester_identity_are_strict(self) -> None:
         for attribute, value, marker in (

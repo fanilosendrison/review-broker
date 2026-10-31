@@ -95,17 +95,19 @@ class GitHubIssueOriginReaderV3:
             raise GitHubIssueOriginV3Error("GITHUB_ISSUE_RESPONSE_INVALID")
         return response
 
-    def observe(self, issue_number: int) -> GitHubIssueOriginObservationV3:
-        issue_number = _positive(issue_number, "GITHUB_ISSUE_NUMBER_INVALID")
-        repository_response = self._get("")
-        if repository_response.status != 200:
+    def _verify_repository_identity(self) -> None:
+        response = self._get("")
+        if response.status != 200:
             raise GitHubIssueOriginV3Error("GITHUB_REPOSITORY_IDENTITY_UNAVAILABLE")
-        repository = _json(repository_response)
+        repository = _json(response)
         if (repository.get("full_name") != self.repository
                 or _positive(repository.get("id"), "GITHUB_REPOSITORY_ID_INVALID")
                 != self.repository_id):
             raise GitHubIssueOriginV3Error("GITHUB_REPOSITORY_IDENTITY_MISMATCH")
 
+    def observe(self, issue_number: int) -> GitHubIssueOriginObservationV3:
+        issue_number = _positive(issue_number, "GITHUB_ISSUE_NUMBER_INVALID")
+        self._verify_repository_identity()
         issue_response = self._get(f"/issues/{issue_number}")
         if issue_response.status != 200:
             raise GitHubIssueOriginV3Error("GITHUB_ISSUE_UNAVAILABLE")
@@ -127,6 +129,7 @@ class GitHubIssueOriginReaderV3:
         if body is not None and not isinstance(body, str):
             raise GitHubIssueOriginV3Error("GITHUB_ISSUE_BODY_INVALID")
         body_sha256 = None if body is None else hashlib.sha256(body.encode("utf-8")).hexdigest()
+        self._verify_repository_identity()
         observed = self._clock()
         if observed.tzinfo is None:
             raise GitHubIssueOriginV3Error("GITHUB_OBSERVATION_TIME_INVALID")
