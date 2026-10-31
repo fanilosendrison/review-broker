@@ -52,12 +52,13 @@ jobs:
           python - <<'PY'
           import json
           import os
-          from urllib.request import Request, urlopen
+          from urllib.request import Request
 
           from review_broker.github_actions_identity_v3 import (
               GitHubActionsExpectationV3, GitHubActionsIdentityReaderV3,
               GitHubActionsRuntimeClaimV3,
           )
+          from review_broker.github_http_live_v3 import urllib_executor
           from review_broker.github_issue_origin_v3 import GitHubIssueOriginReaderV3
           from review_broker.github_journal_transport_v3 import ReadStatusV3
           from review_broker.github_transport_live_v3 import GitHubTransportLiveV3
@@ -77,8 +78,10 @@ jobs:
                   "X-GitHub-Api-Version": "2022-11-28",
               },
           )
-          with urlopen(request, timeout=30) as response:
-              initial_run = json.load(response)
+          initial_response = urllib_executor(request)
+          if initial_response.status != 200:
+              raise SystemExit("QUALIFICATION_RUN_LOOKUP_UNAVAILABLE")
+          initial_run = json.loads(initial_response.body.decode("utf-8"))
           if initial_run.get("path") != workflow_path:
               raise SystemExit("QUALIFICATION_WORKFLOW_PATH_MISMATCH")
 
