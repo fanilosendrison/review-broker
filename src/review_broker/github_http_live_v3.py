@@ -26,16 +26,24 @@ class _RejectRedirects(HTTPRedirectHandler):
         raise GitHubHttpLiveV3Error("GITHUB_REDIRECT_REJECTED")
 
 
-def urllib_executor(request: Request) -> HttpResponseV3:
+def urllib_executor_bounded(request: Request, maximum_body_bytes: int) -> HttpResponseV3:
     failed = False
     result: HttpResponseV3 | None = None
     try:
         with build_opener(_RejectRedirects()).open(request, timeout=30) as response:
-            result = HttpResponseV3(response.status, response.read(), dict(response.headers.items()))
+            body = response.read(maximum_body_bytes + 1)
+            if len(body) > maximum_body_bytes: raise GitHubHttpLiveV3Error("GITHUB_RESPONSE_TOO_LARGE")
+            result = HttpResponseV3(response.status, body, dict(response.headers.items()))
     except HTTPError as exc:
-        result = HttpResponseV3(exc.code, exc.read(), dict(exc.headers.items()) if exc.headers else {})
+        body = exc.read(maximum_body_bytes + 1)
+        if len(body) > maximum_body_bytes: raise GitHubHttpLiveV3Error("GITHUB_RESPONSE_TOO_LARGE")
+        result = HttpResponseV3(exc.code, body, dict(exc.headers.items()) if exc.headers else {})
     except (URLError, OSError, GitHubHttpLiveV3Error):
         failed = True
     if failed or result is None:
         raise GitHubHttpLiveV3Error("GITHUB_TRANSPORT_UNAVAILABLE")
     return result
+
+
+def urllib_executor(request: Request) -> HttpResponseV3:
+    return urllib_executor_bounded(request, 16_000_000)

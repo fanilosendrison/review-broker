@@ -29,14 +29,16 @@ def validate_journal_admission_v3(
         "source_observation", "requester_authorization", "history_observation",
         "reference_ids",
     }
-    if not isinstance(value, dict) or set(value) != fields:
+    actual_fields = set(value) if isinstance(value, dict) else set()
+    if actual_fields not in {frozenset(fields), frozenset(fields | {"reference_admissions"})}:
         raise AdmissionV3CandidateError("JOURNAL_ADMISSION_FIELDS_INVALID")
     request = value["canonical_request"]
     if not isinstance(request, dict):
         raise AdmissionV3CandidateError("JOURNAL_ADMISSION_REQUEST_INVALID")
     request_id = request_identity_v3(request)
     intent_id = review_intent_identity_v3(request)
-    _validate_admitted_subset(request)
+    reference_admissions = value.get("reference_admissions", [])
+    _validate_admitted_subset(request, allow_git_file=bool(reference_admissions))
     if value["request_id"] != request_id or value["review_intent_id"] != intent_id:
         raise AdmissionV3CandidateError("JOURNAL_ADMISSION_REQUEST_IDENTITY_MISMATCH")
     references = tuple(reference["id"] for reference in request["references"])
@@ -165,7 +167,7 @@ def validate_journal_admission_v3(
         raise AdmissionV3CandidateError("JOURNAL_ADMISSION_SOURCE_EVIDENCE_MISMATCH")
     inline_bound = sum(
         inline_rendered_bound_v3(item["source"]["text"])
-        for item in request["references"])
+        for item in request["references"] if item["source"]["kind"] == "inline")
     if (len(subject_sources) + len(references) > 999
             or sum(item["rendered_bytes"] for item in subject_sources)
             + inline_bound + len(canonical_bytes(request)) + 1_000_000 > 8_000_000):
@@ -173,6 +175,40 @@ def validate_journal_admission_v3(
     source_id = _receipt_id(source)
     if source_id != value["source_admission_id"]:
         raise AdmissionV3CandidateError("JOURNAL_ADMISSION_SOURCE_IDENTITY_MISMATCH")
+    git_references = [item for item in request["references"] if item["source"]["kind"] == "git_file"]
+    if len(reference_admissions) != len(git_references):
+        raise AdmissionV3CandidateError("JOURNAL_ADMISSION_GIT_FILE_COVERAGE_MISMATCH")
+    git_fields = {"schema_version", "evidence_type", "repository", "repository_id",
+        "commit_sha", "root_tree_sha", "path", "git_blob_oid", "original_byte_length",
+        "sha256", "observed_at", "api_source", "qualification", "authority_evidence_id",
+        "installation_id", "evidence_id"}
+    for reference, observed in zip(git_references, reference_admissions):
+        if (not isinstance(observed, dict) or set(observed) != git_fields
+                or observed.get("schema_version") != 1
+                or observed.get("evidence_type") != "github-git-file-observation"
+                or not _valid_sha(observed.get("commit_sha"))
+                or not _valid_sha(observed.get("root_tree_sha"))
+                or not _valid_sha(observed.get("git_blob_oid"))
+                or type(observed.get("original_byte_length")) is not int
+                or not 0 <= observed["original_byte_length"] <= 2_000_000
+                or not isinstance(observed.get("sha256"), str) or len(observed["sha256"]) != 64
+                or observed.get("repository") != subject["repository"]
+                or observed.get("repository_id") != subject["repository_id"]
+                or observed.get("commit_sha") != reference["source"]["commit"]
+                or observed.get("path") != reference["source"]["path"]
+                or observed.get("qualification") != "AUTHENTICATED_READ_ONLY"
+                or observed.get("authority_evidence_id") != source["source_authorization_evidence_id"]
+                or observed.get("installation_id") != source["installation_id"]):
+            raise AdmissionV3CandidateError("JOURNAL_ADMISSION_GIT_FILE_MISMATCH")
+        basis = {key: item for key, item in observed.items() if key != "evidence_id"}
+        if _receipt_id(basis) != observed.get("evidence_id"):
+            raise AdmissionV3CandidateError("JOURNAL_ADMISSION_GIT_FILE_EVIDENCE_MISMATCH")
+        if (request["atomicity"] is True
+                and observed.get("commit_sha") != subject["expected_head_commit"]):
+            raise AdmissionV3CandidateError("JOURNAL_ADMISSION_GIT_FILE_ATOMICITY_MISMATCH")
+        expected = reference["source"].get("expected_sha256")
+        if expected is not None and observed.get("sha256") != expected:
+            raise AdmissionV3CandidateError("JOURNAL_ADMISSION_GIT_FILE_DIGEST_MISMATCH")
     evidence_basis = {
         "schema_version": 1, "evidence_type": "review-request-v3-preclaim-admission",
         "request_id": request_id, "review_intent_id": intent_id,
@@ -183,6 +219,8 @@ def validate_journal_admission_v3(
         "history_scan_boundary": value["history_scan_boundary"],
         "reference_ids": list(references),
     }
+    if reference_admissions:
+        evidence_basis["reference_admissions"] = reference_admissions
     if value["admission_evidence_id"] != _receipt_id(evidence_basis):
         raise AdmissionV3CandidateError("JOURNAL_ADMISSION_EVIDENCE_MISMATCH")
     return json.loads(canonical_bytes(value))
