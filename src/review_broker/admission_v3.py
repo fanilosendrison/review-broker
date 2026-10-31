@@ -7,17 +7,15 @@ import json
 from typing import Mapping, Protocol
 
 from .github_issue_origin_v3 import GitHubIssueOriginObservationV3, GitHubIssueOriginReaderV3
+from .github_git_file_v3 import GitHubGitFileObservationV3, GitHubGitFileReaderV3
+from .git_file_admission_v3 import GitFileAdmissionV3Error, acquire_git_file_admissions_v3
 from .identity import artifact_identity, canonical_bytes
 from .request_v3 import (
     inline_rendered_bound_v3, parse_issue_envelope_v3, request_identity_v3,
 )
 from .review_intent_v3 import review_intent_identity_v3
-
-
 class AdmissionV3CandidateError(ValueError):
     """The candidate request cannot cross the bounded pre-claim boundary."""
-
-
 def _evidence(value: object, marker: str) -> str:
     if (not isinstance(value, str) or not value.startswith("artifact:sha256:")
             or len(value) != 80
@@ -138,13 +136,14 @@ class PreclaimAdmissionV3:
     history_evidence_id: str
     history_scan_boundary: str
     admission_evidence_id: str
+    git_file_observations: tuple[GitHubGitFileObservationV3, ...] = ()
 
     @property
     def request(self) -> dict[str, object]:
         return json.loads(self.canonical_request_bytes)
 
     def journal_admission(self) -> dict[str, object]:
-        return {
+        value = {
             "request_id": self.request_id,
             "admission_evidence_id": self.admission_evidence_id,
             "review_intent_id": self.review_intent_id,
@@ -168,9 +167,13 @@ class PreclaimAdmissionV3:
             "history_observation": json.loads(self.history_provenance_bytes),
             "reference_ids": list(self.reference_ids),
         }
+        if self.git_file_observations:
+            value["reference_admissions"] = [item.provenance_basis() | {"evidence_id": item.evidence_id}
+                                                for item in self.git_file_observations]
+        return value
 
 
-def _validate_admitted_subset(request: Mapping[str, object]) -> None:
+def _validate_admitted_subset(request: Mapping[str, object], *, allow_git_file: bool = False) -> None:
     operation = request["review_operation"]["kind"]
     if operation == "changed_head":
         raise AdmissionV3CandidateError("CHANGED_HEAD_ADMISSION_NOT_YET_QUALIFIED")
@@ -182,7 +185,7 @@ def _validate_admitted_subset(request: Mapping[str, object]) -> None:
         {"github_issue_body", "github_issue_comment"}
     ):
         raise AdmissionV3CandidateError("ATOMICITY_MUTABLE_REFERENCE_FORBIDDEN")
-    if remote:
+    if remote - ({"git_file"} if allow_git_file else set()):
         raise AdmissionV3CandidateError("REMOTE_SOURCE_ADMISSION_NOT_YET_QUALIFIED")
 
 
@@ -198,6 +201,7 @@ def admit_initial_inline_v3(
     pr_authority: PullRequestObservationAuthorityV3,
     source_authority: SourceRepositoryAuthorityV3,
     history_authority: InitialHistoryAuthorityV3,
+    git_file_readers: Mapping[str, GitHubGitFileReaderV3] | None = None,
 ) -> PreclaimAdmissionV3:
     """Admit no claim; return retained evidence for the bounded candidate subset."""
     if type(origin_reader) is not GitHubIssueOriginReaderV3:
@@ -246,7 +250,7 @@ def admit_initial_inline_v3(
     }
     request = parse_issue_envelope_v3(origin.body)
     request_id, intent_id = request_identity_v3(request), review_intent_identity_v3(request)
-    _validate_admitted_subset(request)
+    _validate_admitted_subset(request, allow_git_file=git_file_readers is not None)
     try:
         authorization = requester_authority.authorize(
             origin.requester_id, origin.issue_id, origin_evidence)
@@ -357,7 +361,7 @@ def admit_initial_inline_v3(
     reference_ids = tuple(reference["id"] for reference in request["references"])
     inline_bound = sum(
         inline_rendered_bound_v3(item["source"]["text"])
-        for item in request["references"])
+        for item in request["references"] if item["source"]["kind"] == "inline")
     if any(item.original_bytes > 2_000_000 for item in pr.subject_sources):
         raise AdmissionV3CandidateError("EVENTUAL_SUBJECT_SOURCE_BYTES_EXCEEDED")
     if len(pr.subject_sources) + len(reference_ids) > 999:
@@ -366,6 +370,11 @@ def admit_initial_inline_v3(
                 + len(canonical_bytes(request)) + 1_000_000)
     if eventual > 8_000_000:
         raise AdmissionV3CandidateError("EVENTUAL_RENDERED_PACKET_EXCEEDED")
+    try: observations = acquire_git_file_admissions_v3(
+        request, subject, git_file_readers, source_evidence, source.installation_id)
+    except GitFileAdmissionV3Error as exc: raise AdmissionV3CandidateError(str(exc)) from None
+    reference_admissions = [item.provenance_basis() | {"evidence_id": item.evidence_id}
+                            for item in observations]
     evidence_basis = {
         "schema_version": 1, "evidence_type": "review-request-v3-preclaim-admission",
         "request_id": request_id, "review_intent_id": intent_id,
@@ -377,6 +386,8 @@ def admit_initial_inline_v3(
         "history_scan_boundary": history.scan_boundary,
         "reference_ids": list(reference_ids),
     }
+    if reference_admissions:
+        evidence_basis["reference_admissions"] = reference_admissions
     return PreclaimAdmissionV3(
         canonical_bytes(request), request_id, intent_id, origin.issue_id,
         origin.requester_id, origin.requester_login, pr.repository,
@@ -384,5 +395,5 @@ def admit_initial_inline_v3(
         source_admission_id, reference_ids, body_bytes, canonical_bytes(origin_basis),
         canonical_bytes(source_basis), canonical_bytes(requester_receipt),
         canonical_bytes(history_receipt), origin_evidence, requester_evidence,
-        history_evidence, history.scan_boundary, _receipt_id(evidence_basis),
+        history_evidence, history.scan_boundary, _receipt_id(evidence_basis), observations,
     )

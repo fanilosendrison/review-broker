@@ -15,6 +15,7 @@ from .admission_evidence_v3 import validate_journal_admission_v3
 from .admission_v3 import PreclaimAdmissionV3
 from .changes import ChangeScopeError, build_change_basis, validate_change_scope
 from .identity import artifact_identity, canonical_bytes, packet_identity, subject_identity
+from .packet_v2_reference import build_reference_entries_v2
 from .packet_v2_renderer import RENDERER_ID, render_packet_v2_prompt
 from .packets import (
     GitSourceReader, MAX_PACKET_BYTES, MAX_SOURCE_BYTES, MAX_SOURCE_COUNT,
@@ -79,7 +80,8 @@ def _admission(admission: PreclaimAdmissionV3) -> tuple[dict[str, object], dict[
         _fail("PACKET_V2_ADMISSION_IDENTITY_MISMATCH")
     if request["review_operation"]["kind"] != "initial":
         _fail("PACKET_V2_OPERATION_NOT_QUALIFIED")
-    if any(item["source"]["kind"] != "inline" for item in request["references"]):
+    if any(item["source"]["kind"] not in {"inline", "git_file"}
+           for item in request["references"]):
         _fail("PACKET_V2_REMOTE_REFERENCE_NOT_QUALIFIED")
     return request, validated
 def _subject_basis(capture: SubjectCaptureV2) -> dict[str, object]:
@@ -195,26 +197,6 @@ def _subject_entries(capture: SubjectCaptureV2) -> tuple[list[dict[str, object]]
     except ChangeScopeError as exc:
         _fail(str(exc), exc)
     return entries, changes
-def _reference_entries(request: Mapping[str, object], start: int) -> tuple[list[dict[str, object]], list[dict[str, object]], list[bytes]]:
-    entries, outcomes, data = [], [], []
-    for offset, reference in enumerate(request["references"], start):
-        source_id, original = f"S{offset:03d}", reference["source"]["text"].encode("utf-8")
-        try:
-            encoding, _, mapping = decode_physical_lines(original)
-        except (UnicodeEncodeError, PhysicalLineError) as exc:
-            _fail("PACKET_V2_INLINE_MATERIALIZATION_INVALID", exc)
-        entry = {
-            "source_id": source_id, "reference_id": reference["id"],
-            "request_id": request_identity_v3(request), "role": "reference",
-            "required": reference["required"], "source_kind": "inline",
-            "sha256": hashlib.sha256(original).hexdigest(),
-            "original_byte_length": len(original), "encoding": encoding,
-            "physical_lines": list(mapping), "snapshot": f"sources/{source_id}.bin",
-        }
-        entries.append(entry)
-        outcomes.append({"id": reference["id"], "status": "captured", "source_id": source_id})
-        data.append(original)
-    return entries, outcomes, data
 def _technical_policy(profile: TechnicalProfileSnapshotV2) -> dict[str, object]:
     if (not isinstance(profile, TechnicalProfileSnapshotV2)
             or profile.verification != "SYNTHETIC_OFFLINE_VERIFIED"
@@ -253,8 +235,8 @@ def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCa
     request, _ = _admission(admission)
     _validate_capture(capture, admission, request, prove_local_git=True)
     subject_sources, changes = _subject_entries(capture)
-    reference_sources, outcomes, reference_data = _reference_entries(
-        request, len(subject_sources) + 1)
+    reference_sources, outcomes, reference_data = build_reference_entries_v2(
+        request, len(subject_sources) + 1, admission.git_file_observations)
     if len(subject_sources) + len(reference_sources) > MAX_SOURCE_COUNT:
         _fail("PACKET_V2_SOURCE_COUNT_EXCEEDED")
     policy = _technical_policy(profile); program = _program(request, policy)
@@ -348,7 +330,8 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
     request, _ = _admission(admission); _validate_capture(
         capture, admission, request, prove_local_git=False)
     expected_subject, expected_changes = _subject_entries(capture)
-    expected_references, expected_outcomes, _ = _reference_entries(request, len(expected_subject) + 1)
+    expected_references, expected_outcomes, _ = build_reference_entries_v2(
+        request, len(expected_subject) + 1, admission.git_file_observations)
     expected_change, _ = build_change_basis(expected_changes, expected_subject,
         merge_base=capture.merge_base_sha, head=capture.head_sha, diff=capture.diff)
     expected_change.update(diff_snapshot="changes.patch",
@@ -375,8 +358,15 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
         _, subject_lines[entry["source_id"]] = _read_snapshot(output_directory, entry, git=True)
     for entry, reference in zip(manifest["reference_sources"], request["references"]):
         data, reference_lines[entry["source_id"]] = _read_snapshot(output_directory, entry, git=False)
-        if data != reference["source"]["text"].encode("utf-8"):
+        selector = reference["source"]
+        if selector["kind"] == "inline" and data != selector["text"].encode("utf-8"):
             _fail("PACKET_V2_INLINE_REQUEST_MISMATCH")
+        if selector["kind"] == "git_file":
+            header = b"blob " + str(len(data)).encode() + b"\0" + data
+            if hashlib.sha1(header).hexdigest() != entry["git_blob_oid"]:
+                _fail("PACKET_V2_REFERENCE_GIT_BLOB_MISMATCH")
+            if selector.get("expected_sha256") not in {None, entry["sha256"]}:
+                _fail("PACKET_V2_REFERENCE_EXPECTED_DIGEST_MISMATCH")
     try: validate_change_scope(expected_changes, manifest["subject_sources"],
         merge_base=capture.merge_base_sha, head=capture.head_sha)
     except ChangeScopeError as exc: _fail(str(exc), exc)
