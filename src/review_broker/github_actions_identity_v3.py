@@ -117,7 +117,6 @@ class TrustedWorkerBindingV3(Protocol):
                       observation: GitHubActionsRunObservationV3) -> bool: ...
 class GitHubActionsIdentityReaderV3:
     """Confront a boundary-authenticated runtime claim with fresh run/job APIs."""
-
     def __init__(self, token: str, repository: str, repository_id: int, *,
                  executor: HttpExecutorV3 | None = None,
                  clock: ClockV3 | None = None):
@@ -224,7 +223,11 @@ class GitHubActionsIdentityReaderV3:
     def observe(self, claim: GitHubActionsRuntimeClaimV3,
                 expected: GitHubActionsExpectationV3,
                 boundary: TrustedExecutionBoundaryV3) -> GitHubActionsRunObservationV3:
-        if not boundary.authenticates(claim):
+        try:
+            boundary_verdict = boundary.authenticates(claim)
+        except Exception:
+            boundary_verdict = False
+        if type(boundary_verdict) is not bool or not boundary_verdict:
             raise GitHubActionsIdentityV3Error("TRUSTED_EXECUTION_BOUNDARY_REQUIRED")
         if (claim.repository != self.repository or expected.repository != self.repository
                 or claim.repository_id != self.repository_id

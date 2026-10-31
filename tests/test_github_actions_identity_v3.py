@@ -35,6 +35,17 @@ class Boundary:
         return self.trusted and claim == self.claim
 
 
+class InvalidBoundary:
+    def __init__(self, verdict: object, raises: bool = False):
+        self.verdict = verdict
+        self.raises = raises
+
+    def authenticates(self, claim: GitHubActionsRuntimeClaimV3) -> object:
+        if self.raises:
+            raise RuntimeError("untrusted boundary detail")
+        return self.verdict
+
+
 class ActionsApi:
     def __init__(self) -> None:
         self.run_attempt = RUN_ATTEMPT
@@ -128,6 +139,19 @@ class GitHubActionsIdentityV3Tests(unittest.TestCase):
         with self.assertRaisesRegex(GitHubActionsIdentityV3Error, "BOUNDARY_REQUIRED"):
             self.reader(api).observe(runtime, expectation(), Boundary(runtime, False))
         self.assertEqual(api.calls, [])
+
+    def test_boundary_requires_strict_boolean_and_sanitizes_exceptions(self) -> None:
+        runtime = claim()
+        for boundary in (InvalidBoundary(1), InvalidBoundary("true"),
+                         InvalidBoundary(None), InvalidBoundary(False, raises=True)):
+            with self.subTest(verdict=boundary.verdict, raises=boundary.raises):
+                api = ActionsApi()
+                with self.assertRaisesRegex(
+                    GitHubActionsIdentityV3Error, "BOUNDARY_REQUIRED"
+                ) as caught:
+                    self.reader(api).observe(runtime, expectation(), boundary)
+                self.assertNotIn("untrusted boundary detail", str(caught.exception))
+                self.assertEqual(api.calls, [])
 
     def test_spoofed_different_run_claim_is_rejected_before_api(self) -> None:
         trusted, spoofed, api = claim(), replace(claim(), run_id=9999), ActionsApi()
