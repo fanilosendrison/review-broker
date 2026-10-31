@@ -12,7 +12,9 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.head_ref == 'feat/issue51-v3-issue-references-20261101' &&
       github.base_ref == 'feat/issue51-v3-git-file-reference-20261101' &&
-      github.event.pull_request.user.login == 'fanilosendrison'
+      github.event.pull_request.user.login == 'fanilosendrison' &&
+      github.actor == 'fanilosendrison' &&
+      github.triggering_actor == 'fanilosendrison'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
