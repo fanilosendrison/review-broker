@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Versioned Successor Review Contracts — Design Draft"
-version: "0.3.0"
+version: "0.3.1"
 ---
 
 # Versioned Successor Review Contracts — Design Draft
@@ -565,6 +565,59 @@ Readback equality establishes the current target but does not alone prove which
 actor originated an identical commit; identity-bound evidence remains required
 before further journal advancement.
 
+#### Committed state, transition acceptance and actor authorization
+
+The future v3 journal has three distinct evidence categories. They are never
+interchangeable:
+
+1. **Authoritative committed state.** The broker authenticates the exact
+   repository, reads the deterministic v3 Git ref, verifies the referenced Git
+   commit and exact journal bytes, and strictly decodes the committed state.
+   The ref and its verified committed contents are authoritative. An assertion
+   supplied by a requester, controller or worker is not.
+2. **Transition acceptance.** For an existing ref, a complete successful
+   GraphQL `updateRefs` response for the exact `beforeOid`, `afterOid` and
+   `force=false`, followed by authenticated repository-identity-bound exact
+   readback, supports confirmation of the intended transition within the
+   trusted execution. For initial creation, the separately qualified REST
+   create-ref operation and corresponding exact readback provide the bounded
+   observation. The broker may construct a deterministic digest over these
+   retained observations as an evidence identifier. That digest is
+   broker-observed evidence, **not** a GitHub-signed mutation or writer
+   attestation.
+3. **Actor authorization.** Permission for a controller or worker to advance
+   the journal or cause an external effect is an independent obligation. The
+   broker must validate authenticated GitHub repository, workflow and run
+   metadata, the expected executable SHA, and the current journal reservation,
+   generation and worker binding. A Git author string, commit message,
+   `clientMutationId`, raw runner environment variable or possession of a
+   repository-writing token is not independently sufficient. Authenticated
+   GitHub Actions run metadata supports execution-identity checks; it does not
+   prove authorship of every Git mutation.
+
+Consequently, matching an observed target SHA to a locally proposed commit
+cannot identify which of two competing actors wrote it. A controller whose
+original dispatch-reservation CAS acknowledgement was lost cannot infer that
+it personally won from matching ref contents. Opaque GraphQL errors remain
+unattributed and do not create provider-typed expected-old rejection evidence.
+Missing committed-state, transition or actor evidence yields `UNRESOLVED` or an
+equivalent fail-closed refusal. An uncertain Git mutation is never
+subsequently repeated automatically, and an uncertain workflow-dispatch
+acknowledgement never permits automatic worker redispatch.
+
+Durable continuation, including after process restart, must reconstruct the
+required authority from retained qualified evidence and fresh authenticated
+observations or remain blocked; it cannot assume an in-memory successful
+response survived. The durable basis includes the authenticated original
+request/admission, exact repository ID and source identity, exact deterministic
+claim ref, current versioned journal and transition history, explicit
+reservation/generation and worker binding, independently validated workflow/run
+identity when actor authority is required, and confirmed current journal state
+before any Codespace effect. This distinction requires neither a
+provider-signed per-mutation certificate nor a new database, service, lock or
+ledger. A caller-generated hash never substitutes for authenticated execution
+authority.
+
 One mutation updates one v3 claim ref only. This design provides no cross-ref
 transaction guarantee and introduces no distributed lock, database, service or
 second ledger. Initial claim-ref creation remains a separate operation; its
@@ -695,6 +748,24 @@ Neither set of tests proves a deployed v3 gate or external
 worker/credential isolation. The original test receipt
 requiring complete run traces is an **overwide experimental
 candidate**, not necessarily the minimal future wire.
+
+### Explicit next implementation boundary
+
+A separately owner-authorized implementation tranche must qualify concrete
+adapters for all of the following before any operational v3 path is enabled:
+
+1. authenticated original request and admission evidence;
+2. GitHub Actions workflow/run identity and journal worker binding;
+3. committed-ref state and transition-observation evidence; and
+4. independent current-ref authorization at the pre-effect Codespace gate.
+
+Those adapters must preserve the distinction above: broker-observed receipts
+and their local evidence IDs are not GitHub-signed writer attestations. Actual
+shared Codespace physical ownership remains a separate unqualified boundary.
+No recovery generation 2, Codespace activation or authority-adapter
+implementation is authorized by this draft. The bounded transport qualification
+in PR #61 remains applicable within its stated scope and requires no repeated
+live CAS experiment for this clarification.
 
 ## 8. Result publication and applicability
 

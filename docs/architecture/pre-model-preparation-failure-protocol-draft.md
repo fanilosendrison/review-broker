@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Successor Pre-Model Preparation Failure Protocol"
-version: "0.2.0"
+version: "0.2.1"
 ---
 
 # Successor v3 — durable pre-model preparation outcomes
@@ -165,6 +165,50 @@ Readback equality alone does not prove which actor originated an identical
 commit. The journal history appends immutable versioned evidence-ID events on
 each accepted change. The mutation has no cross-ref transaction semantics and
 introduces no additional lock, database, service or ledger.
+
+### Authority and evidence boundary
+
+The v3 journal separates three obligations that must not be conflated:
+
+- **Authoritative committed state** is established only by authenticating the
+  repository, reading the exact deterministic v3 ref, verifying its Git commit
+  and exact journal bytes, and strictly decoding those committed bytes. A
+  requester, controller or worker assertion cannot replace that state.
+- **Transition acceptance** for an existing ref is bounded by a complete
+  successful one-entry GraphQL `updateRefs` response with exact `beforeOid`,
+  `afterOid` and `force=false`, followed by repository-identity-bound exact
+  readback. Initial creation uses the qualified REST create-ref operation and
+  exact readback. A locally computed digest over retained observations is an
+  evidence identifier only; it is not a GitHub-signed mutation or writer
+  attestation.
+- **Actor authorization** is independently validated from authenticated GitHub
+  repository, workflow and run metadata, the expected executable SHA, and the
+  current committed reservation, generation and worker binding. Git commit
+  authorship text, a commit message, `clientMutationId`, raw runner environment
+  variables and possession of a write-capable token are individually
+  insufficient. Actions run metadata supports execution-identity validation,
+  not proof of authorship for every Git mutation.
+
+Only an actor with independently validated current authorization may reach a
+model-capable or Codespace effect. The trusted pre-effect gate must therefore
+confirm the current journal state as well as source-code/journal identity and
+worker binding; a cached successful response or caller-generated digest is not
+authority. If a dispatch-reservation CAS acknowledgement was lost, matching
+ref contents do not prove that the observing controller was the writer. If two
+actors propose the same target, target equality does not attribute the write.
+Opaque GraphQL errors remain unattributed, and missing evidence produces
+`UNRESOLVED` or an equivalent fail-closed refusal.
+
+After restart, continuation must reconstruct authority from qualified retained
+evidence and authenticated observations: the original authenticated
+request/admission; exact repository ID and source identity; deterministic claim
+ref; current versioned journal and transition history; reservation, generation
+and worker binding; independently validated workflow/run identity where actor
+authorization is required; and a fresh confirmed journal state before any
+Codespace effect. No provider-signed per-mutation certificate, separate ledger,
+database, lock, authorization service or other distributed service is required.
+An uncertain Git mutation is never automatically repeated, and an uncertain
+workflow-dispatch acknowledgement never authorizes redispatch.
 
 ## 3. Dispatch reservation, winner and bounded retry policy
 
@@ -660,6 +704,16 @@ normative-contract acceptance and implementation/qualification.
 No existing v1/v2 source files, workflows, package schemas,
 test-run artifacts, app permissions, Codex credentials or results
 were modified by this proposal.
+
+The next separately authorized implementation tranche must qualify concrete
+adapters for: authenticated original request/admission evidence; GitHub Actions
+workflow/run identity and worker binding; committed-ref and
+transition-observation evidence; and independent current-ref authorization for
+the pre-effect Codespace gate. Broker-observed receipts must not be labeled as
+GitHub-signed writer attestations. Shared Codespace physical ownership remains
+separate and unqualified. This clarification introduces no recovery generation
+2 and does not authorize implementation, activation, Codespace access,
+inference or repetition of PR #61's bounded live CAS experiments.
 
 `PREMODEL_PROTOCOL_STATUS=PROPOSED_NOT_NORMATIVE`
 `DISPATCH_POLICY=AUTO_INITIAL_ONE_MANUAL_EXPLICIT_ONLY`
