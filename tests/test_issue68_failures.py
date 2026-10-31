@@ -1,7 +1,7 @@
 from dataclasses import replace
 import json,shutil,tempfile,unittest
 from pathlib import Path
-from tests.issue68_test_support import IntegratedScenario
+from tests.issue68_test_support import IntegratedScenario,TECHNICAL_POLICY_ID
 from tests.packet_v2_test_support import admitted,git_capture,profile,request_for_capture
 from tests.test_git_file_packet_v3 import git_ref
 from tests.test_github_git_file_v3 import Api as GitApi,reader as git_reader
@@ -45,47 +45,47 @@ class Issue68FailureTests(unittest.TestCase):
   scenario=self.scenario().complete();targets=["evidence/admitted-references/contract.bin","packet/sources/S001.bin","packet/changes.patch","packet/input.txt","packet/input-manifest.json","evidence/technical-profile.bin"]
   for relative in targets:
    with self.subTest(relative=relative):
-    copy=scenario.root/("tamper-"+relative.replace("/","-"));shutil.copytree(scenario.retention,copy);path=copy/relative;path.write_bytes(path.read_bytes()+b"x")
-    authority=RetainedPacketAuthorityV3(copy);self.assertFalse(authority.permits(snapshot=scenario.admitted_snapshot,packet_evidence_id=scenario.packet_evidence_id,reservation_id=scenario.admitted_snapshot.record.control.reservation_id,generation=1,worker=scenario.worker))
+    base=scenario.root/("tamper-"+relative.replace("/","-"));copy=base/scenario.retention.name;shutil.copytree(scenario.retention,copy);path=copy/relative;path.write_bytes(path.read_bytes()+b"x")
+    authority=RetainedPacketAuthorityV3(base,TECHNICAL_POLICY_ID);self.assertFalse(authority.permits(snapshot=scenario.admitted_snapshot,packet_evidence_id=scenario.packet_evidence_id,reservation_id=scenario.admitted_snapshot.record.control.reservation_id,generation=1,worker=scenario.worker))
  def test_I68_F11_forged_receipt_or_evidence_refuses_before_mutation(self):
   scenario=self.scenario().complete();before=len(scenario.transport.updates)
-  with self.assertRaises(GitHubJournalV3Error): scenario.journal.prepare(scenario.admitted_snapshot,"artifact:sha256:"+"0"*64,scenario.admitted_snapshot.record.control.reservation_id,1,scenario.worker,RetainedPacketAuthorityV3(scenario.retention))
+  with self.assertRaises(GitHubJournalV3Error): scenario.journal.prepare(scenario.admitted_snapshot,"artifact:sha256:"+"0"*64,scenario.admitted_snapshot.record.control.reservation_id,1,scenario.worker,RetainedPacketAuthorityV3(scenario.retention_base,TECHNICAL_POLICY_ID))
   self.assertEqual(len(scenario.transport.updates),before)
  def test_I68_F13_F14_stale_and_wrong_worker_are_fenced(self):
   scenario=self.scenario().complete();before=len(scenario.transport.updates)
-  stale=scenario.journal.prepare(scenario.admitted_snapshot,scenario.packet_evidence_id,scenario.admitted_snapshot.record.control.reservation_id,1,scenario.worker,RetainedPacketAuthorityV3(scenario.retention))
+  stale=scenario.journal.prepare(scenario.admitted_snapshot,scenario.packet_evidence_id,scenario.admitted_snapshot.record.control.reservation_id,1,scenario.worker,RetainedPacketAuthorityV3(scenario.retention_base,TECHNICAL_POLICY_ID))
   self.assertEqual(stale.status,OutcomeStatusV3.REJECTED)
   wrong=[("preparation-dispatch:sha256:"+"0"*64,1,scenario.worker),(scenario.admitted_snapshot.record.control.reservation_id,2,scenario.worker),(scenario.admitted_snapshot.record.control.reservation_id,1,WorkerIdentityV3(9,1))]
   for reservation,generation,worker in wrong:
-   with self.assertRaises(GitHubJournalV3Error): scenario.journal.prepare(scenario.admitted_snapshot,scenario.packet_evidence_id,reservation,generation,worker,RetainedPacketAuthorityV3(scenario.retention))
+   with self.assertRaises(GitHubJournalV3Error): scenario.journal.prepare(scenario.admitted_snapshot,scenario.packet_evidence_id,reservation,generation,worker,RetainedPacketAuthorityV3(scenario.retention_base,TECHNICAL_POLICY_ID))
   self.assertEqual(len(scenario.transport.updates),before+1)
  def test_I68_F15_F16_duplicate_reservation_and_discovery(self):
   from concurrent.futures import ThreadPoolExecutor
   scenario=self.scenario();claim=scenario._take("claim",scenario.journal.claim(scenario.request,scenario.journal_admission))
-  with ThreadPoolExecutor(max_workers=2) as pool: outcomes=list(pool.map(lambda _:scenario.journal.reserve_initial(claim),range(2)))
-  self.assertEqual([x.status for x in outcomes].count(OutcomeStatusV3.COMMITTED),1);self.assertEqual([x.status for x in outcomes].count(OutcomeStatusV3.REJECTED),1)
+  with ThreadPoolExecutor(max_workers=2) as pool: outcomes=list(pool.map(lambda _:scenario.reserve_and_dispatch_outcome(claim),range(2)))
+  self.assertEqual([x.status for x in outcomes].count(OutcomeStatusV3.COMMITTED),1);self.assertEqual([x.status for x in outcomes].count(OutcomeStatusV3.REJECTED),1);self.assertEqual(scenario.dispatches,1)
   duplicate=scenario.journal.claim(scenario.request,scenario.journal_admission);self.assertEqual(duplicate.status,OutcomeStatusV3.COMMITTED)
   self.assertEqual(scenario.transport.create_statuses.count(CreateRefStatusV3.CREATED),1);self.assertEqual(len(scenario.transport.updates),2)
  def test_I68_F17_F18_interruptions_do_not_report_prepared(self):
   scenario=self.scenario();admitted=scenario.through_admitted();self.assertEqual(scenario.journal.read(scenario.admission.request_id).record.attempt.state.value,"ADMITTED")
-  persist_packet_evidence_v3(scenario.admission,scenario.capture,profile(),scenario.root/"retained",scenario.issue_readers)
+  persist_packet_evidence_v3(scenario.admission,scenario.capture,profile(),scenario.root/"retained",admitted,scenario.issue_readers)
   self.assertEqual(scenario.journal.read(scenario.admission.request_id).record.attempt.state.value,"ADMITTED")
  def test_I68_F19_F20_ambiguous_CAS_never_blindly_retries(self):
   from review_broker.packet_preparation_authority_v3 import prepare_packet_receipt_v3
   for after_apply in (True,False):
-   scenario=self.scenario();current=scenario.through_admitted();scenario.retention=scenario.root/"retained";persist_packet_evidence_v3(scenario.admission,scenario.capture,profile(),scenario.retention,scenario.issue_readers);evidence=prepare_packet_receipt_v3(scenario.retention,current)
+   scenario=self.scenario();current=scenario.through_admitted();scenario.retention_base=scenario.root/"retained";persist_packet_evidence_v3(scenario.admission,scenario.capture,profile(),scenario.retention_base,current,scenario.issue_readers);evidence=prepare_packet_receipt_v3(scenario.retention_base,current,TECHNICAL_POLICY_ID)
    scenario.transport.graphql_error_after_apply=after_apply;scenario.transport.graphql_application_error=not after_apply
-   before=len(scenario.transport.updates);outcome=scenario.journal.prepare(current,evidence,current.record.control.reservation_id,1,scenario.worker,RetainedPacketAuthorityV3(scenario.retention))
+   before=len(scenario.transport.updates);outcome=scenario.journal.prepare(current,evidence,current.record.control.reservation_id,1,scenario.worker,RetainedPacketAuthorityV3(scenario.retention_base,TECHNICAL_POLICY_ID))
    self.assertEqual(outcome.status,OutcomeStatusV3.UNRESOLVED);self.assertEqual(len(scenario.transport.updates),before+1)
    self.assertEqual(scenario.journal.read(scenario.admission.request_id).record.attempt.state.value,"PREPARED" if after_apply else "ADMITTED")
  def test_I68_F21_F22_F23_F24_competing_recovery_and_postprepared_immutability(self):
   from review_broker.packet_preparation_authority_v3 import prepare_packet_receipt_v3
-  competing=self.scenario();current=competing.through_admitted();competing.retention=competing.root/"retained";persist_packet_evidence_v3(competing.admission,competing.capture,profile(),competing.retention,competing.issue_readers);evidence=prepare_packet_receipt_v3(competing.retention,current);competing.transport.competing_descendant_after_update=True
-  outcome=competing.journal.prepare(current,evidence,current.record.control.reservation_id,1,competing.worker,RetainedPacketAuthorityV3(competing.retention));self.assertEqual(outcome.status,OutcomeStatusV3.UNRESOLVED)
-  scenario=self.scenario().complete();before=len(scenario.transport.updates);first=verify_prepared_readback_v3(scenario.retention,scenario.prepared);second=verify_prepared_readback_v3(scenario.retention,scenario.prepared)
+  competing=self.scenario();current=competing.through_admitted();competing.retention_base=competing.root/"retained";persist_packet_evidence_v3(competing.admission,competing.capture,profile(),competing.retention_base,current,competing.issue_readers);evidence=prepare_packet_receipt_v3(competing.retention_base,current,TECHNICAL_POLICY_ID);competing.transport.competing_descendant_after_update=True
+  outcome=competing.journal.prepare(current,evidence,current.record.control.reservation_id,1,competing.worker,RetainedPacketAuthorityV3(competing.retention_base,TECHNICAL_POLICY_ID));self.assertEqual(outcome.status,OutcomeStatusV3.UNRESOLVED)
+  scenario=self.scenario().complete();before=len(scenario.transport.updates);first=verify_prepared_readback_v3(scenario.retention_base,scenario.prepared);second=verify_prepared_readback_v3(scenario.retention_base,scenario.prepared)
   self.assertEqual(first,second);self.assertEqual(len(scenario.transport.updates),before)
-  with self.assertRaises(Exception): persist_packet_evidence_v3(scenario.admission,scenario.capture,profile(),scenario.retention,scenario.issue_readers)
-  self.assertEqual(verify_prepared_readback_v3(scenario.retention,scenario.prepared)["packet_id"],scenario.manifest["packet_id"])
+  with self.assertRaises(Exception): persist_packet_evidence_v3(scenario.admission,scenario.capture,profile(),scenario.retention_base,scenario.admitted_snapshot,scenario.issue_readers)
+  self.assertEqual(verify_prepared_readback_v3(scenario.retention_base,scenario.prepared)["packet_id"],scenario.manifest["packet_id"])
  def test_I68_F25_historical_namespaces_and_v1_identity_unchanged(self):
   import inspect
   legacy=__import__("review_broker.github_journal",fromlist=["GitHubRefJournal"]).GitHubRefJournal

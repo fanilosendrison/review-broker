@@ -7,7 +7,7 @@ class Issue68RecoveryTests(unittest.TestCase):
  def tearDown(self): self.temporary.cleanup()
  def probe(self,retention=None,transport=None):
   environment={**os.environ,"PYTHONPATH":str(Path(__file__).parents[1])}
-  return subprocess.run([sys.executable,"-m","tests.issue68_reload_probe",str(retention or self.scenario.retention),str(transport or self.transport),self.request_id],text=True,capture_output=True,env=environment)
+  return subprocess.run([sys.executable,"-m","tests.issue68_reload_probe",str(retention or self.scenario.retention_base),str(transport or self.transport),self.request_id],text=True,capture_output=True,env=environment)
  def test_I68_N03_fresh_process_reconstructs_exact_prepared_packet(self):
   expected_packet=self.scenario.manifest["packet_id"];expected_evidence=self.scenario.packet_evidence_id
   del self.scenario.admission,self.scenario.capture,self.scenario.manifest,self.scenario.issue_readers,self.scenario.git_readers
@@ -19,10 +19,12 @@ class Issue68RecoveryTests(unittest.TestCase):
    ("request",lambda r:(r/"evidence/origin-body.bin").write_bytes(b"bad")),
    ("admission-reference",lambda r:(r/"evidence/admitted-references/contract.bin").write_bytes(b"bad")),
    ("receipt",lambda r:(r/"evidence/preparation-receipt.json").write_bytes(b"{}\n")),
-   ("manifest",lambda r:(r/"packet/input-manifest.json").write_bytes(b"{}\n"))]
+   ("manifest",lambda r:(r/"packet/input-manifest.json").write_bytes(b"{}\n")),
+   ("public-prompt-mode",lambda r:(r/"packet/input.txt").chmod(0o644)),
+   ("public-receipt-mode",lambda r:(r/"evidence/preparation-receipt.json").chmod(0o644))]
   for name,mutate in cases:
    with self.subTest(name=name):
-    copy=self.root/f"copy-{name}";shutil.copytree(self.scenario.retention,copy);mutate(copy);result=self.probe(copy);self.assertNotEqual(result.returncode,0)
+    base=self.root/f"copy-{name}";copy=base/self.scenario.retention.name;shutil.copytree(self.scenario.retention,copy);mutate(copy);result=self.probe(base);self.assertNotEqual(result.returncode,0)
  def test_altered_journal_and_missing_packet_fail_closed(self):
   missing=self.root/"missing";result=self.probe(missing);self.assertNotEqual(result.returncode,0)
   value=json.loads(self.transport.read_bytes());claim=next(iter(value["refs"]));sha=value["refs"][claim];value["commits"][sha]["parent_sha"]="0"*40
