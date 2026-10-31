@@ -1,0 +1,100 @@
+"""Private atomic retention and cold reconstruction of Reviewer Packet v2."""
+from __future__ import annotations
+from dataclasses import replace
+import hashlib,json,os,re,shutil,tempfile
+from pathlib import Path
+from typing import Mapping
+from .admission_evidence_v3 import validate_journal_admission_v3
+from .admission_v3 import PreclaimAdmissionV3
+from .github_git_file_v3 import GitHubGitFileObservationV3
+from .github_issue_reference_v3 import GitHubIssueReferenceObservationV3
+from .identity import artifact_identity,canonical_bytes
+from .packet_v2 import (SubjectCaptureV2,TechnicalProfileSnapshotV2,build_packet_v2_candidate,
+                        subject_capture_evidence_id_v2,verify_packet_v2_candidate)
+from .packets import SourceRecord
+
+class PacketRetentionV3Error(ValueError): pass
+_SAFE_ID=re.compile(r"[a-z][a-z0-9-]{0,63}\Z")
+def _exclusive(path:Path,data:bytes)->None:
+ path.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
+ fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+ with os.fdopen(fd,"wb") as stream: stream.write(data);stream.flush();os.fsync(stream.fileno())
+def _private_tree(root:Path)->None:
+ for path in [root,*root.rglob("*")]:
+  if path.is_symlink(): raise PacketRetentionV3Error("RETAINED_SYMLINK_FORBIDDEN")
+  os.chmod(path,0o700 if path.is_dir() else 0o600)
+def persist_packet_evidence_v3(admission:PreclaimAdmissionV3,capture:SubjectCaptureV2,
+ profile:TechnicalProfileSnapshotV2,retention_root:Path,issue_reference_readers:Mapping|None=None)->dict[str,object]:
+ """Build and verify in staging, then atomically expose one private retained tree."""
+ if retention_root.is_symlink() or retention_root.exists(): raise PacketRetentionV3Error("RETENTION_TARGET_EXISTS")
+ retention_root.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
+ staging=Path(tempfile.mkdtemp(prefix=".retained-v3-",dir=retention_root.parent))
+ try:
+  manifest=build_packet_v2_candidate(admission,capture,profile,staging/"packet",issue_reference_readers)
+  verify_packet_v2_candidate(staging/"packet",admission,capture,profile)
+  _exclusive(staging/"evidence/origin-body.bin",admission.origin_body_bytes)
+  _exclusive(staging/"evidence/technical-profile.bin",profile.original_bytes)
+  remote={item["id"]:item for item in admission.request["references"] if item["source"]["kind"]!="inline"}
+  git=iter(admission.git_file_observations);issues=iter(admission.issue_reference_observations)
+  for identifier,reference in remote.items():
+   if _SAFE_ID.fullmatch(identifier) is None: raise PacketRetentionV3Error("REFERENCE_ID_PATH_UNSAFE")
+   observation=next(git) if reference["source"]["kind"]=="git_file" else next(issues)
+   _exclusive(staging/f"evidence/admitted-references/{identifier}.bin",observation.original_bytes)
+  _private_tree(staging);os.replace(staging,retention_root)
+  return manifest
+ except BaseException:
+  shutil.rmtree(staging,ignore_errors=True);raise
+
+def _read_private(path:Path)->bytes:
+ if (path.is_symlink() or not path.is_file() or path.stat().st_mode & 0o077):
+  raise PacketRetentionV3Error("RETAINED_FILE_INVALID")
+ return path.read_bytes()
+def _git_observation(meta:dict[str,object],data:bytes)->GitHubGitFileObservationV3:
+ digest=hashlib.sha256(data).hexdigest();header=b"blob "+str(len(data)).encode()+b"\0"+data
+ if len(data)!=meta["original_byte_length"] or digest!=meta["sha256"] or hashlib.sha1(header).hexdigest()!=meta["git_blob_oid"]:
+  raise PacketRetentionV3Error("RETAINED_GIT_FILE_BYTES_MISMATCH")
+ value=GitHubGitFileObservationV3(meta["repository"],meta["repository_id"],meta["commit_sha"],meta["root_tree_sha"],meta["path"],meta["git_blob_oid"],data,len(data),digest,meta["observed_at"],meta["api_source"],meta["qualification"],meta["authority_evidence_id"],meta["installation_id"],meta["evidence_id"])
+ if artifact_identity(canonical_bytes(value.provenance_basis())+b"\n")!=value.evidence_id: raise PacketRetentionV3Error("RETAINED_GIT_FILE_EVIDENCE_MISMATCH")
+ return value
+def _issue_observation(meta:dict[str,object],data:bytes)->GitHubIssueReferenceObservationV3:
+ digest=hashlib.sha256(data).hexdigest()
+ if len(data)!=meta["original_byte_length"] or digest!=meta["sha256"]: raise PacketRetentionV3Error("RETAINED_ISSUE_BYTES_MISMATCH")
+ value=GitHubIssueReferenceObservationV3(meta["source_kind"],meta["repository"],meta["repository_id"],meta["selector_id"],meta["issue_id"],meta["issue_number"],meta["comment_id"],meta["author_id"],data,len(data),digest,meta["observed_at"],meta["updated_at"],meta["api_source"],meta["qualification"],meta["authority_evidence_id"],meta["installation_id"],meta["evidence_id"])
+ if artifact_identity(canonical_bytes(value.provenance_basis())+b"\n")!=value.evidence_id: raise PacketRetentionV3Error("RETAINED_ISSUE_EVIDENCE_MISMATCH")
+ return value
+
+def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,object])->tuple[PreclaimAdmissionV3,SubjectCaptureV2,TechnicalProfileSnapshotV2,dict[str,object]]:
+ """Cold-reconstruct verifier inputs from journal authority and retained bytes only."""
+ packet,evidence=retention_root/"packet",retention_root/"evidence"
+ if retention_root.is_symlink() or packet.is_symlink() or evidence.is_symlink(): raise PacketRetentionV3Error("RETAINED_SYMLINK_FORBIDDEN")
+ if ({item.name for item in retention_root.iterdir()}!={"packet","evidence"}
+  or retention_root.stat().st_mode&0o077 or packet.stat().st_mode&0o077 or evidence.stat().st_mode&0o077):
+  raise PacketRetentionV3Error("RETAINED_ROOT_INVENTORY_INVALID")
+ origin=_read_private(evidence/"origin-body.bin");validated=validate_journal_admission_v3(journal_admission,origin)
+ try: manifest=json.loads(_read_private(packet/"input-manifest.json"))
+ except (UnicodeError,json.JSONDecodeError) as exc: raise PacketRetentionV3Error("RETAINED_MANIFEST_INVALID") from exc
+ request=validated["canonical_request"];refs={item["id"]:item for item in request["references"] if item["source"]["kind"]!="inline"}
+ expected={"origin-body.bin","technical-profile.bin","admitted-references"}
+ if {item.name for item in evidence.iterdir()}-({"preparation-receipt.json"}|expected): raise PacketRetentionV3Error("RETAINED_EVIDENCE_INVENTORY_INVALID")
+ admitted_dir=evidence/"admitted-references";expected_files={f"{key}.bin" for key in refs}
+ if (admitted_dir.is_symlink() or not admitted_dir.is_dir() or admitted_dir.stat().st_mode&0o077
+  or {item.name for item in admitted_dir.iterdir()}!=expected_files):
+  raise PacketRetentionV3Error("RETAINED_REFERENCE_INVENTORY_INVALID")
+ git_meta=iter(validated.get("reference_admissions",[]));issue_meta=iter(validated.get("issue_reference_admissions",[]));git=[];issues=[]
+ for identifier,reference in refs.items():
+  data=_read_private(admitted_dir/f"{identifier}.bin")
+  if reference["source"]["kind"]=="git_file": git.append(_git_observation(next(git_meta),data))
+  else: issues.append(_issue_observation(next(issue_meta),data))
+ source=validated["source_observation"];origin_meta=validated["origin_observation"]
+ admission=PreclaimAdmissionV3(canonical_bytes(request),validated["request_id"],validated["review_intent_id"],validated["broker_issue_id"],validated["requester_id"],origin_meta["requester_login_observed"],source["repository"],source["repository_id"],source["pull_request"],source["pull_request_id"],source["head_sha"],validated["source_admission_id"],tuple(validated["reference_ids"]),origin,canonical_bytes(origin_meta),canonical_bytes(source),canonical_bytes(validated["requester_authorization"]),canonical_bytes(validated["history_observation"]),validated["origin_evidence_id"],validated["requester_authorization_evidence_id"],validated["history_evidence_id"],validated["history_scan_boundary"],validated["admission_evidence_id"],tuple(git),tuple(issues))
+ records=[]
+ for entry in manifest["subject_sources"]:
+  data=_read_private(packet/entry["snapshot"]);record=SourceRecord.from_bytes(entry["repository"],entry["commit"],entry["path"],entry["git_blob_oid"],data)
+  if hashlib.sha256(data).hexdigest()!=entry["sha256"]: raise PacketRetentionV3Error("RETAINED_SUBJECT_BYTES_MISMATCH")
+  records.append(record)
+ subject=manifest["subject"];capture=SubjectCaptureV2(subject["repository"],subject["repository_id"],subject["pull_request"],subject["pull_request_id"],subject["head_sha"],subject["base_sha"],subject["merge_base_sha"],tuple({"status":x["status"],"path":x["path"],"previous_path":x["previous_path"]} for x in manifest["change_scope"]["changes"]),tuple(records),_read_private(packet/"changes.patch"),subject["subject_capture_evidence_id"],Path("."),subject["capture_qualification"])
+ if subject_capture_evidence_id_v2(capture)!=capture.evidence_id: raise PacketRetentionV3Error("RETAINED_SUBJECT_EVIDENCE_MISMATCH")
+ profile_bytes=_read_private(evidence/"technical-profile.bin");name=manifest["technical_policy"]["basis"]["permission_profile_name"]
+ profile=TechnicalProfileSnapshotV2(name,name,profile_bytes,artifact_identity(profile_bytes),"SYNTHETIC_OFFLINE_VERIFIED")
+ verify_packet_v2_candidate(packet,admission,capture,profile)
+ return admission,capture,profile,manifest
