@@ -9,7 +9,12 @@ permissions:
 
 jobs:
   qualify:
-    if: github.head_ref == 'feat/issue51-v3-git-file-reference-20261101'
+    if: >-
+      github.repository == 'fanilosendrison/review-broker' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'feat/issue51-v3-git-file-reference-20261101' &&
+      github.base_ref == 'feat/issue51-v3-inline-reference-packet-v2-20261031' &&
+      github.event.pull_request.user.login == 'fanilosendrison'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
