@@ -49,9 +49,12 @@ class Issue68FailureTests(unittest.TestCase):
     authority=RetainedPacketAuthorityV3(base,TECHNICAL_POLICY_ID,scenario.capture.evidence_id);self.assertFalse(authority.permits(snapshot=scenario.admitted_snapshot,packet_evidence_id=scenario.packet_evidence_id,reservation_id=scenario.admitted_snapshot.record.control.reservation_id,generation=1,worker=scenario.worker))
  def test_I68_F11_forged_receipt_or_evidence_refuses_before_mutation(self):
   from review_broker.packet_preparation_authority_v3 import prepare_packet_receipt_v3
-  unbound=self.scenario();admitted=unbound.through_admitted();base=unbound.root/"retained";persist_packet_evidence_v3(unbound.admission,unbound.capture,profile(),base,admitted,unbound.issue_readers)
+  unbound=self.scenario();admitted=unbound.through_admitted();base=unbound.root/"retained";persist_packet_evidence_v3(unbound.admission,unbound.capture,profile(),base,admitted,unbound.journal,unbound.issue_readers)
   with self.assertRaisesRegex(PacketPreparationAuthorityV3Error,"SUBJECT_CAPTURE_IDENTITY_MISMATCH"): prepare_packet_receipt_v3(base,admitted,TECHNICAL_POLICY_ID,"artifact:sha256:"+"0"*64)
   scenario=self.scenario().complete();before=len(scenario.transport.updates)
+  receipt_path=scenario.retention/"evidence/preparation-receipt.json";original=receipt_path.read_bytes();forged=json.loads(original);forged["generation"]=True;receipt_path.write_bytes(canonical_bytes(forged)+b"\n")
+  forged_id=__import__("review_broker.identity",fromlist=["artifact_identity"]).artifact_identity(receipt_path.read_bytes())
+  self.assertFalse(RetainedPacketAuthorityV3(scenario.retention_base,TECHNICAL_POLICY_ID,scenario.capture.evidence_id).permits(snapshot=scenario.admitted_snapshot,packet_evidence_id=forged_id,reservation_id=scenario.admitted_snapshot.record.control.reservation_id,generation=1,worker=scenario.worker));receipt_path.write_bytes(original)
   with self.assertRaises(GitHubJournalV3Error): scenario.journal.prepare(scenario.admitted_snapshot,"artifact:sha256:"+"0"*64,scenario.admitted_snapshot.record.control.reservation_id,1,scenario.worker,RetainedPacketAuthorityV3(scenario.retention_base,TECHNICAL_POLICY_ID,scenario.capture.evidence_id))
   self.assertEqual(len(scenario.transport.updates),before)
  def test_I68_F13_F14_stale_and_wrong_worker_are_fenced(self):
@@ -71,23 +74,25 @@ class Issue68FailureTests(unittest.TestCase):
   self.assertEqual(scenario.transport.create_statuses.count(CreateRefStatusV3.CREATED),1);self.assertEqual(len(scenario.transport.updates),2)
  def test_I68_F17_F18_interruptions_do_not_report_prepared(self):
   scenario=self.scenario();admitted=scenario.through_admitted();self.assertEqual(scenario.journal.read(scenario.admission.request_id).record.attempt.state.value,"ADMITTED")
-  persist_packet_evidence_v3(scenario.admission,scenario.capture,profile(),scenario.root/"retained",admitted,scenario.issue_readers)
+  persist_packet_evidence_v3(scenario.admission,scenario.capture,profile(),scenario.root/"retained",admitted,scenario.journal,scenario.issue_readers)
   self.assertEqual(scenario.journal.read(scenario.admission.request_id).record.attempt.state.value,"ADMITTED")
  def test_I68_F19_F20_ambiguous_CAS_never_blindly_retries(self):
   from review_broker.packet_preparation_authority_v3 import prepare_packet_receipt_v3
   for after_apply in (True,False):
-   scenario=self.scenario();current=scenario.through_admitted();scenario.retention_base=scenario.root/"retained";persist_packet_evidence_v3(scenario.admission,scenario.capture,profile(),scenario.retention_base,current,scenario.issue_readers);evidence=prepare_packet_receipt_v3(scenario.retention_base,current,TECHNICAL_POLICY_ID,scenario.capture.evidence_id)
+   scenario=self.scenario();current=scenario.through_admitted();scenario.retention_base=scenario.root/"retained";persist_packet_evidence_v3(scenario.admission,scenario.capture,profile(),scenario.retention_base,current,scenario.journal,scenario.issue_readers);evidence=prepare_packet_receipt_v3(scenario.retention_base,current,TECHNICAL_POLICY_ID,scenario.capture.evidence_id)
    scenario.transport.graphql_error_after_apply=after_apply;scenario.transport.graphql_application_error=not after_apply
    before=len(scenario.transport.updates);outcome=scenario.journal.prepare(current,evidence,current.record.control.reservation_id,1,scenario.worker,RetainedPacketAuthorityV3(scenario.retention_base,TECHNICAL_POLICY_ID,scenario.capture.evidence_id))
    self.assertEqual(outcome.status,OutcomeStatusV3.UNRESOLVED);self.assertEqual(len(scenario.transport.updates),before+1)
    self.assertEqual(scenario.journal.read(scenario.admission.request_id).record.attempt.state.value,"PREPARED" if after_apply else "ADMITTED")
  def test_I68_F21_F22_F23_F24_competing_recovery_and_postprepared_immutability(self):
   from review_broker.packet_preparation_authority_v3 import prepare_packet_receipt_v3
-  competing=self.scenario();current=competing.through_admitted();competing.retention_base=competing.root/"retained";persist_packet_evidence_v3(competing.admission,competing.capture,profile(),competing.retention_base,current,competing.issue_readers);evidence=prepare_packet_receipt_v3(competing.retention_base,current,TECHNICAL_POLICY_ID,competing.capture.evidence_id);competing.transport.competing_descendant_after_update=True
+  competing=self.scenario();current=competing.through_admitted();competing.retention_base=competing.root/"retained";persist_packet_evidence_v3(competing.admission,competing.capture,profile(),competing.retention_base,current,competing.journal,competing.issue_readers);evidence=prepare_packet_receipt_v3(competing.retention_base,current,TECHNICAL_POLICY_ID,competing.capture.evidence_id);competing.transport.competing_descendant_after_update=True
   outcome=competing.journal.prepare(current,evidence,current.record.control.reservation_id,1,competing.worker,RetainedPacketAuthorityV3(competing.retention_base,TECHNICAL_POLICY_ID,competing.capture.evidence_id));self.assertEqual(outcome.status,OutcomeStatusV3.UNRESOLVED)
   scenario=self.scenario().complete();before=len(scenario.transport.updates);first=verify_prepared_readback_v3(scenario.retention_base,scenario.prepared);second=verify_prepared_readback_v3(scenario.retention_base,scenario.prepared)
   self.assertEqual(first,second);self.assertEqual(len(scenario.transport.updates),before)
-  with self.assertRaises(Exception): persist_packet_evidence_v3(scenario.admission,scenario.capture,profile(),scenario.retention_base,scenario.admitted_snapshot,scenario.issue_readers)
+  backup=scenario.root/"retained-backup";shutil.move(scenario.retention,backup)
+  with self.assertRaisesRegex(PacketRetentionV3Error,"CURRENT_ADMITTED"): persist_packet_evidence_v3(scenario.admission,scenario.capture,profile(),scenario.retention_base,scenario.admitted_snapshot,scenario.journal,scenario.issue_readers)
+  shutil.move(backup,scenario.retention)
   self.assertEqual(verify_prepared_readback_v3(scenario.retention_base,scenario.prepared)["packet_id"],scenario.manifest["packet_id"])
  def test_I68_F25_historical_namespaces_and_v1_identity_unchanged(self):
   import inspect

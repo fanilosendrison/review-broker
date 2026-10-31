@@ -60,8 +60,11 @@ directory contains the original request
 body, technical-profile bytes, admission-time remote-reference bytes, and the
 exclusive preparation receipt. Construction occurs in a private staging tree,
 verification precedes publication, and one same-filesystem rename exposes the
-complete tree. Existing claim locators, symlinks, unsafe identifiers, non-owner file modes,
-missing entries, extra entries, changed bytes, and receipt rewrites fail closed.
+complete tree. Before any source reader is invoked, persistence performs an authoritative
+journal read and requires its exact commit to remain the supplied `ADMITTED`
+snapshot. Existing claim locators, stale snapshots, symlinks, unsafe identifiers,
+non-owner file modes, missing entries, extra entries, changed bytes, and receipt
+rewrites fail closed.
 The packet authority is configured with the retention base, expected technical-
 policy identity, and independently captured subject-evidence identity; none is
 selected from packet-controlled metadata. A coordinated pre-receipt rewrite of
@@ -141,7 +144,7 @@ has no remote reader and the retained target cannot be overwritten.
 | I68-F08 | PASS | Changed Git-file bytes or blob identity fails cold authority. |
 | I68-F09 | PASS | Changed subject image or diff fails packet authority. |
 | I68-F10 | PASS | Changed manifest, prompt, or snapshot fails packet authority. |
-| I68-F11 | PASS | Forged receipt/evidence refuses PREPARED before mutation. |
+| I68-F11 | PASS | Forged receipt/evidence, including JSON boolean/integer aliasing, refuses PREPARED before mutation. |
 | I68-F12 | PASS | Missing or changed technical profile fails reconstruction. |
 | I68-F13 | PASS | Stale expected-old update is rejected. |
 | I68-F14 | PASS | Wrong reservation, generation, or worker is fenced. |
@@ -153,7 +156,7 @@ has no remote reader and the retained target cannot be overwritten.
 | I68-F20 | PASS | Unconfirmed ambiguous mutation remains UNRESOLVED without retry. |
 | I68-F21 | PASS | Competing descendant remains UNRESOLVED and cannot inherit authority. |
 | I68-F22 | PASS | Repeated confirmed recovery is read-only and identity-stable. |
-| I68-F23 | PASS | Post-PREPARED overwrite/reacquisition is rejected. |
+| I68-F23 | PASS | Fresh journal read rejects stale-ADMITTED post-PREPARED reacquisition even after retained-directory removal. |
 | I68-F24 | PASS | Later mutable bytes do not alter the committed retained packet. |
 | I68-F25 | PASS | Historical namespace and full v1/v2 regression behavior remain unchanged. |
 
