@@ -52,8 +52,8 @@ class IntegratedScenario:
  def complete(self,*,preparation_body="new body",preparation_comment="new comment"):
   admitted_snapshot=self.through_admitted();self.admitted_snapshot=admitted_snapshot;fresh={"requirement":issue_reader(IssueApi(body=preparation_body)),"decision":issue_reader(IssueApi(body=preparation_comment))}
   self.retention_base=self.root/"retained";self.retention=packet_retention_locator_v3(self.retention_base,admitted_snapshot.claim_ref);self.manifest=persist_packet_evidence_v3(self.admission,self.capture,profile(),self.retention_base,admitted_snapshot,self.journal,fresh)
-  self.packet_evidence_id=prepare_packet_receipt_v3(self.retention_base,admitted_snapshot,TECHNICAL_POLICY_ID,self.capture.evidence_id)
-  prepared=self._take("prepare",self.journal.prepare(admitted_snapshot,self.packet_evidence_id,admitted_snapshot.record.control.reservation_id,1,self.worker,RetainedPacketAuthorityV3(self.retention_base,TECHNICAL_POLICY_ID,self.capture.evidence_id)),admitted_snapshot)
+  self.packet_evidence_id=prepare_packet_receipt_v3(self.retention_base,admitted_snapshot,TECHNICAL_POLICY_ID,self.capture.evidence_id,self.manifest["packet_id"])
+  prepared=self._take("prepare",self.journal.prepare(admitted_snapshot,self.packet_evidence_id,admitted_snapshot.record.control.reservation_id,1,self.worker,RetainedPacketAuthorityV3(self.retention_base,TECHNICAL_POLICY_ID,self.capture.evidence_id,self.manifest["packet_id"])),admitted_snapshot)
   self.prepared=self.journal.read(self.admission.request_id);assert self.prepared.commit_sha==prepared.commit_sha
   self.verified=verify_prepared_readback_v3(self.retention_base,self.prepared);return self
  def save_transport(self,path:Path):

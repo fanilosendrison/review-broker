@@ -66,8 +66,9 @@ snapshot. Existing claim locators, stale snapshots, symlinks, unsafe identifiers
 non-owner file modes, missing entries, extra entries, changed bytes, and receipt
 rewrites fail closed.
 The packet authority is configured with the retention base, expected technical-
-policy identity, and independently captured subject-evidence identity; none is
-selected from packet-controlled metadata. A coordinated pre-receipt rewrite of
+policy identity, independently captured subject-evidence identity, and the
+packet ID returned by the protected persistence operation; none is selected
+later from retained packet-controlled metadata. A coordinated pre-receipt rewrite of
 the diff, manifest, prompt, packet ID, and recomputed capture evidence therefore
 cannot authorize PREPARED because it cannot match the external expected capture
 identity.
@@ -144,7 +145,7 @@ has no remote reader and the retained target cannot be overwritten.
 | I68-F08 | PASS | Changed Git-file bytes or blob identity fails cold authority. |
 | I68-F09 | PASS | Changed subject image or diff fails packet authority. |
 | I68-F10 | PASS | Changed manifest, prompt, or snapshot fails packet authority. |
-| I68-F11 | PASS | Forged receipt/evidence, including JSON boolean/integer aliasing, refuses PREPARED before mutation. |
+| I68-F11 | PASS | Forged receipt/evidence, boolean/integer aliasing, or a changed externally expected packet ID refuses PREPARED before mutation. |
 | I68-F12 | PASS | Missing or changed technical profile fails reconstruction. |
 | I68-F13 | PASS | Stale expected-old update is rejected. |
 | I68-F14 | PASS | Wrong reservation, generation, or worker is fenced. |
