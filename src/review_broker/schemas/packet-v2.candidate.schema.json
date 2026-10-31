@@ -89,17 +89,23 @@
       "required": ["source_id", "reference_id", "request_id", "role", "required", "source_kind", "sha256", "original_byte_length", "encoding", "physical_lines", "snapshot"],
       "properties": {
         "source_id": {"$ref": "#/$defs/sourceId"}, "reference_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
-        "request_id": {"$ref": "#/$defs/requestId"}, "role": {"const": "reference"}, "required": {"type": "boolean"}, "source_kind": {"enum": ["inline", "git_file"]},
+        "request_id": {"$ref": "#/$defs/requestId"}, "role": {"const": "reference"}, "required": {"type": "boolean"}, "source_kind": {"enum": ["inline", "git_file", "github_issue_body", "github_issue_comment"]},
         "sha256": {"$ref": "#/$defs/digest"}, "original_byte_length": {"type": "integer", "minimum": 0, "maximum": 2000000},
         "encoding": {"enum": ["utf-8", "utf-8-sig"]}, "physical_lines": {"type": "array", "items": {"$ref": "#/$defs/physicalLine"}},
         "snapshot": {"type": "string", "pattern": "^sources/S[0-9]{3}\\.bin$"},
         "repository": {"type": "string", "minLength": 1}, "repository_id": {"type": "integer", "minimum": 1},
         "commit": {"$ref": "#/$defs/sha"}, "path": {"type": "string", "minLength": 1}, "root_tree_sha": {"$ref": "#/$defs/sha"},
-        "git_blob_oid": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "provenance_evidence_id": {"$ref": "#/$defs/artifactId"}
+        "git_blob_oid": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "provenance_evidence_id": {"$ref": "#/$defs/artifactId"},
+        "selector_id": {"type": "integer", "minimum": 1}, "issue_id": {"type": "integer", "minimum": 1},
+        "issue_number": {"type": "integer", "minimum": 1}, "comment_id": {"type": ["integer", "null"]},
+        "author_id": {"type": "integer", "minimum": 1}, "updated_at": {"type": "string", "minLength": 1},
+        "observed_at": {"type": "string", "minLength": 1}, "qualification": {"enum": ["AUTHENTICATED_READ_ONLY", "SAME_REPOSITORY_ACTIONS_QUALIFICATION"]},
+        "authority_evidence_id": {"$ref": "#/$defs/artifactId"}, "installation_id": {"type": "integer", "minimum": 1}
       },
-      "allOf": [{"if": {"properties": {"source_kind": {"const": "git_file"}}},
-        "then": {"required": ["repository", "repository_id", "commit", "path", "root_tree_sha", "git_blob_oid", "provenance_evidence_id"]},
-        "else": {"not": {"anyOf": [{"required": ["repository"]}, {"required": ["repository_id"]}, {"required": ["commit"]}, {"required": ["path"]}, {"required": ["root_tree_sha"]}, {"required": ["git_blob_oid"]}, {"required": ["provenance_evidence_id"]}]}}}]
+      "allOf": [
+        {"if": {"properties": {"source_kind": {"const": "git_file"}}}, "then": {"required": ["repository", "repository_id", "commit", "path", "root_tree_sha", "git_blob_oid", "provenance_evidence_id"]}},
+        {"if": {"properties": {"source_kind": {"enum": ["github_issue_body", "github_issue_comment"]}}}, "then": {"required": ["repository", "repository_id", "selector_id", "issue_id", "issue_number", "comment_id", "author_id", "updated_at", "observed_at", "qualification", "authority_evidence_id", "installation_id", "provenance_evidence_id"]}}
+      ]
     },
     "referenceOutcome": {
       "type": "object", "additionalProperties": false, "required": ["id", "status", "source_id"],

@@ -24,7 +24,7 @@ def build_reference_entries_v2(request: Mapping[str, object], start: int,
             header = b"blob " + str(len(original)).encode() + b"\0" + original
             if (len(original) != observed.original_byte_length
                     or hashlib.sha256(original).hexdigest() != observed.sha256
-                    or hashlib.sha1(header).hexdigest() != observed.git_blob_oid):
+                    or (selector["kind"]=="git_file" and hashlib.sha1(header).hexdigest() != observed.git_blob_oid)):
                 raise PacketV2ReferenceError("PACKET_V2_GIT_FILE_OBSERVATION_BYTES_MISMATCH")
         try: encoding, _, mapping = decode_physical_lines(original)
         except (UnicodeEncodeError, PhysicalLineError) as exc: raise PacketV2ReferenceError("PACKET_V2_REFERENCE_MATERIALIZATION_INVALID") from exc
@@ -33,10 +33,19 @@ def build_reference_entries_v2(request: Mapping[str, object], start: int,
             "required": reference["required"], "source_kind": selector["kind"],
             "sha256": hashlib.sha256(original).hexdigest(), "original_byte_length": len(original),
             "encoding": encoding, "physical_lines": list(mapping), "snapshot": f"sources/{source_id}.bin"}
-        if observed is not None:
+        if observed is not None and selector["kind"]=="git_file":
             entry.update(repository=observed.repository, repository_id=observed.repository_id,
                 commit=observed.commit_sha, path=observed.path, root_tree_sha=observed.root_tree_sha,
                 git_blob_oid=observed.git_blob_oid, provenance_evidence_id=observed.evidence_id)
+        if observed is not None and selector["kind"] in {"github_issue_body","github_issue_comment"}:
+            entry.update(repository=observed.repository, repository_id=observed.repository_id,
+                selector_id=observed.selector_id, issue_id=observed.issue_id,
+                issue_number=observed.issue_number, comment_id=observed.comment_id,
+                author_id=observed.author_id, updated_at=observed.updated_at,
+                observed_at=observed.observed_at, qualification=observed.qualification,
+                authority_evidence_id=observed.authority_evidence_id,
+                installation_id=observed.installation_id,
+                provenance_evidence_id=observed.evidence_id)
         entries.append(entry); outcomes.append({"id": reference["id"], "status": "captured", "source_id": source_id}); data.append(original)
     if remote_index != len(observations): raise PacketV2ReferenceError("PACKET_V2_GIT_FILE_OBSERVATION_INVENTED")
     return entries, outcomes, data

@@ -14,7 +14,9 @@ from jsonschema import Draft202012Validator
 from .admission_evidence_v3 import validate_journal_admission_v3
 from .admission_v3 import PreclaimAdmissionV3
 from .changes import ChangeScopeError, build_change_basis, validate_change_scope
+from .github_issue_reference_v3 import GitHubIssueReferenceReaderV3
 from .identity import artifact_identity, canonical_bytes, packet_identity, subject_identity
+from .issue_reference_preparation_v3 import prepare_ordered_remote_observations_v3, retained_ordered_remote_observations_v3
 from .packet_v2_reference import build_reference_entries_v2
 from .packet_v2_renderer import RENDERER_ID, render_packet_v2_prompt
 from .packets import (
@@ -80,7 +82,7 @@ def _admission(admission: PreclaimAdmissionV3) -> tuple[dict[str, object], dict[
         _fail("PACKET_V2_ADMISSION_IDENTITY_MISMATCH")
     if request["review_operation"]["kind"] != "initial":
         _fail("PACKET_V2_OPERATION_NOT_QUALIFIED")
-    if any(item["source"]["kind"] not in {"inline", "git_file"}
+    if any(item["source"]["kind"] not in {"inline", "git_file", "github_issue_body", "github_issue_comment"}
            for item in request["references"]):
         _fail("PACKET_V2_REMOTE_REFERENCE_NOT_QUALIFIED")
     return request, validated
@@ -229,14 +231,15 @@ def _exclusive(path: Path, data: bytes) -> None:
     except BaseException:
         path.unlink(missing_ok=True); raise
 def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCaptureV2,
-                              profile: TechnicalProfileSnapshotV2,
-                              output_directory: Path) -> dict[str, object]:
+                              profile: TechnicalProfileSnapshotV2, output_directory: Path,
+                              issue_reference_readers: Mapping[str, GitHubIssueReferenceReaderV3] | None = None) -> dict[str, object]:
     """Build atomically without network, execution, inference, or publication."""
     request, _ = _admission(admission)
     _validate_capture(capture, admission, request, prove_local_git=True)
     subject_sources, changes = _subject_entries(capture)
+    remote=prepare_ordered_remote_observations_v3(request,admission,issue_reference_readers)
     reference_sources, outcomes, reference_data = build_reference_entries_v2(
-        request, len(subject_sources) + 1, admission.git_file_observations)
+        request, len(subject_sources) + 1, tuple(remote))
     if len(subject_sources) + len(reference_sources) > MAX_SOURCE_COUNT:
         _fail("PACKET_V2_SOURCE_COUNT_EXCEEDED")
     policy = _technical_policy(profile); program = _program(request, policy)
@@ -310,7 +313,8 @@ def _read_snapshot(directory: Path, entry: Mapping[str, object], *, git: bool) -
             _fail("PACKET_V2_GIT_BLOB_MISMATCH")
     return data, lines
 def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmissionV3,
-                               capture: SubjectCaptureV2, profile: TechnicalProfileSnapshotV2) -> dict[str, object]:
+                               capture: SubjectCaptureV2, profile: TechnicalProfileSnapshotV2,
+                               issue_reference_observations: tuple[object,...]=()) -> dict[str, object]:
     """Independently reconstruct every candidate packet identity and byte."""
     manifest_path, prompt_path = output_directory / "input-manifest.json", output_directory / "input.txt"
     if (output_directory.is_symlink() or (output_directory / "sources").is_symlink()
@@ -330,8 +334,9 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
     request, _ = _admission(admission); _validate_capture(
         capture, admission, request, prove_local_git=False)
     expected_subject, expected_changes = _subject_entries(capture)
+    remote=retained_ordered_remote_observations_v3(request,admission,issue_reference_observations)
     expected_references, expected_outcomes, _ = build_reference_entries_v2(
-        request, len(expected_subject) + 1, admission.git_file_observations)
+        request, len(expected_subject) + 1, tuple(remote))
     expected_change, _ = build_change_basis(expected_changes, expected_subject,
         merge_base=capture.merge_base_sha, head=capture.head_sha, diff=capture.diff)
     expected_change.update(diff_snapshot="changes.patch",
