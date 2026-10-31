@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import os
 import subprocess
 
 from tests.request_v3_test_support import (
@@ -59,13 +60,17 @@ def git_capture(root: Path) -> SubjectCaptureV2:
     subprocess.run(["git", "init", "-q", "-b", "main", str(repository)], check=True)
     subprocess.run(["git", "-C", str(repository), "config", "user.email", "test@example.invalid"], check=True)
     subprocess.run(["git", "-C", str(repository), "config", "user.name", "Test"], check=True)
+    commit_environment = {**os.environ, "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
+                          "GIT_COMMITTER_DATE": "2026-01-01T00:00:00Z"}
     (repository / "review.md").write_bytes(b"before\r\n")
     subprocess.run(["git", "-C", str(repository), "add", "."], check=True)
-    subprocess.run(["git", "-C", str(repository), "commit", "-q", "-m", "base"], check=True)
+    subprocess.run(["git", "-C", str(repository), "commit", "-q", "-m", "base"], check=True,
+                   env=commit_environment)
     base = subprocess.check_output(["git", "-C", str(repository), "rev-parse", "HEAD"], text=True).strip()
     (repository / "review.md").write_bytes(b"after\n")
     subprocess.run(["git", "-C", str(repository), "add", "."], check=True)
-    subprocess.run(["git", "-C", str(repository), "commit", "-q", "-m", "head"], check=True)
+    subprocess.run(["git", "-C", str(repository), "commit", "-q", "-m", "head"], check=True,
+                   env=commit_environment)
     head = subprocess.check_output(["git", "-C", str(repository), "rev-parse", "HEAD"], text=True).strip()
     reader = GitSourceReader(repository)
     records = (
