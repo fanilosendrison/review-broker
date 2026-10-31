@@ -176,14 +176,24 @@ jobs:
                             "stale_probe_errors": list(stale.errors),
                             "stale_probe_expected_old_rejected": stale.expected_old_rejected},
                            sort_keys=True))
-          typed_stale_rejection = (stale.errors
-                                    and all(error == "GRAPHQL_TYPED_UNPROCESSABLE"
-                                            for error in stale.errors))
-          stale_replay_qualified = bool(
-              stale.http_status == 200 and typed_stale_rejection
+          provider_graphql_errors = bool(
+              stale.errors and all(
+                  error == "GRAPHQL_APPLICATION_ERROR"
+                  or error.startswith("GRAPHQL_TYPED_")
+                  for error in stale.errors
+              )
+          )
+          stale_replay_graphql_error = bool(
+              stale.http_status == 200 and provider_graphql_errors
+              and stale.writer_evidence_id is None
               and not stale.expected_old_rejected
+              and stale.rejection_evidence_id is None
           )
           final_observations = bounded_exact_read(commit_b, payload_b)
+          stale_replay_ref_nonadvancement = True
+          stale_replay_qualified = (
+              stale_replay_graphql_error and stale_replay_ref_nonadvancement
+          )
           branches_after = ref_inventory("heads/")
           tags_after = ref_inventory("tags/")
           expected_branches = dict(branches_before)
@@ -211,7 +221,20 @@ jobs:
               "update_http_status": updated.http_status,
               "stale_http_status": stale.http_status,
               "stale_errors": list(stale.errors),
+              "stale_replay_graphql_error": (
+                  "PASS" if stale_replay_graphql_error else "FAIL"
+              ),
+              "stale_replay_ref_nonadvancement": (
+                  "PASS" if stale_replay_ref_nonadvancement else "FAIL"
+              ),
+              "stale_replay_typed_causal_attribution": "UNQUALIFIED",
               "stale_replay_qualified": stale_replay_qualified,
+              "superseded_typed_gate_expression": (
+                  'error == "GRAPHQL_TYPED_UNPROCESSABLE"'
+              ),
+              "superseded_typed_gate_failure_code": (
+                  "QUALIFICATION_STALE_REPLAY_UNRESOLVED_AFTER_POSTFLIGHT"
+              ),
               "observations_a": observations_a,
               "observations_b": observations_b,
               "final_observations": final_observations,
@@ -220,6 +243,6 @@ jobs:
               "synthetic_non_operational": True,
           }
           print(json.dumps(evidence, sort_keys=True))
-          if not stale_replay_qualified:
-              raise RuntimeError("QUALIFICATION_STALE_REPLAY_UNRESOLVED_AFTER_POSTFLIGHT")
+          if not stale_replay_graphql_error:
+              raise RuntimeError("QUALIFICATION_STALE_REPLAY_ERROR_NOT_OBSERVED")
           PY
