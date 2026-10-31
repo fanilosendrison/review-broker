@@ -600,10 +600,12 @@ cannot identify which of two competing actors wrote it. A controller whose
 original dispatch-reservation CAS acknowledgement was lost cannot infer that
 it personally won from matching ref contents. Opaque GraphQL errors remain
 unattributed and do not create provider-typed expected-old rejection evidence.
-Missing committed-state, transition or actor evidence yields `UNRESOLVED` or an
-equivalent fail-closed refusal. An uncertain Git mutation is never
-subsequently repeated automatically, and an uncertain workflow-dispatch
-acknowledgement never permits automatic worker redispatch.
+Missing committed-state, transition or actor evidence creates no new state,
+disposition, field or receipt class. Advancement fails closed; where a claim
+exists, retain the already-defined `BLOCKED` disposition with `UNKNOWN`
+evidence semantics. An uncertain Git mutation is never subsequently repeated
+automatically, and an uncertain workflow-dispatch acknowledgement never
+permits automatic worker redispatch.
 
 Durable continuation, including after process restart, must reconstruct the
 required authority from retained qualified evidence and fresh authenticated

@@ -196,8 +196,10 @@ worker binding; a cached successful response or caller-generated digest is not
 authority. If a dispatch-reservation CAS acknowledgement was lost, matching
 ref contents do not prove that the observing controller was the writer. If two
 actors propose the same target, target equality does not attribute the write.
-Opaque GraphQL errors remain unattributed, and missing evidence produces
-`UNRESOLVED` or an equivalent fail-closed refusal.
+Opaque GraphQL errors remain unattributed. Missing evidence creates no new
+state, disposition, field or receipt class. Advancement fails closed; where a
+claim exists, retain the already-defined `BLOCKED` disposition with `UNKNOWN`
+evidence semantics.
 
 After restart, continuation must reconstruct authority from qualified retained
 evidence and authenticated observations: the original authenticated
