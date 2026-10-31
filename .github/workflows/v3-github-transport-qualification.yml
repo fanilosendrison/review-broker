@@ -172,6 +172,10 @@ jobs:
           observations_b = bounded_exact_read(commit_b, payload_b)
 
           stale = transport.update_ref(update)
+          print(json.dumps({"stale_probe_http_status": stale.http_status,
+                            "stale_probe_errors": list(stale.errors),
+                            "stale_probe_expected_old_rejected": stale.expected_old_rejected},
+                           sort_keys=True))
           typed_stale_rejection = (stale.errors
                                     and all(error == "GRAPHQL_TYPED_UNPROCESSABLE"
                                             for error in stale.errors))
