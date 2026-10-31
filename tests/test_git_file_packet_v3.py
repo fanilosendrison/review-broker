@@ -72,6 +72,13 @@ class GitFilePacketIntegrationTests(unittest.TestCase):
             with self.assertRaisesRegex(PacketV2CandidateError, "ADMISSION_INVALID"):
                 build_packet_v2_candidate(forged, capture, profile(), root / "packet")
 
+    def test_git_file_rendered_size_is_rejected_at_preclaim_admission(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); capture = git_capture(root); request = request_for_capture(capture, [git_ref()])
+            with self.assertRaisesRegex(AdmissionV3CandidateError, "EVENTUAL_RENDERED_PACKET_EXCEEDED"):
+                admitted(request, capture=capture,
+                         git_file_readers={"contract": reader(Api(data=b"\n" * 900_000))})
+
     def test_reader_subclass_cannot_cross_trusted_acquisition_boundary(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); capture = git_capture(root); request = request_for_capture(capture, [git_ref()])

@@ -10,6 +10,7 @@ from .github_issue_origin_v3 import GitHubIssueOriginObservationV3, GitHubIssueO
 from .github_git_file_v3 import GitHubGitFileObservationV3, GitHubGitFileReaderV3
 from .git_file_admission_v3 import GitFileAdmissionV3Error, acquire_git_file_admissions_v3
 from .identity import artifact_identity, canonical_bytes
+from .physical import decode_physical_lines
 from .request_v3 import (
     inline_rendered_bound_v3, parse_issue_envelope_v3, request_identity_v3,
 )
@@ -22,29 +23,19 @@ def _evidence(value: object, marker: str) -> str:
             or any(character not in "0123456789abcdef" for character in value[16:])):
         raise AdmissionV3CandidateError(marker)
     return value
-
-
 def _receipt_id(value: Mapping[str, object]) -> str:
     return artifact_identity(canonical_bytes(value) + b"\n")
-
-
 def _valid_sha(value: object) -> bool:
     return (isinstance(value, str) and len(value) == 40
             and all(character in "0123456789abcdef" for character in value))
-
-
 def _valid_source_id(value: object) -> bool:
     return (isinstance(value, str) and len(value) == 4 and value[0] == "S"
             and all(character in "0123456789" for character in value[1:])
             and value != "S000")
-
-
 def _valid_request_id(value: object) -> bool:
     return (isinstance(value, str) and value.startswith("request:sha256:")
             and len(value) == 79
             and all(character in "0123456789abcdef" for character in value[15:]))
-
-
 @dataclass(frozen=True)
 class RequesterAuthorizationV3:
     requester_id: int
@@ -373,6 +364,11 @@ def admit_initial_inline_v3(
     try: observations = acquire_git_file_admissions_v3(
         request, subject, git_file_readers, source_evidence, source.installation_id)
     except GitFileAdmissionV3Error as exc: raise AdmissionV3CandidateError(str(exc)) from None
+    git_rendered = sum(sum(len(line.encode("utf-8")) + 9
+                           for line in decode_physical_lines(item.original_bytes)[1])
+                       for item in observations)
+    if eventual + git_rendered > 8_000_000:
+        raise AdmissionV3CandidateError("EVENTUAL_RENDERED_PACKET_EXCEEDED")
     reference_admissions = [item.provenance_basis() | {"evidence_id": item.evidence_id}
                             for item in observations]
     evidence_basis = {
