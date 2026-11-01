@@ -57,10 +57,12 @@ access grant no requester authority.
 
 ## Permission and credential boundary
 
-The offline authority requires `contents:read`, `pull_requests:read`,
-`metadata:read`, and `issues:read` in trusted mint metadata. This validates the
-adapter's fail-closed permission contract, not the installed App's effective
-permissions. Effective Issues access remains unestablished.
+The offline authority requires exactly `contents:read`, `pull_requests:read`,
+`metadata:read`, and `issues:read` in trusted mint metadata, with no write,
+Actions, workflow, administration, or additional permission. It also requires
+the observed and selected repository scope to contain exactly the admitted
+repository. This validates the adapter's fail-closed candidate contract, not the
+installed App's effective permissions. Effective Issues access remains unestablished.
 
 The candidate manual workflow is `workflow_dispatch` only and stops before
 credential minting or source access. It confronts the exact workflow/candidate
