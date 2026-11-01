@@ -10,6 +10,12 @@ from review_broker.packets import GitSourceReader,SourceSpec
 class Issue69SubjectCaptureTests(unittest.TestCase):
  def setup_capture(self,root):
   origin,base,head,merge,files=git_graph(root);authority=source_authority();api=PullApi(base,head,merge,files);observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=api);scope=observer.observe_scope();authorization=authority.authorize(REPOSITORY,REPOSITORY_ID);capture=capture_authenticated_subject_v3(scope,observer,authorization,authority.scope_observation.evidence_id,TOKEN,root/"capture",acquire_repository=local_acquirer(origin));pr=observer.finalize(scope,capture);capture=bind_authenticated_capture_v3(capture,authorization.evidence_id,pr.evidence_id);return origin,scope,observer,authorization,capture,pr
+ def test_I69_F27_exited_leader_descendant_is_killed_on_pipe_timeout(self):
+  from review_broker.github_subject_capture_v3 import _run
+  with tempfile.TemporaryDirectory() as temporary:
+   marker=Path(temporary)/"orphan-descendant";script="import subprocess,sys;subprocess.Popen([sys.executable,'-c',\"import time,pathlib;time.sleep(1);pathlib.Path(r'%s').write_text('bad')\"])"%marker
+   with self.assertRaisesRegex(GitHubSubjectCaptureV3Error,"COMMAND_TIMEOUT"):_run([sys.executable,"-c",script],{"PATH":os.environ["PATH"]},.1)
+   time.sleep(1.2);self.assertFalse(marker.exists())
  def test_I69_N06_N07_N08_real_merge_base_images_diff_and_evidence(self):
   with tempfile.TemporaryDirectory() as temporary:
    _,scope,_,authorization,capture,pr=self.setup_capture(Path(temporary));self.assertEqual(capture.merge_base_sha,scope.merge_base_sha);self.assertEqual([x["status"] for x in capture.changes],["added","modified"]);self.assertEqual(len(capture.records),3);self.assertEqual(capture.evidence_id,subject_capture_evidence_id_v2(capture));self.assertEqual(capture.source_authorization_evidence_id,authorization.evidence_id);self.assertEqual(capture.pr_observation_evidence_id,pr.evidence_id)
