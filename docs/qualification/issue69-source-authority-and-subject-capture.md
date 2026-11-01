@@ -110,16 +110,16 @@ runtime policy, reviewer execution, ReviewResult, or production readiness.
 | Scenario | Status | Boundary exercised |
 | -------- | ------ | ------------------ |
 | I69-N01–N03 | PASS | Trusted mint scope, source receipt, and requester authorization. |
-| I69-N04–N05 | PASS | Exact PR identity and complete paginated file inventory. |
+| I69-N04–N05 | PASS | Exact PR identity and a 101-file, two-page complete inventory. |
 | I69-N06–N08 | PASS | Real divergent Git graph, merge base, images, diff, and capture evidence. |
 | I69-N09 | PASS | Authenticated packet provenance with synthetic technical policy. |
 | I69-N10 | PASS | Existing synthetic packet behavior remains distinct. |
 | I69-F01–F06 | PASS | Repository, installation, selection, pagination, and unavailable authority reject. |
 | I69-F07–F10 | PASS | Requester, permission, and qualification-token confusion reject. |
-| I69-F11–F15 | PASS | PR object, drift, compare, pagination, duplicate, and malformed scope reject. |
+| I69-F11–F15 | PASS | PR object, HEAD/base drift, conflicting compare, pagination, duplicate, and malformed scope reject. |
 | I69-F16–F22 | PASS | Unsafe/type, ancestry, merge-base, image, object, diff, and size failures reject. |
-| I69-F23–F28 | PASS | Ambiguity, role confusion, forged provenance, credential escape, and policy inflation reject. |
-| I69-F29 | PASS | Synthetic packet and historical compatibility remain unchanged. |
+| I69-F23–F28 | PASS | Ambiguity, role confusion, forged provenance, injected source-token bytes, and policy inflation reject. |
+| I69-F29 | PASS | Baseline synthetic Packet v2 and v1/v2 regression behavior remain unchanged. |
 | I69-F30 | PASS | Injected GitHub operations remain read-only; no model-capable effect exists. |
 | Effective source-App Issues permission | BLOCKED | Separate owner approval and installation upgrade required. |
 | Same-token live Issue/comment read | BLOCKED | Depends on approved effective Issues permission. |
@@ -128,11 +128,11 @@ runtime policy, reviewer execution, ReviewResult, or production readiness.
 ## Validation and limitations
 
 The draft PR records exact focused commands, complete regression result,
-independent-review provenance, and exact-SHA CI. PR #68's test modules are not
-present in the mandated independent PR #66 baseline and cannot be executed
-without improperly stacking PR #71; compatibility is instead checked through
-the unchanged synthetic packet suites and PR #71 remains an independent
-integration prerequisite for #70.
+independent-review provenance, and exact-SHA CI. PR #68's test modules are not present in the mandated independent PR #66
+baseline and cannot be executed without improperly stacking PR #71. Therefore
+`ISSUE68_EXACT_SUITE=BLOCKED_INDEPENDENT_BASELINE`; no #68 PASS is claimed.
+Baseline synthetic packet and full v1/v2 regressions pass, while PR #71 remains
+an independent integration prerequisite for #70.
 
 The qualification does not establish effective production App permission,
 production token behavior, live private-source access, workflow/run identity,
