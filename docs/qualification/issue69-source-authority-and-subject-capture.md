@@ -83,7 +83,9 @@ sanitized failures for token absence.
 The observation performs repository reads before and after the PR scope,
 requires canonical name and numeric ID, exact PR number and immutable object ID,
 pinned HEAD, observed base, compare-base consistency, compare terminal HEAD,
-and merge-base identity. Changed files are paged at 100 entries and confronted
+and merge-base identity. The required before/after image count is bounded before
+any Git acquisition, and cumulative rendered bytes are bounded while images are
+read. Changed files are paged at 100 entries and confronted
 with `changed_files`; duplicate, malformed, unsafe, truncated, capped, or
 unsupported inventories fail closed. GitHub `patch` text is not authoritative.
 

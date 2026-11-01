@@ -7,7 +7,7 @@ from typing import Callable,Mapping
 from .admission_v3 import SourceRepositoryAuthorizationV3
 from .github_pull_request_observation_v3 import GitHubPullRequestObservationReaderV3,PullRequestScopeV3
 from .packet_v2 import SubjectCaptureV2,subject_capture_evidence_id_v2
-from .packets import GitSourceReader,SourceSpec
+from .packets import GitSourceReader,MAX_PACKET_BYTES,MAX_SOURCE_COUNT,SourceSpec
 from .source_authorization import isolated_source_environment,require_private_source_environment
 
 class GitHubSubjectCaptureV3Error(RuntimeError):pass
@@ -53,6 +53,8 @@ def capture_authenticated_subject_v3(scope:PullRequestScopeV3,reader:GitHubPullR
   or source_authorization!=expected_authorization
   or source_authority_scope_evidence_id!=reader.source_authority.scope_observation.evidence_id):
   raise GitHubSubjectCaptureV3Error("SUBJECT_SOURCE_AUTHORITY_MISMATCH")
+ image_count=sum(1 if change["status"] in {"added","removed"} else 2 for change in scope.changes)
+ if image_count>MAX_SOURCE_COUNT:raise GitHubSubjectCaptureV3Error("SUBJECT_SOURCE_COUNT_EXCEEDED")
  environment=require_private_source_environment(scope.repository,frozenset({scope.repository}),source_token)
  if private_root.is_symlink() or private_root.exists() and not private_root.is_dir():raise GitHubSubjectCaptureV3Error("SUBJECT_CAPTURE_ROOT_INVALID")
  private_root.mkdir(mode=0o700,parents=True,exist_ok=True)
@@ -74,11 +76,13 @@ def capture_authenticated_subject_v3(scope:PullRequestScopeV3,reader:GitHubPullR
   if merge!=scope.merge_base_sha:raise GitHubSubjectCaptureV3Error("SUBJECT_MERGE_BASE_MISMATCH")
   inventory=_inventory(git,merge,scope.head_sha)
   if inventory!=scope.changes or git.changed_paths(merge,scope.head_sha)!={item["path"] for item in scope.changes}:raise GitHubSubjectCaptureV3Error("SUBJECT_CHANGE_SCOPE_MISMATCH")
-  records=[]
+  records=[];rendered_bytes=0
   for change in inventory:
-   status,path,previous=change["status"],change["path"],change["previous_path"]
+   status,path,previous=change["status"],change["path"],change["previous_path"];start=len(records)
    if status!="added":records.append(_read_regular(git,SourceSpec(scope.repository,merge,previous or path)))
    if status!="removed":records.append(_read_regular(git,SourceSpec(scope.repository,scope.head_sha,path)))
+   rendered_bytes+=sum(sum(len(line.encode("utf-8"))+9 for line in record.lines) for record in records[start:])
+   if rendered_bytes>MAX_PACKET_BYTES:raise GitHubSubjectCaptureV3Error("SUBJECT_RENDERED_BYTES_EXCEEDED")
   diff=git.diff(merge,scope.head_sha)
   credential=source_token.encode("utf-8")
   if credential in diff or any(credential in record.original_bytes for record in records):

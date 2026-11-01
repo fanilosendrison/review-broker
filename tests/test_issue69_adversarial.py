@@ -22,6 +22,12 @@ class Issue69AdversarialTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);capture,admission,_=self.integrated(root);oid=capture.records[-1].git_blob_oid;object_path=capture.repository_root/".git/objects"/oid[:2]/oid[2:];self.assertTrue(object_path.exists());object_path.chmod(0o600);object_path.write_bytes(b"corrupt")
    with self.assertRaisesRegex(PacketV2CandidateError,"LOCAL_GIT_PROOF_INVALID"):build_packet_v2_candidate(admission,capture,profile(),root/"packet")
+ def test_I69_F22_source_count_rejected_before_acquisition(self):
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);origin,base,head,merge,_=git_graph(root);files=[{"status":"modified","filename":f"path-{i}.md"} for i in range(500)];authority=source_authority();observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=PullApi(base,head,merge,files));scope=observer.observe_scope();calls=[]
+   def forbidden(destination,environment):calls.append(destination)
+   with self.assertRaisesRegex(GitHubSubjectCaptureV3Error,"SOURCE_COUNT_EXCEEDED"):capture_authenticated_subject_v3(scope,observer,authority.authorize(REPOSITORY,REPOSITORY_ID),authority.scope_observation.evidence_id,TOKEN,root/"capture",acquire_repository=forbidden)
+   self.assertEqual(calls,[])
  def test_I69_F22_oversized_subject_image_rejected(self):
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);origin,base,_,merge,_=git_graph(root);subprocess.run(["git","-C",str(origin),"checkout","-q","feature"],check=True);(origin/"huge.md").write_bytes(b"x"*2_000_001);subprocess.run(["git","-C",str(origin),"add","huge.md"],check=True);subprocess.run(["git","-C",str(origin),"commit","-q","-m","huge"],check=True);head=subprocess.check_output(["git","-C",str(origin),"rev-parse","HEAD"],text=True).strip();files=[{"status":"added","filename":"added.md"},{"status":"added","filename":"huge.md"},{"status":"modified","filename":"review.md"}];authority=source_authority();observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=PullApi(base,head,merge,files));scope=observer.observe_scope()
