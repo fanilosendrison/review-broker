@@ -20,6 +20,8 @@ from .issue_reference_preparation_v3 import prepare_ordered_remote_observations_
 from .issue_reference_reconstruction_v3 import reconstruct_issue_observations_v3
 from .packet_v2_reference import build_reference_entries_v2
 from .packet_v2_renderer import RENDERER_ID, render_packet_v2_prompt
+from .packet_v2_subject import SubjectCaptureV2
+from .packet_v2_subject_provenance import evidence_basis_v2,manifest_fields_v2,validate_capture_provenance_v2
 from .packets import (
     GitSourceReader, MAX_PACKET_BYTES, MAX_SOURCE_BYTES, MAX_SOURCE_COUNT,
     SourceRecord, SourceSpec,
@@ -34,16 +36,6 @@ _SHA = re.compile(r"[0-9a-f]{40}\Z")
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
 class PacketV2CandidateError(ValueError):
     """Candidate packet construction or verification failed closed."""
-@dataclass(frozen=True)
-class SubjectCaptureV2:
-    repository: str; repository_id: int
-    pull_request: int; pull_request_id: int
-    head_sha: str; base_sha: str; merge_base_sha: str
-    changes: tuple[dict[str, object], ...]
-    records: tuple[SourceRecord, ...]
-    diff: bytes; evidence_id: str; repository_root: Path
-    verification: str = "SYNTHETIC_OFFLINE_VERIFIED"
-
 @dataclass(frozen=True)
 class TechnicalProfileSnapshotV2:
     expected_name: str; actual_name: str
@@ -102,12 +94,13 @@ def subject_capture_evidence_id_v2(capture: SubjectCaptureV2) -> str:
     basis = {**_subject_basis(capture), "changes": list(capture.changes), "records": records,
              "diff_sha256": hashlib.sha256(capture.diff).hexdigest(),
              "verification": capture.verification}
+    basis.update(evidence_basis_v2(capture))
     return artifact_identity(canonical_bytes(basis) + b"\n")
 def _validate_capture(capture: SubjectCaptureV2, admission: PreclaimAdmissionV3,
                       request: Mapping[str, object], *, prove_local_git: bool) -> None:
     subject = request["subject"]
     if (not isinstance(capture, SubjectCaptureV2)
-            or capture.verification != "SYNTHETIC_OFFLINE_VERIFIED"
+            or capture.verification not in {"SYNTHETIC_OFFLINE_VERIFIED", "AUTHENTICATED_SOURCE_READ_ONLY"}
             or capture.evidence_id != subject_capture_evidence_id_v2(capture)
             or type(capture.repository_id) is not int or type(capture.pull_request) is not int
             or type(capture.pull_request_id) is not int
@@ -127,6 +120,8 @@ def _validate_capture(capture: SubjectCaptureV2, admission: PreclaimAdmissionV3,
     if any(not isinstance(path, str) for path in paths) or len(paths) != len(set(paths)):
         _fail("PACKET_V2_CHANGED_PATH_INVENTORY_INVALID")
     admitted_source = json.loads(admission.source_provenance_bytes)
+    try: validate_capture_provenance_v2(capture,admitted_source)
+    except ValueError as exc: _fail(str(exc),exc)
     observed = admitted_source.get("subject_sources")
     captured = [{"source_id": f"S{index:03d}", "original_bytes": len(record.original_bytes),
                  "rendered_bytes": sum(len(line.encode("utf-8")) + 9 for line in record.lines)}
@@ -258,7 +253,8 @@ def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCa
         "admission_evidence_id": admission.admission_evidence_id,
         "subject": {**_subject_basis(capture), "source_admission_id": admission.source_admission_id,
                     "subject_capture_evidence_id": capture.evidence_id,
-                    "capture_qualification": capture.verification},
+                    "capture_qualification": capture.verification,
+                    **manifest_fields_v2(capture)},
         "atomicity": request["atomicity"], "change_scope": change_scope,
         **source_manifest, "technical_policy": policy, "program": program,
         "source_manifest_id": _hash("source-manifest", source_manifest),
@@ -346,7 +342,8 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
     expected_change.update(diff_snapshot="changes.patch",
                            changed_paths=[item["path"] for item in expected_changes])
     expected_subject_group = {**_subject_basis(capture), "source_admission_id": admission.source_admission_id,
-        "subject_capture_evidence_id": capture.evidence_id, "capture_qualification": capture.verification}
+        "subject_capture_evidence_id": capture.evidence_id, "capture_qualification": capture.verification,
+        **manifest_fields_v2(capture)}
     if (manifest["request_id"] != admission.request_id
             or manifest["review_intent_id"] != admission.review_intent_id
             or manifest["admission_evidence_id"] != admission.admission_evidence_id

@@ -49,8 +49,11 @@
         "pull_request_id": {"type": "integer", "minimum": 1}, "head_sha": {"$ref": "#/$defs/sha"},
         "base_sha": {"$ref": "#/$defs/sha"}, "merge_base_sha": {"$ref": "#/$defs/sha"},
         "source_admission_id": {"$ref": "#/$defs/artifactId"}, "subject_capture_evidence_id": {"$ref": "#/$defs/artifactId"},
-        "capture_qualification": {"const": "SYNTHETIC_OFFLINE_VERIFIED"}
-      }
+        "capture_qualification": {"enum": ["SYNTHETIC_OFFLINE_VERIFIED", "AUTHENTICATED_SOURCE_READ_ONLY"]},
+        "source_authorization_evidence_id": {"$ref": "#/$defs/artifactId"},
+        "pr_observation_evidence_id": {"$ref": "#/$defs/artifactId"}
+      },
+      "allOf": [{"if": {"properties": {"capture_qualification": {"const": "AUTHENTICATED_SOURCE_READ_ONLY"}}}, "then": {"required": ["source_authorization_evidence_id", "pr_observation_evidence_id"]}}]
     },
     "change": {
       "type": "object", "additionalProperties": false,
