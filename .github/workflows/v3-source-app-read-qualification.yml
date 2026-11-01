@@ -1,0 +1,79 @@
+name: V3 source App read-only qualification
+
+on:
+  repository_dispatch:
+    types: [review-broker-v3-source-app-read-qualification]
+
+permissions: {}
+
+concurrency:
+  group: review-broker-v3-source-app-read-qualification
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    if: >-
+      github.repository == 'fanilosendrison/review-broker' &&
+      github.event.repository.id == 1433701208 &&
+      github.event.repository.default_branch == 'dev' &&
+      github.event_name == 'repository_dispatch' &&
+      github.event.action == 'review-broker-v3-source-app-read-qualification' &&
+      github.ref == 'refs/heads/dev' &&
+      github.event.sender.id == 30498238 &&
+      github.actor == 'fanilosendrison' &&
+      github.triggering_actor == 'fanilosendrison' &&
+      vars.REVIEW_BROKER_V3_SOURCE_QUALIFICATION_SHA != '' &&
+      github.sha == vars.REVIEW_BROKER_V3_SOURCE_QUALIFICATION_SHA
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11"
+      - name: Verify credential-free exact execution
+        env:
+          APPROVED_SOURCE_SHA: ${{ vars.REVIEW_BROKER_V3_SOURCE_QUALIFICATION_SHA }}
+        run: |
+          python - <<'PY'
+          import os
+          import subprocess
+          from pathlib import Path
+          assert os.environ["GITHUB_REF"] == "refs/heads/dev"
+          assert os.environ["GITHUB_EVENT_NAME"] == "repository_dispatch"
+          approved = os.environ["APPROVED_SOURCE_SHA"]
+          assert approved and approved == os.environ["GITHUB_SHA"]
+          assert subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip() == approved
+          assert Path("scripts/qualification/v3_source_app_read.py").is_file()
+          assert not any(os.environ.get(key) for key in (
+              "REVIEW_BROKER_SOURCE_TOKEN", "REVIEW_BROKER_SOURCE_APP_PRIVATE_KEY",
+              "GH_TOKEN", "GITHUB_TOKEN"))
+          PY
+      - name: Mint repository-scoped v3 source read token
+        id: source_auth
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ vars.REVIEW_BROKER_SOURCE_APP_ID }}
+          private-key: ${{ secrets.REVIEW_BROKER_SOURCE_APP_PRIVATE_KEY }}
+          owner: fanilosendrison
+          repositories: review-broker
+          permission-contents: read
+          permission-pull-requests: read
+          permission-metadata: read
+          permission-issues: read
+      - name: Observe read-only source App authority
+        env:
+          REVIEW_BROKER_SOURCE_TOKEN: ${{ steps.source_auth.outputs.token }}
+          SOURCE_APP_SLUG: ${{ steps.source_auth.outputs.app-slug }}
+          SOURCE_INSTALLATION_ID: ${{ steps.source_auth.outputs.installation-id }}
+          GITHUB_TOKEN: ""
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GITHUB_JOB: ${{ github.job }}
+          EXPECTED_REPOSITORY: fanilosendrison/review-broker
+          EXPECTED_REPOSITORY_ID: "1433701208"
+        run: python scripts/qualification/v3_source_app_read.py
