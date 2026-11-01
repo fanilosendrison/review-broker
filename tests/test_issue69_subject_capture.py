@@ -11,6 +11,10 @@ class Issue69SubjectCaptureTests(unittest.TestCase):
  def test_I69_N06_N07_N08_real_merge_base_images_diff_and_evidence(self):
   with tempfile.TemporaryDirectory() as temporary:
    _,scope,_,authorization,capture,pr=self.setup_capture(Path(temporary));self.assertEqual(capture.merge_base_sha,scope.merge_base_sha);self.assertEqual([x["status"] for x in capture.changes],["added","modified"]);self.assertEqual(len(capture.records),3);self.assertEqual(capture.evidence_id,subject_capture_evidence_id_v2(capture));self.assertEqual(capture.source_authorization_evidence_id,authorization.evidence_id);self.assertEqual(capture.pr_observation_evidence_id,pr.evidence_id)
+ def test_I69_F03_substituted_source_token_rejected_before_git(self):
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);origin,base,head,merge,files=git_graph(root);authority=source_authority();observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=PullApi(base,head,merge,files));scope=observer.observe_scope()
+   with self.assertRaisesRegex(GitHubSubjectCaptureV3Error,"SOURCE_AUTHORITY_MISMATCH"):capture_authenticated_subject_v3(scope,observer,authority.authorize(REPOSITORY,REPOSITORY_ID),authority.scope_observation.evidence_id,"different-token",root/"capture",acquire_repository=local_acquirer(origin))
  def test_I69_F17_F18_ancestry_and_merge_base_fail_closed(self):
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);origin,base,head,merge,files=git_graph(root);authority=source_authority();observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=PullApi(base,head,"f"*40,files));scope=observer.observe_scope()

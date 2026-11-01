@@ -35,7 +35,7 @@ class Issue69AdversarialTests(unittest.TestCase):
    root=Path(temporary);capture,admission,_=self.integrated(root);manifest=build_packet_v2_candidate(admission,capture,profile(),root/"packet");material=(root/"packet/input.txt").read_bytes()+(root/"packet/input-manifest.json").read_bytes()+(capture.repository_root/".git/config").read_bytes();self.assertNotIn(TOKEN.encode(),material)
  def test_I69_N_live_candidate_binds_required_receipt_domains(self):
   workflow=(Path(__file__).parents[1]/".github/workflows/v3-source-authority-qualification.yml").read_text();required=("workflow_run_id","approved_code_sha","owner_approval_receipt_sha256","installation_id","pr_observation_evidence_id","subject_capture_evidence_id","git_blob_oid","github_mutations\":0")
-  self.assertTrue(all(value in workflow for value in required))
+  self.assertTrue(all(value in workflow for value in required));self.assertIn('test "$GITHUB_SHA" = "$APPROVED_CODE_SHA"',workflow)
  def test_I69_F30_all_injected_github_operations_are_read_only(self):
   with tempfile.TemporaryDirectory() as temporary:
    _,_,api=self.integrated(Path(temporary));self.assertTrue(api.calls);self.assertEqual(set(api.methods),{"GET"});self.assertFalse(any(term in call for call in api.calls for term in ("/git/refs","/dispatches","/codespaces")))
