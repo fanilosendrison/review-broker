@@ -7,6 +7,7 @@ import unittest
 from review_broker.github_git_file_v3 import GitHubGitFileReaderV3, GitHubGitFileV3Error
 from review_broker.github_http_live_v3 import HttpResponseV3
 from review_broker.identity import artifact_identity, canonical_bytes
+from tests.issue69_test_support import source_authority
 
 REPO = "fanilosendrison/review-broker"; REPO_ID = 1433701208
 COMMIT = "a" * 40; TREE = "b" * 40; DATA = b"alpha\r\nbeta\n"
@@ -47,7 +48,7 @@ class Api:
 
 def reader(api):
     return GitHubGitFileReaderV3("token", REPO, REPO_ID, authority_evidence_id=AUTHORITY,
-        expected_installation_id=123, executor=api,
+        source_authority=source_authority(), executor=api,
         clock=lambda: datetime(2026, 11, 1, tzinfo=timezone.utc))
 
 

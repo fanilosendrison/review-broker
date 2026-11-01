@@ -6,6 +6,7 @@ import unittest
 
 from tests.packet_v2_test_support import admitted, git_capture, inline, profile, request_for_capture
 from tests.test_github_git_file_v3 import Api, COMMIT, DATA, reader
+from tests.issue69_test_support import source_authority
 from review_broker.admission_v3 import AdmissionV3CandidateError
 from review_broker.packet_v2 import PacketV2CandidateError, build_packet_v2_candidate, verify_packet_v2_candidate
 
@@ -86,8 +87,8 @@ class GitFilePacketIntegrationTests(unittest.TestCase):
                 def observe(self, *args, **kwargs): return reader(Api()).observe(*args, **kwargs)
             trusted = reader(Api())
             forged = ForgedReader("token", trusted.repository, trusted.repository_id,
-                authority_evidence_id=trusted.authority_evidence_id, expected_installation_id=123,
-                executor=Api())
+                authority_evidence_id=trusted.authority_evidence_id,
+                source_authority=source_authority(), executor=Api())
             with self.assertRaisesRegex(AdmissionV3CandidateError, "TRUSTED_READER_REQUIRED"):
                 admitted(request, capture=capture, git_file_readers={"contract": forged})
 

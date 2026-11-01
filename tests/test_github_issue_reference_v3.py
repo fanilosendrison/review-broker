@@ -4,6 +4,7 @@ import unittest
 from review_broker.github_http_live_v3 import HttpResponseV3
 from review_broker.github_issue_reference_v3 import GitHubIssueReferenceReaderV3,GitHubIssueReferenceV3Error
 from tests.test_github_git_file_v3 import AUTHORITY,REPO,REPO_ID
+from tests.issue69_test_support import source_authority
 class Api:
  def __init__(self,body="alpha\r\nbeta",status=None,pr=False): self.body,self.status,self.pr=body,status,pr
  def __call__(self,r):
@@ -16,7 +17,7 @@ class Api:
   elif u.endswith("/issues/51"): v={"id":510,"number":51,"body":"parent","updated_at":"2026-01-01Z","user":{"id":7},**({"pull_request":{}} if self.pr else {})}
   else: raise AssertionError(u)
   return HttpResponseV3(200,json.dumps(v).encode(),{})
-def reader(api): return GitHubIssueReferenceReaderV3("token",REPO,REPO_ID,authority_evidence_id=AUTHORITY,expected_installation_id=123,executor=api,clock=lambda:datetime(2026,1,2,tzinfo=timezone.utc))
+def reader(api): return GitHubIssueReferenceReaderV3("token",REPO,REPO_ID,authority_evidence_id=AUTHORITY,source_authority=source_authority(),executor=api,clock=lambda:datetime(2026,1,2,tzinfo=timezone.utc))
 class Tests(unittest.TestCase):
  def test_issue_and_comment_exact_bytes_identity(self):
   issue=reader(Api()).observe_issue_body(43); comment=reader(Api()).observe_issue_comment(99)
