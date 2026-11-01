@@ -17,11 +17,10 @@ def _close_pipes(process)->None:
  for stream in (process.stdout,process.stderr):
   if stream is not None:stream.close()
 def _terminate(process)->None:
- if process.poll() is None:
-  try:os.killpg(process.pid,signal.SIGKILL)
-  except OSError:process.kill()
-  process.communicate()
- _close_pipes(process)
+ try:os.killpg(process.pid,signal.SIGKILL)
+ except OSError:
+  if process.poll() is None:process.kill()
+ process.communicate();_close_pipes(process)
 def _run(arguments:list[str],environment:Mapping[str,str],timeout:int=300)->bytes:
  try:
   process=_popen(arguments,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=dict(environment),start_new_session=True)
