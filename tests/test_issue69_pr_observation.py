@@ -9,6 +9,9 @@ class Issue69PullRequestObservationTests(unittest.TestCase):
  def test_I69_N04_N05_exact_pr_and_complete_files(self):
   with tempfile.TemporaryDirectory() as temporary:
    _,scope,api=self.scope(Path(temporary));self.assertEqual((scope.pull_request_id,scope.changed_files),(7001,2));self.assertEqual([x["path"] for x in scope.changes],["added.md","review.md"]);self.assertTrue(scope.evidence_id.startswith("artifact:sha256:"));self.assertTrue(all("per_page=100" in call for call in api.calls if "/files?" in call))
+ def test_I69_N05_multiple_file_pages_are_consumed(self):
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);origin,base,head,merge,_=git_graph(root);files=[{"status":"added","filename":f"path-{i}.md"} for i in range(101)];api=PullApi(base,head,merge,files);reader=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=source_authority(),executor=api);scope=reader.observe_scope();self.assertEqual(scope.changed_files,101);self.assertEqual(api.methods.count("GET"),6)
  def test_I69_F11_F12_F13_pr_identity_and_drift(self):
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);origin,base,head,merge,files=git_graph(root)
@@ -16,6 +19,10 @@ class Issue69PullRequestObservationTests(unittest.TestCase):
    with self.assertRaisesRegex(GitHubPullRequestObservationV3Error,"IDENTITY_INVALID"):reader.observe_scope()
    reader=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=source_authority(),executor=PullApi(base,head,merge,files,drift_head="f"*40));scope=reader.observe_scope()
    with self.assertRaisesRegex(GitHubPullRequestObservationV3Error,"FINAL_IDENTITY_DRIFT"):reader.verify_final_identity(scope)
+   reader=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=source_authority(),executor=PullApi(base,head,merge,files,drift_base="e"*40));scope=reader.observe_scope()
+   with self.assertRaisesRegex(GitHubPullRequestObservationV3Error,"FINAL_IDENTITY_DRIFT"):reader.verify_final_identity(scope)
+   reader=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=source_authority(),executor=PullApi(base,head,merge,files,compare_base="d"*40))
+   with self.assertRaisesRegex(GitHubPullRequestObservationV3Error,"COMPARE_INVALID"):reader.observe_scope()
  def test_I69_F14_F15_incomplete_duplicate_and_unsafe_files(self):
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);origin,base,head,merge,files=git_graph(root)
