@@ -1,16 +1,17 @@
 """Exact isolated Git-backed subject capture for authenticated v3 PR scope."""
 from __future__ import annotations
 from dataclasses import replace
-import os,subprocess
+import hashlib,os,signal,subprocess
 from pathlib import Path
 from typing import Callable,Mapping
 from .admission_v3 import SourceRepositoryAuthorizationV3
 from .github_pull_request_observation_v3 import GitHubPullRequestObservationReaderV3,PullRequestScopeV3
 from .packet_v2 import SubjectCaptureV2,subject_capture_evidence_id_v2
-from .packets import GitSourceReader,MAX_PACKET_BYTES,MAX_SOURCE_COUNT,SourceSpec
+from .packets import GitSourceReader,MAX_PACKET_BYTES,MAX_SOURCE_BYTES,MAX_SOURCE_COUNT,SourceRecord,SourceSpec
 from .source_authorization import isolated_source_environment,require_private_source_environment
 
 class GitHubSubjectCaptureV3Error(RuntimeError):pass
+_popen=subprocess.Popen
 AcquireRepositoryV3=Callable[[Path,Mapping[str,str]],None]
 def _run(arguments:list[str],environment:Mapping[str,str],timeout:int=300)->bytes:
  try:result=subprocess.run(arguments,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=False,timeout=timeout,shell=False,env=dict(environment))
@@ -40,10 +41,28 @@ def _inventory(reader:GitSourceReader,merge_base:str,head:str)->tuple[dict[str,o
  return tuple(result)
 def _read_regular(git:GitSourceReader,spec:SourceSpec):
  raw=git._git("ls-tree",spec.commit,"--",spec.path)
- try:metadata,listed_path=raw.rstrip(b"\n").split(b"\t",1);mode,kind,_=metadata.split(b" ",2)
- except ValueError:raise GitHubSubjectCaptureV3Error("SUBJECT_IMAGE_METADATA_INVALID") from None
+ try:metadata,listed_path=raw.rstrip(b"\n").split(b"\t",1);mode,kind,oid_bytes=metadata.split(b" ",2);oid=oid_bytes.decode("ascii")
+ except (ValueError,UnicodeError):raise GitHubSubjectCaptureV3Error("SUBJECT_IMAGE_METADATA_INVALID") from None
  if listed_path.decode("ascii")!=spec.path or kind!=b"blob" or mode not in {b"100644",b"100755"}:raise GitHubSubjectCaptureV3Error("SUBJECT_IMAGE_TYPE_UNSUPPORTED")
- return git.read(spec)
+ try:
+  process=_popen(["git","-C",str(git.repository_root),"cat-file","blob",oid],stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=git.environment,start_new_session=True)
+  assert process.stdout is not None;data=process.stdout.read(MAX_SOURCE_BYTES+1)
+  if len(data)>MAX_SOURCE_BYTES:
+   try:os.killpg(process.pid,signal.SIGKILL)
+   except OSError:process.kill()
+   process.communicate();raise GitHubSubjectCaptureV3Error("SUBJECT_SOURCE_TOO_LARGE")
+  _,stderr=process.communicate(timeout=git.timeout_seconds)
+ except GitHubSubjectCaptureV3Error:raise
+ except (OSError,subprocess.TimeoutExpired):
+  if 'process' in locals() and process.poll() is None:
+   try:os.killpg(process.pid,signal.SIGKILL)
+   except OSError:process.kill()
+   process.communicate()
+  raise GitHubSubjectCaptureV3Error("SUBJECT_IMAGE_READ_FAILED") from None
+ if process.returncode!=0:raise GitHubSubjectCaptureV3Error("SUBJECT_IMAGE_READ_FAILED")
+ header=b"blob "+str(len(data)).encode()+b"\0"+data;algorithm=hashlib.sha1 if len(oid)==40 else hashlib.sha256
+ if algorithm(header).hexdigest()!=oid:raise GitHubSubjectCaptureV3Error("SUBJECT_IMAGE_BLOB_MISMATCH")
+ return SourceRecord.from_bytes(spec.repository,spec.commit,spec.path,oid,data)
 def capture_authenticated_subject_v3(scope:PullRequestScopeV3,reader:GitHubPullRequestObservationReaderV3,
  source_authorization:SourceRepositoryAuthorizationV3,source_authority_scope_evidence_id:str,
  source_token:str,private_root:Path,*,acquire_repository:AcquireRepositoryV3|None=None)->SubjectCaptureV2:
