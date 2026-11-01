@@ -1,5 +1,5 @@
 from dataclasses import replace
-import tempfile,unittest
+import os,subprocess,tempfile,unittest
 from pathlib import Path
 from tests.issue69_test_support import *
 from review_broker.github_pull_request_observation_v3 import GitHubPullRequestObservationReaderV3
@@ -15,6 +15,10 @@ class Issue69SubjectCaptureTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);origin,base,head,merge,files=git_graph(root);authority=source_authority();observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=PullApi(base,head,"f"*40,files));scope=observer.observe_scope()
    with self.assertRaisesRegex(GitHubSubjectCaptureV3Error,"MERGE_BASE_MISMATCH"):capture_authenticated_subject_v3(scope,observer,authority.authorize(REPOSITORY,REPOSITORY_ID),authority.scope_observation.evidence_id,TOKEN,root/"capture",acquire_repository=local_acquirer(origin))
+ def test_I69_F17_unavailable_ancestry_fails_closed(self):
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);origin=root/"orphan";origin.mkdir();subprocess.run(["git","init","-q","-b","main",str(origin)],check=True);subprocess.run(["git","-C",str(origin),"config","user.email","test@example.invalid"],check=True);subprocess.run(["git","-C",str(origin),"config","user.name","Test"],check=True);(origin/"base.md").write_text("base");subprocess.run(["git","-C",str(origin),"add","."],check=True);subprocess.run(["git","-C",str(origin),"commit","-q","-m","base"],check=True);base=subprocess.check_output(["git","-C",str(origin),"rev-parse","HEAD"],text=True).strip();subprocess.run(["git","-C",str(origin),"checkout","-q","--orphan","feature"],check=True);subprocess.run(["git","-C",str(origin),"rm","-q","-rf","."],check=True);(origin/"head.md").write_text("head");subprocess.run(["git","-C",str(origin),"add","."],check=True);subprocess.run(["git","-C",str(origin),"commit","-q","-m","head"],check=True);head=subprocess.check_output(["git","-C",str(origin),"rev-parse","HEAD"],text=True).strip();files=[{"status":"added","filename":"head.md"}];authority=source_authority();observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=PullApi(base,head,"f"*40,files));scope=observer.observe_scope()
+   with self.assertRaisesRegex(GitHubSubjectCaptureV3Error,"ANCESTRY_UNAVAILABLE"):capture_authenticated_subject_v3(scope,observer,authority.authorize(REPOSITORY,REPOSITORY_ID),authority.scope_observation.evidence_id,TOKEN,root/"capture",acquire_repository=local_acquirer(origin))
  def test_I69_F19_F21_missing_image_and_change_mismatch(self):
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);origin,base,head,merge,files=git_graph(root);files=[{"status":"modified","filename":"missing.md"}];authority=source_authority();observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=PullApi(base,head,merge,files));scope=observer.observe_scope()
