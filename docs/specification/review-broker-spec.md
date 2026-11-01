@@ -5,7 +5,7 @@ asset_type: "specification"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker v1 Specification"
-version: "0.7.0"
+version: "0.7.1"
 ---
 
 # Review Broker v1 Specification
@@ -205,9 +205,22 @@ and result publication remain separate authority boundaries. Source tokens
 cannot mutate repository state or grant reviewer execution authority. Neither
 profile grants repository-write, Issues-write, Actions, workflow,
 administration, Codespaces-control, publication, or reviewer-model authority.
-No source token may reach the reviewer runtime, Codespaces, publication
-mechanism, or retained packet. Legacy publication-applicability lookup remains
-a source read, not publication authority.
+Source installation tokens have read-only authority. The trusted broker's
+publication command may possess a source token for current-source-PR
+applicability checks. That lookup remains a source-read operation; the source
+token is not the publication writer credential and must not be used for journal
+or result mutation. Those mutations use separately authorized credentials.
+The trusted reconciliation command may possess source, journal, and
+Codespaces-control credentials within the same process; their permitted
+operations remain separately restricted.
+
+No source token may be passed into the independent reviewer execution
+environment, Codespace reviewer process, model prompt, retained packet, public
+logs, or ReviewResult. Journal, publication, and Codespaces-control credentials
+must likewise remain outside reviewer execution. The existing implementation
+provides purpose-restricted credential use and controlled subprocess propagation,
+not complete process-level possession isolation. A compromise of the trusted
+broker process may cross these logical boundaries.
 
 Missing permissions, ambiguous API failures, unauthorized installations, and
 repository mismatches fail closed. Production v3 activation and live use require

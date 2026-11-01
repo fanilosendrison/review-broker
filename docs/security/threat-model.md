@@ -5,7 +5,7 @@ asset_type: "security-model"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Threat Model"
-version: "0.3.0"
+version: "0.3.1"
 ---
 
 # Review Broker Threat Model
@@ -42,15 +42,37 @@ token restriction does not remove that shared risk. App expansion therefore
 requires accepted contract publication, verified legacy restrictions, separate
 owner App/installation approval, and separately approved live qualification.
 
-Source credentials are passed only to isolated source-resolution, Git acquisition,
-and, for authorized candidate v3, Issue/comment reference-read subprocesses.
-Requester admission remains independent. Neither profile permits writes, Actions,
-workflow, administration, journal mutation, result publication, Codespaces
-control, or reviewer-model authority. Source-read publication-applicability
-lookup does not grant publication authority. Source tokens must not reach the
-publication mechanism, retained packet, Codespaces, or reviewer subprocesses.
-The Codex ChatGPT session exists only in the dedicated Codespace. No reviewer
-process receives source, repository-write, lifecycle, or publication credentials.
+The source-token authority, trusted broker orchestrator process, isolated
+source-read subprocesses, journal/result mutation authority, Codespaces lifecycle
+authority, and independent reviewer execution environment are distinct trust
+roles. Separate GitHub credential permissions do not imply separate OS processes.
+The trusted publication command may possess a source token for read-only
+current-source-PR applicability lookup alongside its journal/publication
+credential. The trusted reconciler may temporarily possess source, journal,
+and Codespaces-control credentials within the same process.
+
+Controls restrict credential use and subprocess propagation: source-read
+operations receive the source token, including applicable isolated Git
+subprocesses and separately authorized candidate v3 Issue/comment reads.
+Journal/result mutations and Codespaces lifecycle operations use their separately
+authorized credentials. Requester admission remains independent. Neither source
+profile permits writes, Actions, workflow, administration, journal mutation,
+result publication, Codespaces control, or reviewer-model authority.
+Publication-applicability lookup does not make the source token a writer.
+
+Credential permission separation is supported; complete process-level possession
+isolation is not established. A compromised trusted broker process could
+potentially access co-resident credentials and cross these logical boundaries.
+This is an existing architectural exposure and residual risk, not evidence of
+an experimentally demonstrated compromise. The original risk-proportionate
+security policy remains applicable; no exhaustive Codex-internals attestation
+requirement is introduced.
+
+No source, journal, publication, or Codespaces-control credential is intentionally
+transferred into the independent reviewer execution environment or Codespace
+reviewer process. Those credentials must remain outside that environment,
+model prompts, retained packets, public logs, and ReviewResults. The Codex
+ChatGPT session exists only in the dedicated Codespace.
 
 ## Threats and controls
 

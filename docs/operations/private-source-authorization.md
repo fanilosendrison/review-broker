@@ -5,7 +5,7 @@ asset_type: "operations"
 domain: "independent-review"
 severity: "strict"
 name: "Private Source Authorization"
-version: "0.3.0"
+version: "0.3.1"
 ---
 
 # Private Source Authorization
@@ -91,16 +91,32 @@ Thus every active legacy mint path must be constrained before App expansion.
 The workflow uses the pinned official `actions/create-github-app-token` action
 to mint a short-lived installation token, expiring after one hour. Default
 post-job revocation must remain enabled; `skip-token-revoke` must not bypass it.
-Token use is bounded to the authorized acquisition, with transient environments
-and temporary credential-bearing state disposed after use. Credential bytes
-must never enter logs, retained packets, artifacts, Codespaces, reviewer
-runtime, or the publication mechanism. Publication-applicability lookup is a
-source read only; the separate publication credential performs mutations.
-Broker code removes the token from its parent environment before any subprocess
-and supplies it only to exact
-source-resolution, file-enumeration, clone, fetch, and publication-applicability
-operations. Journal, publication, Codespaces, and reviewer subprocesses do not
-receive it.
+Token use is bounded to authorized source-read operations, with transient
+environments and temporary credential-bearing state disposed after use.
+
+The trusted broker's internal publication command may receive a source token
+for current-source-PR HEAD/applicability lookup. The trusted reconciliation
+command may temporarily possess source, journal, and Codespaces-control
+credentials in the same process. This does not grant every subprocess or
+downstream component those credentials. At CLI entry, the source token is
+removed from `os.environ` and passed explicitly to the relevant broker functions.
+It is propagated only to authorized GitHub source-read operations and applicable
+isolated Git subprocesses for resolution, file enumeration, clone, and fetch.
+Publication-applicability lookup remains a source read, not a result mutation.
+
+Journal and result mutations use separately authorized credentials. The source
+token must never substitute for a mutation credential. Source, journal,
+publication, and Codespaces-control credentials must not be passed into the
+reviewer model's execution environment, including the Codespace reviewer process.
+No credential value may be stored in retained packets, reviewer-visible prompts,
+ReviewResults, public logs, or public evidence.
+
+These controls provide purpose-restricted credential use and controlled
+subprocess propagation, not complete process-level possession isolation.
+Temporary credential co-residence is an existing architectural exposure: a
+compromised trusted broker process could access co-resident credentials and
+cross their logical boundaries. This residual risk is not an experimentally
+demonstrated compromise and does not relax reviewer credential exclusions.
 
 Bounded private admission additionally verifies that the token can observe the
 configured repository as private and that its installation repository listing
