@@ -30,7 +30,7 @@ def validate_journal_admission_v3(
         "reference_ids",
     }
     actual_fields = set(value) if isinstance(value, dict) else set()
-    optional={"reference_admissions","issue_reference_admissions"}
+    optional={"reference_admissions","issue_reference_admissions","source_app_scope_evidence_id"}
     if not fields <= actual_fields or actual_fields - fields - optional:
         raise AdmissionV3CandidateError("JOURNAL_ADMISSION_FIELDS_INVALID")
     request = value["canonical_request"]
@@ -85,6 +85,8 @@ def validate_journal_admission_v3(
                   "requester_authorization_evidence_id", "history_evidence_id",
                   "source_admission_id"):
         _evidence(value[field], "JOURNAL_ADMISSION_EVIDENCE_ID_INVALID")
+    if "source_app_scope_evidence_id" in value:
+        _evidence(value["source_app_scope_evidence_id"], "JOURNAL_ADMISSION_SCOPE_EVIDENCE_INVALID")
     positive = (value["broker_issue_id"], value["requester_id"], value["repository_id"],
                 origin.get("repository_id"), origin.get("issue_number"),
                 origin.get("issue_id"), origin.get("requester_id"),
@@ -244,6 +246,7 @@ def validate_journal_admission_v3(
     }
     if reference_admissions: evidence_basis["reference_admissions"] = reference_admissions
     if issue_admissions: evidence_basis["issue_reference_admissions"] = issue_admissions
+    if "source_app_scope_evidence_id" in value: evidence_basis["source_app_scope_evidence_id"] = value["source_app_scope_evidence_id"]
     if value["admission_evidence_id"] != _receipt_id(evidence_basis):
         raise AdmissionV3CandidateError("JOURNAL_ADMISSION_EVIDENCE_MISMATCH")
     return json.loads(canonical_bytes(value))

@@ -16,6 +16,8 @@ class Issue69PacketProvenanceTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);capture,admission=self.integrated(root);forged=replace(capture,source_authorization_evidence_id="artifact:sha256:"+"0"*64,evidence_id="");forged=replace(forged,evidence_id=subject_capture_evidence_id_v2(forged))
    with self.assertRaisesRegex(PacketV2CandidateError,"AUTHENTICATED_CAPTURE_AUTHORITY_MISMATCH"):build_packet_v2_candidate(admission,forged,profile(),root/"packet")
+   downgraded=replace(capture,verification="SYNTHETIC_OFFLINE_VERIFIED",source_authorization_evidence_id=None,pr_observation_evidence_id=None,evidence_id="");downgraded=replace(downgraded,evidence_id=subject_capture_evidence_id_v2(downgraded))
+   with self.assertRaisesRegex(PacketV2CandidateError,"SYNTHETIC_CAPTURE_AUTHORITY_FORBIDDEN"):build_packet_v2_candidate(admission,downgraded,profile(),root/"downgraded")
  def test_I69_F28_technical_policy_not_promoted(self):
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);capture,admission=self.integrated(root);manifest=build_packet_v2_candidate(admission,capture,profile(),root/"packet");self.assertEqual(manifest["technical_policy"]["qualification"],"SYNTHETIC_OFFLINE_ONLY")

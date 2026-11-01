@@ -10,12 +10,13 @@ def evidence_basis_v2(capture:"SubjectCaptureV2")->dict[str,object]:
          "pr_observation_evidence_id":capture.pr_observation_evidence_id}
 def manifest_fields_v2(capture:"SubjectCaptureV2")->dict[str,object]:
  return evidence_basis_v2(capture)
-def validate_capture_provenance_v2(capture:"SubjectCaptureV2",admitted_source:Mapping[str,object])->None:
+def validate_capture_provenance_v2(capture:"SubjectCaptureV2",admitted_source:Mapping[str,object],source_scope_evidence_id:str|None)->None:
  if capture.verification=="SYNTHETIC_OFFLINE_VERIFIED":
-  if capture.source_authorization_evidence_id is not None or capture.pr_observation_evidence_id is not None:
+  if (capture.source_authorization_evidence_id is not None or capture.pr_observation_evidence_id is not None
+   or source_scope_evidence_id is not None):
    raise SubjectCaptureProvenanceV2Error("PACKET_V2_SYNTHETIC_CAPTURE_AUTHORITY_FORBIDDEN")
   return
- if (capture.verification!="AUTHENTICATED_SOURCE_READ_ONLY"
+ if (capture.verification!="AUTHENTICATED_SOURCE_READ_ONLY" or source_scope_evidence_id is None
   or not isinstance(capture.source_authorization_evidence_id,str)
   or not isinstance(capture.pr_observation_evidence_id,str)
   or capture.source_authorization_evidence_id!=admitted_source.get("source_authorization_evidence_id")

@@ -113,6 +113,7 @@ class PreclaimAdmissionV3:
     admission_evidence_id: str
     git_file_observations: tuple[GitHubGitFileObservationV3, ...] = ()
     issue_reference_observations: tuple[GitHubIssueReferenceObservationV3, ...] = ()
+    source_scope_evidence_id: str | None = None
 
     @property
     def request(self) -> dict[str, object]:
@@ -149,6 +150,8 @@ class PreclaimAdmissionV3:
         if self.issue_reference_observations:
             value["issue_reference_admissions"] = [item.provenance_basis() | {"evidence_id": item.evidence_id}
                                                     for item in self.issue_reference_observations]
+        if self.source_scope_evidence_id is not None:
+            value["source_app_scope_evidence_id"] = self.source_scope_evidence_id
         return value
 
 
@@ -268,6 +271,9 @@ def admit_initial_inline_v3(
             or source.repository_id != subject["repository_id"]):
         raise AdmissionV3CandidateError("SOURCE_REPOSITORY_UNAUTHORIZED")
     source_evidence = _evidence(source.evidence_id, "SOURCE_AUTHORIZATION_EVIDENCE_INVALID")
+    scope_observation = getattr(source_authority, "scope_observation", None)
+    source_scope_evidence = (None if scope_observation is None else
+        _evidence(getattr(scope_observation, "evidence_id", None), "SOURCE_SCOPE_EVIDENCE_INVALID"))
     source_receipt = {
         "schema_version": 1, "evidence_type": "v3-source-repository-authorization",
         "repository": source.repository, "repository_id": source.repository_id,
@@ -383,6 +389,7 @@ def admit_initial_inline_v3(
     }
     if reference_admissions: evidence_basis["reference_admissions"] = reference_admissions
     if issue_admissions: evidence_basis["issue_reference_admissions"] = issue_admissions
+    if source_scope_evidence is not None: evidence_basis["source_app_scope_evidence_id"] = source_scope_evidence
     return PreclaimAdmissionV3(
         canonical_bytes(request), request_id, intent_id, origin.issue_id,
         origin.requester_id, origin.requester_login, pr.repository,
@@ -391,5 +398,5 @@ def admit_initial_inline_v3(
         canonical_bytes(source_basis), canonical_bytes(requester_receipt),
         canonical_bytes(history_receipt), origin_evidence, requester_evidence,
         history_evidence, history.scan_boundary, _receipt_id(evidence_basis), observations,
-        issue_observations,
+        issue_observations, source_scope_evidence,
     )

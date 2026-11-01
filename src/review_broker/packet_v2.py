@@ -120,7 +120,7 @@ def _validate_capture(capture: SubjectCaptureV2, admission: PreclaimAdmissionV3,
     if any(not isinstance(path, str) for path in paths) or len(paths) != len(set(paths)):
         _fail("PACKET_V2_CHANGED_PATH_INVENTORY_INVALID")
     admitted_source = json.loads(admission.source_provenance_bytes)
-    try: validate_capture_provenance_v2(capture,admitted_source)
+    try: validate_capture_provenance_v2(capture,admitted_source,admission.source_scope_evidence_id)
     except ValueError as exc: _fail(str(exc),exc)
     observed = admitted_source.get("subject_sources")
     captured = [{"source_id": f"S{index:03d}", "original_bytes": len(record.original_bytes),
