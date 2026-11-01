@@ -132,7 +132,7 @@ def _validate_capture(capture: SubjectCaptureV2, admission: PreclaimAdmissionV3,
         return
     try:
         git_environment = {"PATH": os.environ.get("PATH", ""), "GIT_NO_REPLACE_OBJECTS": "1",
-                           "GIT_CONFIG_NOSYSTEM": "1"}
+                           "GIT_NO_LAZY_FETCH": "1", "GIT_CONFIG_NOSYSTEM": "1"}
         reader = GitSourceReader(capture.repository_root, environment=git_environment)
         reread = tuple(reader.read(SourceSpec(item.repository, item.commit, item.path))
                        for item in capture.records)

@@ -72,7 +72,7 @@ class PacketV2IntegrityTests(unittest.TestCase):
                 build_packet_v2_candidate(admission, capture, profile(), root / "packet")
             self.assertEqual(reader.call_args.kwargs["environment"], {
                 "PATH": os.environ.get("PATH", ""), "GIT_NO_REPLACE_OBJECTS": "1",
-                "GIT_CONFIG_NOSYSTEM": "1"})
+                "GIT_NO_LAZY_FETCH": "1", "GIT_CONFIG_NOSYSTEM": "1"})
 
     def test_local_git_proof_ignores_repository_replacement_objects(self):
         with tempfile.TemporaryDirectory() as temporary:

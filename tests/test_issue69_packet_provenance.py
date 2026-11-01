@@ -1,5 +1,5 @@
 from dataclasses import replace
-import tempfile,unittest
+import subprocess,tempfile,unittest
 from pathlib import Path
 from tests.issue69_test_support import *
 from tests.packet_v2_test_support import inline,profile,request_for_capture
@@ -14,6 +14,22 @@ class Issue69PacketProvenanceTests(unittest.TestCase):
  def test_I69_N09_authenticated_packet_and_synthetic_policy_remain_distinct(self):
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);capture,admission=self.integrated(root);output=root/"packet";manifest=build_packet_v2_candidate(admission,capture,profile(),output);verify_packet_v2_candidate(output,admission,capture,profile());self.assertEqual(manifest["subject"]["capture_qualification"],"AUTHENTICATED_SOURCE_READ_ONLY");self.assertEqual(manifest["technical_policy"]["qualification"],"SYNTHETIC_OFFLINE_ONLY");self.assertNotIn(TOKEN,(output/"input.txt").read_text());self.assertNotIn(TOKEN,(output/"input-manifest.json").read_text())
+ def test_I69_N09_packet_proof_disables_partial_clone_lazy_fetch(self):
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);origin,base,head,merge,files=git_graph(root);bare=root/"remote.git";subprocess.run(["git","clone","-q","--bare",str(origin),str(bare)],check=True);subprocess.run(["git","-C",str(bare),"config","uploadpack.allowFilter","true"],check=True)
+   def partial(destination,environment):subprocess.run(["git","clone","-q","--filter=blob:none","--no-checkout","--depth=256",bare.as_uri(),str(destination)],check=True,env=dict(environment))
+   authority=source_authority();observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=PullApi(base,head,merge,files));scope=observer.observe_scope();authorization=authority.authorize(REPOSITORY,REPOSITORY_ID);capture=capture_authenticated_subject_v3(scope,observer,authorization,authority.scope_observation.evidence_id,TOKEN,root/"capture",acquire_repository=partial);pr=observer.finalize(scope,capture);capture=bind_authenticated_capture_v3(capture,authorization.evidence_id,pr.evidence_id);admission=authenticated_admission(request_for_capture(capture,[inline()]),observer,authority);oid=capture.records[-1].git_blob_oid;pack_root=capture.repository_root/".git/objects/pack";matching=[]
+   for index in pack_root.glob("*.idx"):
+    listing=subprocess.check_output(["git","verify-pack","-v",str(index)],text=True,errors="replace")
+    if any(line.startswith(oid+" ") for line in listing.splitlines()):matching.append(index)
+   self.assertTrue(matching)
+   for index in matching:
+    stem=index.with_suffix("")
+    for suffix in (".idx",".pack",".promisor"):
+     path=Path(str(stem)+suffix)
+     if path.exists():path.chmod(0o600);path.unlink()
+   subprocess.run(["git","-C",str(capture.repository_root),"remote","set-url","origin","file:///unreachable"],check=True)
+   with self.assertRaisesRegex(PacketV2CandidateError,"LOCAL_GIT_PROOF_INVALID"):build_packet_v2_candidate(admission,capture,profile(),root/"packet")
  def test_I69_F25_F26_forged_qualification_or_authority_rejected(self):
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);capture,admission=self.integrated(root);forged=replace(capture,source_authorization_evidence_id="artifact:sha256:"+"0"*64,evidence_id="");forged=replace(forged,evidence_id=subject_capture_evidence_id_v2(forged))
