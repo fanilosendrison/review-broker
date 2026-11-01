@@ -5,7 +5,7 @@ asset_type: "specification"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker v1 Specification"
-version: "0.6.0"
+version: "0.7.1"
 ---
 
 # Review Broker v1 Specification
@@ -153,9 +153,11 @@ blocks the affected path.
 
 ### Bounded private-source operational admission
 
-A distinct default-disabled path may admit one explicitly configured,
-low-sensitivity private-repository pull request. It requires exact requester,
-repository, pull-request number, expected head, and executing broker SHA
+The existing bounded private operational boundary is v1/v2-specific; it does
+not admit successor v3 requests. A distinct default-disabled path may admit one
+explicitly configured, low-sensitivity private-repository pull request. It requires
+exact requester, repository, pull-request number, expected head, and executing
+broker SHA
 bindings. It is available only for ReviewRequest v2, whose canonical request
 already binds the expected head.
 
@@ -166,10 +168,13 @@ credentials cannot substitute for source-read authority. Public-mode evidence
 cannot satisfy this path, and private-mode evidence records
 `public_repository_verified` as false.
 
-The source token is limited to repository metadata, pull-request resolution,
-file enumeration, clone, fetch, and publication applicability lookup. It is
-removed before reviewer execution and is never transferred to the reviewer
-runtime. This path preserves all canonical v1/v2 bytes, identities, one-attempt
+The source installation token explicitly requests only Contents: read,
+Pull requests: read, and Metadata: read. It does not obtain Issues: read merely
+because the parent App installation is later approved for v3. Its use is limited
+to repository metadata, pull-request resolution, file enumeration, clone, fetch,
+and publication applicability lookup. It is removed before reviewer execution
+and is never transferred to the reviewer runtime. This path preserves all
+canonical v1/v2 bytes, identities, one-attempt
 semantics, packet integrity, publication, recovery, and uncertainty rules. Its
 configuration does not authorize inference; exact operational activation and
 model execution remain separate decisions.
@@ -177,6 +182,51 @@ model execution remain separate decisions.
 The requester continues to own the variable mission and criteria. A reviewer
 result is evidence only; it never authorizes merge, publication, source
 modification or alteration of normative premises. See RB-PI-SEC-01 (#27).
+
+### Successor v3 source-reference credential boundary
+
+One dedicated source-reader GitHub App may support both legacy v1/v2 and
+successor protocols. The installed App may request exactly four read-only
+repository permissions: Contents, Pull requests, Metadata, and Issues. Every
+installation token must explicitly request its bounded use-case subset;
+implicit inheritance of installation permissions is forbidden.
+
+Legacy v1/v2 tokens request only Contents: read, Pull requests: read, and
+Metadata: read, omitting Issues. Candidate v3 tokens may additionally request
+Issues: read only for explicitly authorized source-reference acquisition.
+V3 Issue-body and comment reads use the same appropriately scoped source
+installation token as v3 source acquisition, under verified installation and
+repository authority. Requester authorization remains independent of the App's
+source-read permission. A credential issued for one protocol must not be
+silently substituted for another.
+
+Original broker Issue admission, source-reference acquisition, journal mutation,
+and result publication remain separate authority boundaries. Source tokens
+cannot mutate repository state or grant reviewer execution authority. Neither
+profile grants repository-write, Issues-write, Actions, workflow,
+administration, Codespaces-control, publication, or reviewer-model authority.
+Source installation tokens have read-only authority. The trusted broker's
+publication command may possess a source token for current-source-PR
+applicability checks. That lookup remains a source-read operation; the source
+token is not the publication writer credential and must not be used for journal
+or result mutation. Those mutations use separately authorized credentials.
+The trusted reconciliation command may possess source, journal, and
+Codespaces-control credentials within the same process; their permitted
+operations remain separately restricted.
+
+No source token may be passed into the independent reviewer execution
+environment, Codespace reviewer process, model prompt, retained packet, public
+logs, or ReviewResult. Journal, publication, and Codespaces-control credentials
+must likewise remain outside reviewer execution. The existing implementation
+provides purpose-restricted credential use and controlled subprocess propagation,
+not complete process-level possession isolation. A compromise of the trusted
+broker process may cross these logical boundaries.
+
+Missing permissions, ambiguous API failures, unauthorized installations, and
+repository mismatches fail closed. Production v3 activation and live use require
+separate qualification and owner approval. This subsection accepts only the
+source-credential boundary for the separately qualified successor path; it does
+not normatively accept ReviewRequest v3 or Reviewer Packet v2 as a whole.
 
 ## Required separations
 

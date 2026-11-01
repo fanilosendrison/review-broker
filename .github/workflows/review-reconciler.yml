@@ -36,6 +36,9 @@ jobs:
           app-id: ${{ vars.REVIEW_BROKER_SOURCE_APP_ID }}
           private-key: ${{ secrets.REVIEW_BROKER_SOURCE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
+          permission-contents: read
+          permission-pull-requests: read
+          permission-metadata: read
       - name: Discover durable attempts and stranded Codespace
         env:
           GH_TOKEN: ${{ github.token }}

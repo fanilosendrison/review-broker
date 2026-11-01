@@ -5,7 +5,7 @@ asset_type: "security-model"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Threat Model"
-version: "0.2.0"
+version: "0.3.1"
 ---
 
 # Review Broker Threat Model
@@ -25,12 +25,54 @@ on the default branch, versioned schemas and profiles, admission policy, the
 atomic journal, and independent validators are trusted only within their
 qualified responsibilities.
 
-The GitHub Actions publication token, dedicated Codespaces lifecycle token, and
-short-lived private-source read token are separate. The source token is minted
-from a read-only GitHub App and is passed only to source-resolution and Git
-acquisition subprocesses. The Codex ChatGPT session exists only in the dedicated
-Codespace. No reviewer process receives source, repository-write, lifecycle, or
-publication credentials.
+The GitHub Actions journal/publication credential, dedicated Codespaces
+lifecycle credential, and source-reader GitHub App authority remain separate.
+One installed source App may support two explicitly restricted installation-token
+profiles: `LEGACY_SOURCE_READ` requests only Contents, Pull requests, and Metadata
+reads; candidate `V3_REFERENCE_SOURCE_READ` additionally requests Issues: read
+for separately authorized source-reference acquisition. Legacy tokens never
+inherit Issues access from a broader installation. App registered permissions,
+installation approval, and effective issued-token grants are distinct facts;
+proposed Issues permission is not evidence of an approved effective grant.
+
+Both source tokens derive from the same App private key. They are separately
+scoped tokens, not independent App-private-key compromise domains. A compromised
+App private key could mint tokens within the installation's approved authority;
+token restriction does not remove that shared risk. App expansion therefore
+requires accepted contract publication, verified legacy restrictions, separate
+owner App/installation approval, and separately approved live qualification.
+
+The source-token authority, trusted broker orchestrator process, isolated
+source-read subprocesses, journal/result mutation authority, Codespaces lifecycle
+authority, and independent reviewer execution environment are distinct trust
+roles. Separate GitHub credential permissions do not imply separate OS processes.
+The trusted publication command may possess a source token for read-only
+current-source-PR applicability lookup alongside its journal/publication
+credential. The trusted reconciler may temporarily possess source, journal,
+and Codespaces-control credentials within the same process.
+
+Controls restrict credential use and subprocess propagation: source-read
+operations receive the source token, including applicable isolated Git
+subprocesses and separately authorized candidate v3 Issue/comment reads.
+Journal/result mutations and Codespaces lifecycle operations use their separately
+authorized credentials. Requester admission remains independent. Neither source
+profile permits writes, Actions, workflow, administration, journal mutation,
+result publication, Codespaces control, or reviewer-model authority.
+Publication-applicability lookup does not make the source token a writer.
+
+Credential permission separation is supported; complete process-level possession
+isolation is not established. A compromised trusted broker process could
+potentially access co-resident credentials and cross these logical boundaries.
+This is an existing architectural exposure and residual risk, not evidence of
+an experimentally demonstrated compromise. The original risk-proportionate
+security policy remains applicable; no exhaustive Codex-internals attestation
+requirement is introduced.
+
+No source, journal, publication, or Codespaces-control credential is intentionally
+transferred into the independent reviewer execution environment or Codespace
+reviewer process. Those credentials must remain outside that environment,
+model prompts, retained packets, public logs, and ReviewResults. The Codex
+ChatGPT session exists only in the dedicated Codespace.
 
 ## Threats and controls
 
@@ -69,16 +111,18 @@ authorize a second attempt.
 ### Credential exposure and network exfiltration
 
 API-key, GitHub token, base URL, organization, and project overrides are removed
-from the Codex child environment. Known credential-shaped patterns are screened before each ordinary artifact
-upload and result publication. Detected raw runner evidence is replaced with a
+from the Codex child environment. Known credential-shaped patterns are screened
+before each ordinary artifact upload and result publication. Detected raw runner
+evidence is replaced with a
 sanitized incident; contaminated results and findings cannot be published.
 This bounded detection is not proof that all secrets are absent. The ChatGPT
 credential file is never intentionally copied, logged, committed, or placed in
 Actions secrets.
 
 The built-in Codex `:read-only` profile was proven insufficient because it
-allowed reads from filesystem root. The reviewed named profile denied the runtime home and trusted workspace but
-still allowed reads elsewhere at filesystem root. A direct non-secret Codex
+allowed reads from filesystem root. The reviewed named profile denied the
+runtime home and trusted workspace but still allowed reads elsewhere at
+filesystem root. A direct non-secret Codex
 `0.164.0` probe independently observed an outside-tree canary readable. The
 revised profile instead grants Codex's minimal system paths plus only the exact
 packet directory, explicitly denies the home and workspace, denies writes and
@@ -168,13 +212,15 @@ comprehensive high-assurance qualification variable remains separate and unset.
 ## Residual risks and comprehensive blocker
 
 ChatGPT authentication is verified. The dedicated Codespaces-control transport
-passed T1–T6 in Actions run `40304872558`. The historical root-readable profile passed its limited producer canaries but
-failed an outside-tree canary. A temporary minimal-read direct-sandbox probe
+passed T1–T6 in Actions run `40304872558`. The historical root-readable profile
+passed its limited producer canaries but failed an outside-tree canary. A
+temporary minimal-read direct-sandbox probe
 observed denial of that outside canary, but did not test an authenticated
 model-tool invocation or establish parent-process, descriptor, hard-link, and
 output-channel safety. The installed historical profile is not silently
-upgraded: the revised installer fails closed on mismatch. Managed-policy overrides, filesystem aliases, inherited process capabilities,
-`/proc` and descriptor visibility, and unobserved effective tool routes remain
+upgraded: the revised installer fails closed on mismatch. Managed-policy
+overrides, filesystem aliases, inherited process capabilities, `/proc` and
+descriptor visibility, and unobserved effective tool routes remain
 real residual risks. They remain blockers for the comprehensive qualification
 claim, not silently reclassified PASS. The comprehensive security variable must
 remain unset until its independent qualification accepts the required exact
@@ -187,6 +233,7 @@ not establish upstream-source reproducibility. Synthetic managed-requirement
 probes also demonstrated that Codex can replace `shell_tool=false`, the named
 profile, `approval_policy=never`, and network denial. No supported interface was
 found that exposes all final values from the same `codex exec` process before
-model transport. Effective-policy attestation is therefore blocked for the original complete
-production qualification gate, which remains closed. The fixed synthetic pilot
+model transport. Effective-policy attestation is therefore blocked for the
+original complete production qualification gate, which remains closed. The fixed
+synthetic pilot
 is the narrowly scoped, explicit exception described above.
