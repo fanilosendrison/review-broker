@@ -1,7 +1,7 @@
 """Exact isolated Git-backed subject capture for authenticated v3 PR scope."""
 from __future__ import annotations
 from dataclasses import replace
-import hashlib,os,signal,subprocess
+import hashlib,os,selectors,signal,subprocess,time
 from pathlib import Path
 from typing import Callable,Mapping
 from .admission_v3 import SourceRepositoryAuthorizationV3
@@ -13,11 +13,24 @@ from .source_authorization import isolated_source_environment,require_private_so
 class GitHubSubjectCaptureV3Error(RuntimeError):pass
 _popen=subprocess.Popen
 AcquireRepositoryV3=Callable[[Path,Mapping[str,str]],None]
+def _close_pipes(process)->None:
+ for stream in (process.stdout,process.stderr):
+  if stream is not None:stream.close()
+def _terminate(process)->None:
+ if process.poll() is None:
+  try:os.killpg(process.pid,signal.SIGKILL)
+  except OSError:process.kill()
+  process.communicate()
+ _close_pipes(process)
 def _run(arguments:list[str],environment:Mapping[str,str],timeout:int=300)->bytes:
- try:result=subprocess.run(arguments,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=False,timeout=timeout,shell=False,env=dict(environment))
- except (OSError,subprocess.TimeoutExpired):raise GitHubSubjectCaptureV3Error("SUBJECT_GIT_COMMAND_FAILED") from None
- if result.returncode!=0:raise GitHubSubjectCaptureV3Error("SUBJECT_GIT_COMMAND_FAILED")
- return result.stdout
+ try:
+  process=_popen(arguments,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=dict(environment),start_new_session=True)
+  stdout,_=process.communicate(timeout=timeout);_close_pipes(process)
+ except subprocess.TimeoutExpired:
+  _terminate(process);raise GitHubSubjectCaptureV3Error("SUBJECT_GIT_COMMAND_TIMEOUT") from None
+ except OSError:raise GitHubSubjectCaptureV3Error("SUBJECT_GIT_COMMAND_FAILED") from None
+ if process.returncode!=0:raise GitHubSubjectCaptureV3Error("SUBJECT_GIT_COMMAND_FAILED")
+ return stdout
 def _default_acquire(repository:str,token:str)->AcquireRepositoryV3:
  def acquire(destination:Path,environment:Mapping[str,str])->None:
   remote=f"https://github.com/{repository}.git"
@@ -46,18 +59,23 @@ def _read_regular(git:GitSourceReader,spec:SourceSpec):
  if listed_path.decode("ascii")!=spec.path or kind!=b"blob" or mode not in {b"100644",b"100755"}:raise GitHubSubjectCaptureV3Error("SUBJECT_IMAGE_TYPE_UNSUPPORTED")
  try:
   process=_popen(["git","-C",str(git.repository_root),"cat-file","blob",oid],stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=git.environment,start_new_session=True)
-  assert process.stdout is not None;data=process.stdout.read(MAX_SOURCE_BYTES+1)
-  if len(data)>MAX_SOURCE_BYTES:
-   try:os.killpg(process.pid,signal.SIGKILL)
-   except OSError:process.kill()
-   process.communicate();raise GitHubSubjectCaptureV3Error("SUBJECT_SOURCE_TOO_LARGE")
-  _,stderr=process.communicate(timeout=git.timeout_seconds)
- except GitHubSubjectCaptureV3Error:raise
+  assert process.stdout is not None and process.stderr is not None;selector=selectors.DefaultSelector();selector.register(process.stdout,selectors.EVENT_READ,"stdout");selector.register(process.stderr,selectors.EVENT_READ,"stderr");data=bytearray();deadline=time.monotonic()+git.timeout_seconds
+  while selector.get_map():
+   remaining=deadline-time.monotonic()
+   if remaining<=0:raise subprocess.TimeoutExpired(process.args,git.timeout_seconds)
+   events=selector.select(remaining)
+   if not events:raise subprocess.TimeoutExpired(process.args,git.timeout_seconds)
+   for key,_ in events:
+    chunk=os.read(key.fileobj.fileno(),65536)
+    if not chunk:selector.unregister(key.fileobj);continue
+    if key.data=="stdout":
+     data.extend(chunk)
+     if len(data)>MAX_SOURCE_BYTES:raise GitHubSubjectCaptureV3Error("SUBJECT_SOURCE_TOO_LARGE")
+  process.wait(timeout=max(0.01,deadline-time.monotonic()));data=bytes(data);_close_pipes(process)
+ except GitHubSubjectCaptureV3Error:
+  _terminate(process);raise
  except (OSError,subprocess.TimeoutExpired):
-  if 'process' in locals() and process.poll() is None:
-   try:os.killpg(process.pid,signal.SIGKILL)
-   except OSError:process.kill()
-   process.communicate()
+  if 'process' in locals():_terminate(process)
   raise GitHubSubjectCaptureV3Error("SUBJECT_IMAGE_READ_FAILED") from None
  if process.returncode!=0:raise GitHubSubjectCaptureV3Error("SUBJECT_IMAGE_READ_FAILED")
  header=b"blob "+str(len(data)).encode()+b"\0"+data;algorithm=hashlib.sha1 if len(oid)==40 else hashlib.sha256
@@ -80,16 +98,18 @@ def capture_authenticated_subject_v3(scope:PullRequestScopeV3,reader:GitHubPullR
  with isolated_source_environment(environment) as isolated:
   assert isolated is not None;repository_root=private_root/"source.git"
   (acquire_repository or _default_acquire(scope.repository,source_token))(repository_root,isolated)
-  isolated={**isolated,"GIT_NO_REPLACE_OBJECTS":"1"}
+  source_environment=isolated
   for commit in (scope.base_sha,scope.head_sha):
-   try:_run(["git","-C",str(repository_root),"fetch","origin",commit,"--depth=256"],isolated,180)
+   try:_run(["git","-C",str(repository_root),"fetch","origin",commit,"--depth=256"],source_environment,180)
    except GitHubSubjectCaptureV3Error:raise GitHubSubjectCaptureV3Error("SUBJECT_COMMIT_FETCH_FAILED") from None
-  git=GitSourceReader(repository_root,environment=isolated);merge=None
+  local_environment={key:value for key,value in isolated.items() if key not in {"GH_TOKEN","GIT_CONFIG_COUNT","GIT_CONFIG_KEY_0","GIT_CONFIG_KEY_1","GIT_CONFIG_VALUE_0","GIT_CONFIG_VALUE_1"}}
+  local_environment.update({"GIT_NO_REPLACE_OBJECTS":"1","GIT_CONFIG_NOSYSTEM":"1","GIT_CONFIG_GLOBAL":os.devnull,"GIT_TERMINAL_PROMPT":"0"})
+  git=GitSourceReader(repository_root,environment=local_environment);merge=None
   for deepen in (0,256,512,1024,2048,4096):
    try:merge=git._git("merge-base",scope.base_sha,scope.head_sha).decode().strip()
    except Exception:
     if deepen==4096:break
-    _run(["git","-C",str(repository_root),"fetch","origin",f"--deepen={max(1,deepen)}"],isolated,180);continue
+    _run(["git","-C",str(repository_root),"fetch","origin",f"--deepen={max(1,deepen)}"],source_environment,180);continue
    break
   if merge is None:raise GitHubSubjectCaptureV3Error("SUBJECT_ANCESTRY_UNAVAILABLE")
   if merge!=scope.merge_base_sha:raise GitHubSubjectCaptureV3Error("SUBJECT_MERGE_BASE_MISMATCH")
