@@ -87,5 +87,6 @@ class GitHubSourceAuthorityV3:
   return self._scope
  def authorize(self,repository:str,repository_id:int)->SourceRepositoryAuthorizationV3|None:
   if repository!=self.repository or repository_id!=self.repository_id or self._scope is None:return None
-  basis={"schema_version":1,"evidence_type":"v3-source-repository-authorization","repository":repository,"repository_id":repository_id,"principal_id":self.app_slug,"installation_id":self.installation_id}
-  return SourceRepositoryAuthorizationV3(repository,repository_id,self.app_slug,self.installation_id,artifact_identity(canonical_bytes(basis)+b"\n"))
+  principal=f"{self.app_slug}|scope={self._scope.evidence_id}"
+  basis={"schema_version":1,"evidence_type":"v3-source-repository-authorization","repository":repository,"repository_id":repository_id,"principal_id":principal,"installation_id":self.installation_id}
+  return SourceRepositoryAuthorizationV3(repository,repository_id,principal,self.installation_id,artifact_identity(canonical_bytes(basis)+b"\n"))

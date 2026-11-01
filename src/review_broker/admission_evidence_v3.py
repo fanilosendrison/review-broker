@@ -155,6 +155,13 @@ def validate_journal_admission_v3(
             or resolved.get("pull_request_id") != source.get("pull_request_id")
             or resolved.get("head_commit") != source.get("head_sha")):
         raise AdmissionV3CandidateError("JOURNAL_ADMISSION_PROVENANCE_MISMATCH")
+    principal=source["principal_id"]
+    if "|scope=" in principal:
+        scope_id=principal.rsplit("|scope=",1)[1]
+        if value.get("source_app_scope_evidence_id")!=scope_id:
+            raise AdmissionV3CandidateError("JOURNAL_ADMISSION_SOURCE_SCOPE_MISMATCH")
+    elif "source_app_scope_evidence_id" in value:
+        raise AdmissionV3CandidateError("JOURNAL_ADMISSION_SOURCE_SCOPE_UNBOUND")
     source_auth = {
         "schema_version": 1, "evidence_type": "v3-source-repository-authorization",
         "repository": source["repository"], "repository_id": source["repository_id"],
