@@ -78,7 +78,8 @@ class GitHubGitFileReaderV3:
 
     def __init__(self, token: str, repository: str, repository_id: int, *,
                  authority_evidence_id: str, expected_installation_id: int | None = None,
-                 qualification_only: bool = False, executor: HttpExecutorV3 | None = None,
+                 source_authority: object | None = None, qualification_only: bool = False,
+                 executor: HttpExecutorV3 | None = None,
                  clock: ClockV3 | None = None):
         if not token or token.strip() != token or any(c in token for c in "\r\n"):
             raise ValueError("GITHUB_TOKEN_INVALID")
@@ -88,18 +89,22 @@ class GitHubGitFileReaderV3:
         if (not authority_evidence_id.startswith("artifact:sha256:")
                 or len(authority_evidence_id) != 80): raise ValueError("GITHUB_SOURCE_AUTHORITY_INVALID")
         self.repository, self.repository_id, self._token = repository, repository_id, token
-        if not qualification_only: _positive(expected_installation_id, "GITHUB_INSTALLATION_ID_INVALID")
+        if not qualification_only:
+            from .github_source_authority_v3 import GitHubSourceAuthorityV3
+            if type(source_authority) is not GitHubSourceAuthorityV3: raise ValueError("GITHUB_SOURCE_AUTHORITY_REQUIRED")
         self.authority_evidence_id = authority_evidence_id
-        self.expected_installation_id, self.qualification_only = expected_installation_id, qualification_only
+        self.source_authority,self.qualification_only=source_authority,qualification_only
+        self.expected_installation_id=(expected_installation_id if qualification_only else getattr(source_authority,"installation_id",None))
+        if not qualification_only: _positive(self.expected_installation_id,"GITHUB_INSTALLATION_ID_INVALID")
         self._owner, self._name = repository.split("/", 1)
         self._executor = executor or (lambda request: urllib_executor_bounded(request, _MAX_RESPONSE))
         self._clock = clock or (lambda: datetime.now(timezone.utc))
 
     def _get(self, suffix: str) -> HttpResponseV3:
         root = f"/repos/{quote(self._owner, safe='')}/{quote(self._name, safe='')}"
-        if not (suffix in {"", "/installation"} or re.fullmatch(r"/git/(?:commits|trees|blobs)/[0-9a-f]{40}", suffix)):
+        if not (suffix == "" or re.fullmatch(r"/git/(?:commits|trees|blobs)/[0-9a-f]{40}", suffix)):
             raise GitHubGitFileV3Error("GIT_FILE_ENDPOINT_INVALID")
-        url = _API + suffix if suffix == "/installation" else _API + root + suffix
+        url = _API + root + suffix
         request = Request(url, headers={
             "Accept": "application/vnd.github+json", "Authorization": f"Bearer {self._token}",
             "X-GitHub-Api-Version": _VERSION}, method="GET")
@@ -112,9 +117,9 @@ class GitHubGitFileReaderV3:
 
     def _verify_credential_authority(self) -> None:
         if self.qualification_only: return
-        value = _object(self._get("/installation"), "GIT_FILE_INSTALLATION_RESPONSE_INVALID")
-        if _positive(value.get("id"), "GIT_FILE_INSTALLATION_ID_INVALID") != self.expected_installation_id:
-            raise GitHubGitFileV3Error("GIT_FILE_INSTALLATION_IDENTITY_MISMATCH")
+        permits=getattr(self.source_authority,"permits_token",None)
+        if not callable(permits) or not permits(self._token,self.repository,self.repository_id):
+            raise GitHubGitFileV3Error("GIT_FILE_SOURCE_AUTHORITY_MISMATCH")
 
     def _verify_repository(self) -> None:
         value = _object(self._get(""), "GIT_FILE_REPOSITORY_RESPONSE_INVALID")

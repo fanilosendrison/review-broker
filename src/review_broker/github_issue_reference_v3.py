@@ -43,23 +43,27 @@ def _object(response,marker):
 
 class GitHubIssueReferenceReaderV3:
     def __init__(self,token,repository,repository_id,*,authority_evidence_id,
-                 expected_installation_id=None,qualification_only=False,executor=None,clock=None):
+                 expected_installation_id=None,source_authority=None,qualification_only=False,executor=None,clock=None):
         if not token or token.strip()!=token or any(c in token for c in "\r\n"): raise ValueError("GITHUB_TOKEN_INVALID")
         if _REPO.fullmatch(repository) is None: raise ValueError("GITHUB_REPOSITORY_INVALID")
         _positive(repository_id,"GITHUB_REPOSITORY_ID_INVALID")
         if not authority_evidence_id.startswith("artifact:sha256:") or len(authority_evidence_id)!=80: raise ValueError("GITHUB_SOURCE_AUTHORITY_INVALID")
-        if not qualification_only: _positive(expected_installation_id,"GITHUB_INSTALLATION_ID_INVALID")
+        if not qualification_only:
+            from .github_source_authority_v3 import GitHubSourceAuthorityV3
+            if type(source_authority) is not GitHubSourceAuthorityV3: raise ValueError("GITHUB_SOURCE_AUTHORITY_REQUIRED")
         self.repository,self.repository_id,self._token=repository,repository_id,token
-        self.authority_evidence_id,self.installation_id=authority_evidence_id,expected_installation_id
+        self.authority_evidence_id=authority_evidence_id;self.source_authority=source_authority
+        self.installation_id=expected_installation_id if qualification_only else getattr(source_authority,"installation_id",None)
+        if not qualification_only:_positive(self.installation_id,"GITHUB_INSTALLATION_ID_INVALID")
         self.qualification_only=qualification_only; self._owner,self._name=repository.split("/",1)
         self._executor=executor or (lambda req: urllib_executor_bounded(req,_RESP))
         self._clock=clock or (lambda:datetime.now(timezone.utc))
     def _get(self,suffix):
         root=f"/repos/{quote(self._owner,safe='')}/{quote(self._name,safe='')}"
-        allowed=(suffix in {"","/installation"} or re.fullmatch(r"/issues/[1-9][0-9]*",suffix)
+        allowed=(suffix=="" or re.fullmatch(r"/issues/[1-9][0-9]*",suffix)
                  or re.fullmatch(r"/issues/comments/[1-9][0-9]*",suffix))
         if not allowed: raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_ENDPOINT_INVALID")
-        url=_API+suffix if suffix=="/installation" else _API+root+suffix
+        url=_API+root+suffix
         request=Request(url,headers={"Accept":"application/vnd.github+json","Authorization":f"Bearer {self._token}","X-GitHub-Api-Version":_VERSION},method="GET")
         try: response=self._executor(request)
         except Exception: raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_AUTHORITY_UNAVAILABLE") from None
@@ -69,8 +73,8 @@ class GitHubIssueReferenceReaderV3:
         return response
     def _authority(self):
         if not self.qualification_only:
-            value=_object(self._get("/installation"),"ISSUE_REFERENCE_INSTALLATION_INVALID")
-            if _positive(value.get("id"),"ISSUE_REFERENCE_INSTALLATION_INVALID")!=self.installation_id: raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_INSTALLATION_MISMATCH")
+            permits=getattr(self.source_authority,"permits_token",None)
+            if not callable(permits) or not permits(self._token,self.repository,self.repository_id): raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_SOURCE_AUTHORITY_MISMATCH")
     def _repo(self):
         value=_object(self._get(""),"ISSUE_REFERENCE_REPOSITORY_INVALID")
         if value.get("full_name")!=self.repository or _positive(value.get("id"),"ISSUE_REFERENCE_REPOSITORY_INVALID")!=self.repository_id: raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_REPOSITORY_MISMATCH")
