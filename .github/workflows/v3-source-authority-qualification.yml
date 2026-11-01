@@ -1,141 +1,35 @@
-name: V3 source authority qualification candidate
+name: V3 source authority qualification blocked candidate
 
 on:
   workflow_dispatch:
     inputs:
       approved_code_sha:
-        description: Independently reviewed exact executable SHA
+        description: Independently reviewed exact candidate SHA
         required: true
         type: string
-      owner_approval_receipt:
-        description: Owner-controlled source-App permission approval identifier
+      accepted_authority_decision:
+        description: Accepted decision authorizing the successor credential boundary
         required: true
         type: string
-      issue_comment_id:
-        description: Approved comment object used for same-token read qualification
-        required: true
-        type: number
-      authorized_requester_id:
-        description: Owner-approved numeric requester identity for broker Issue 69
-        required: true
-        type: number
 
 permissions: {}
 
-concurrency:
-  group: v3-source-authority-qualification
-  cancel-in-progress: false
-
 jobs:
-  verify-approved-code:
+  authority-gate:
     runs-on: ubuntu-24.04
-    outputs:
-      approved: ${{ steps.verify.outputs.approved }}
     steps:
-      - id: verify
+      - name: Stop before credentials or source effects
         env:
           APPROVED_CODE_SHA: ${{ inputs.approved_code_sha }}
           OWNER_APPROVED_CODE_SHA: ${{ vars.REVIEW_BROKER_V3_SOURCE_QUALIFICATION_SHA }}
+          ACCEPTED_AUTHORITY_DECISION: ${{ inputs.accepted_authority_decision }}
         run: |
           set -euo pipefail
+          test -n "$APPROVED_CODE_SHA"
           test -n "$OWNER_APPROVED_CODE_SHA"
-          test "$APPROVED_CODE_SHA" = "$OWNER_APPROVED_CODE_SHA"
           test "$GITHUB_SHA" = "$APPROVED_CODE_SHA"
-          [[ "$APPROVED_CODE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          echo "approved=true" >> "$GITHUB_OUTPUT"
-
-  qualify:
-    needs: verify-approved-code
-    if: needs.verify-approved-code.outputs.approved == 'true'
-    environment: v3-source-authority-owner-approved
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - name: Mint exact repository-scoped source token
-        id: source-auth
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
-        with:
-          app-id: ${{ vars.REVIEW_BROKER_SOURCE_APP_ID }}
-          private-key: ${{ secrets.REVIEW_BROKER_SOURCE_APP_PRIVATE_KEY }}
-          owner: fanilosendrison
-          repositories: review-broker
-          permission-contents: read
-          permission-pull-requests: read
-          permission-metadata: read
-          permission-issues: read
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          ref: ${{ inputs.approved_code_sha }}
-          token: ${{ steps.source-auth.outputs.token }}
-          persist-credentials: false
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.11'
-      - name: Execute bounded read-only qualification
-        env:
-          GH_TOKEN: ${{ steps.source-auth.outputs.token }}
-          APPROVED_CODE_SHA: ${{ inputs.approved_code_sha }}
-          SOURCE_APP_SLUG: ${{ steps.source-auth.outputs.app-slug }}
-          SOURCE_INSTALLATION_ID: ${{ steps.source-auth.outputs.installation-id }}
-          OWNER_APPROVAL_RECEIPT: ${{ inputs.owner_approval_receipt }}
-          EXPECTED_REPOSITORY: fanilosendrison/review-broker
-          EXPECTED_REPOSITORY_ID: '1433701208'
-          EXPECTED_PULL_REQUEST: '71'
-          EXPECTED_HEAD: 9258617056e9d2e20cce7f05e6be71ea82dfbd23
-          ISSUE_COMMENT_ID: ${{ inputs.issue_comment_id }}
-          AUTHORIZED_REQUESTER_ID: ${{ inputs.authorized_requester_id }}
-        run: |
-          set -euo pipefail
-          set +x
-          test "$(git rev-parse HEAD)" = "${{ inputs.approved_code_sha }}"
-          test -n "$SOURCE_APP_SLUG"
-          test -n "$SOURCE_INSTALLATION_ID"
-          test -n "$OWNER_APPROVAL_RECEIPT"
-          env -u GH_TOKEN python -m pip install . >/dev/null
-          python - <<'PY'
-          import hashlib, json, os, tempfile
-          from pathlib import Path
-          from review_broker.github_issue_origin_v3 import GitHubIssueOriginReaderV3
-          from review_broker.github_issue_reference_v3 import GitHubIssueReferenceReaderV3
-          from review_broker.github_requester_authority_v3 import GitHubRequesterAuthorityV3
-          from review_broker.github_pull_request_observation_v3 import GitHubPullRequestObservationReaderV3
-          from review_broker.github_source_authority_v3 import GitHubSourceAuthorityV3
-          from review_broker.github_subject_capture_v3 import capture_authenticated_subject_v3, bind_authenticated_capture_v3
-          from review_broker.identity import artifact_identity, canonical_bytes
-          repository=os.environ["EXPECTED_REPOSITORY"];repository_id=int(os.environ["EXPECTED_REPOSITORY_ID"])
-          authority=GitHubSourceAuthorityV3(os.environ["GH_TOKEN"],expected_app_slug=os.environ["SOURCE_APP_SLUG"],expected_installation_id=int(os.environ["SOURCE_INSTALLATION_ID"]),repository=repository,repository_id=repository_id,approved_permissions=frozenset({"contents:read","pull_requests:read","metadata:read","issues:read"}),authorized_repositories=frozenset({repository}))
-          scope_authority=authority.observe_scope();source=authority.authorize(repository,repository_id)
-          origin=GitHubIssueOriginReaderV3(os.environ["GH_TOKEN"],repository,repository_id).observe(69)
-          requester=GitHubRequesterAuthorityV3(requester_id=int(os.environ["AUTHORIZED_REQUESTER_ID"]),broker_issue_id=origin.issue_id,origin_evidence_id=origin.evidence_id,authorized=True).authorize(origin.requester_id,origin.issue_id,origin.evidence_id)
-          if requester is None: raise RuntimeError("REQUESTER_AUTHORIZATION_REJECTED")
-          issue_reader=GitHubIssueReferenceReaderV3(os.environ["GH_TOKEN"],repository,repository_id,authority_evidence_id=source.evidence_id,source_authority=authority)
-          issue=issue_reader.observe_issue_body(69);comment=issue_reader.observe_issue_comment(int(os.environ["ISSUE_COMMENT_ID"]))
-          observer=GitHubPullRequestObservationReaderV3(os.environ["GH_TOKEN"],repository,repository_id,int(os.environ["EXPECTED_PULL_REQUEST"]),os.environ["EXPECTED_HEAD"],source_authority=authority)
-          pr_scope=observer.observe_scope()
-          with tempfile.TemporaryDirectory() as temporary:
-              capture=capture_authenticated_subject_v3(pr_scope,observer,source,scope_authority.evidence_id,os.environ["GH_TOKEN"],Path(temporary))
-              observed=observer.finalize(pr_scope,capture)
-              capture=bind_authenticated_capture_v3(capture,source.evidence_id,observed.evidence_id)
-              receipt={"schema_version":1,"evidence_type":"v3-live-source-authority-qualification","workflow_run_id":int(os.environ["GITHUB_RUN_ID"]),"workflow_run_attempt":int(os.environ["GITHUB_RUN_ATTEMPT"]),"workflow_job":os.environ["GITHUB_JOB"],"event_name":os.environ["GITHUB_EVENT_NAME"],"executing_sha":os.environ["GITHUB_SHA"],"approved_code_sha":os.environ["APPROVED_CODE_SHA"],"owner_approval_receipt_sha256":hashlib.sha256(os.environ["OWNER_APPROVAL_RECEIPT"].encode()).hexdigest(),"app_slug":os.environ["SOURCE_APP_SLUG"],"installation_id":int(os.environ["SOURCE_INSTALLATION_ID"]),"permissions":["contents:read","issues:read","metadata:read","pull_requests:read"],"repository":repository,"repository_id":repository_id,"pull_request":int(os.environ["EXPECTED_PULL_REQUEST"]),"pull_request_id":observed.pull_request_id,"base_sha":capture.base_sha,"head_sha":capture.head_sha,"merge_base_sha":capture.merge_base_sha,"source_scope_evidence_id":scope_authority.evidence_id,"origin_evidence_id":origin.evidence_id,"requester_authorization_evidence_id":requester.evidence_id,"issue_evidence_id":issue.evidence_id,"comment_evidence_id":comment.evidence_id,"pr_observation_evidence_id":observed.evidence_id,"subject_capture_evidence_id":capture.evidence_id,"diff_sha256":hashlib.sha256(capture.diff).hexdigest(),"images":[{"commit":record.commit,"path":record.path,"git_blob_oid":record.git_blob_oid,"sha256":hashlib.sha256(record.original_bytes).hexdigest()} for record in capture.records],"github_mutations":0,"codespace_effects":0,"model_invocations":0}
-              raw=canonical_bytes(receipt)+b"\n";Path("qualification-receipt.json").write_bytes(raw)
-              print("QUALIFICATION_DISPOSITION=PASS")
-              print(f"QUALIFICATION_RECEIPT_ID={artifact_identity(raw)}")
-              print(f"SOURCE_SCOPE_EVIDENCE_ID={scope_authority.evidence_id}")
-              print(f"ORIGIN_EVIDENCE_ID={origin.evidence_id}")
-              print(f"REQUESTER_AUTHORIZATION_EVIDENCE_ID={requester.evidence_id}")
-              print(f"ISSUE_EVIDENCE_ID={issue.evidence_id}")
-              print(f"COMMENT_EVIDENCE_ID={comment.evidence_id}")
-              print(f"PR_OBSERVATION_EVIDENCE_ID={observed.evidence_id}")
-              print(f"SUBJECT_CAPTURE_EVIDENCE_ID={capture.evidence_id}")
-              print(f"DIFF_SHA256={hashlib.sha256(capture.diff).hexdigest()}")
-          print("LIVE_GITHUB_MUTATIONS=0")
-          print("LIVE_CODESPACE_EFFECTS=0")
-          print("LIVE_MODEL_INVOCATIONS=0")
-          PY
-      - name: Retain credential-free qualification receipt
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: v3-source-authority-qualification-${{ github.run_id }}-${{ github.run_attempt }}
-          path: qualification-receipt.json
-          if-no-files-found: error
-          retention-days: 30
+          test "$APPROVED_CODE_SHA" = "$OWNER_APPROVED_CODE_SHA"
+          test -n "$ACCEPTED_AUTHORITY_DECISION"
+          echo 'LIVE_SOURCE_APP_PERMISSION=BLOCKED_AUTHORITY_CONFLICT'
+          echo 'No credential was minted and no source request was made.'
+          exit 1
