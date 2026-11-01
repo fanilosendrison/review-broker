@@ -24,6 +24,8 @@ jobs:
       github.triggering_actor == 'fanilosendrison' &&
       vars.REVIEW_BROKER_V3_SOURCE_QUALIFICATION_SHA != '' &&
       github.sha == vars.REVIEW_BROKER_V3_SOURCE_QUALIFICATION_SHA
+    permissions:
+      contents: read
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

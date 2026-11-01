@@ -27,7 +27,7 @@ V3_PERMISSIONS = {**LEGACY_PERMISSIONS, "permission-issues": "read"}
 # Exact, independently reviewed workflow snapshot: fixes trigger, one guarded
 # job, preflight-before-key order, pins, repository selection and token consumers.
 # Static current-tree evidence only; not a claim about live effective grants.
-V3_WORKFLOW_SHA256 = "cf7ba54f654ac869843b27b75bd201a1ad301786f73348c357c3bf03b7b84fa2"
+V3_WORKFLOW_SHA256 = "f761c4d838c4249497ff205e7130a06c0d09f26be654228e0f2c43688e5d4e3e"
 
 QUALIFICATION_HEADER = """name: Private source qualification
 
@@ -340,6 +340,9 @@ class SourceAppCredentialScopeTests(unittest.TestCase):
 
     def test_v3_workflow_trust_and_scope_mutations_are_rejected(self):
         mutations = [
+            ("    permissions:\n      contents: read\n", ""),
+            ("      contents: read\n", "      contents: write\n"),
+            ("      contents: read\n", "      contents: read\n      issues: write\n"),
             ("      github.sha == vars.REVIEW_BROKER_V3_SOURCE_QUALIFICATION_SHA\n", ""),
             ("repository_dispatch:", "workflow_dispatch:"),
             ("on:\n", "on:\n  pull_request_target:\n"),

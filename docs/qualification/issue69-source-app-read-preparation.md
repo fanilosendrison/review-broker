@@ -64,6 +64,13 @@ merely a reviewed PR head. A later default-branch commit requires fresh approval
 Default-branch writers/admins remain a broader trust domain; this is not global
 repository-secret isolation or protection from a compromised authorized owner.
 
+The workflow's default permissions remain empty. The sole guarded job requests
+only `contents: read` for its job token so pinned checkout can fetch the private
+trusted broker repository. This bootstrap token is not used for source authority
+observations or passed to the preflight environment. No job-token write or other
+permission is requested. The oracle step explicitly empties `GITHUB_TOKEN` and
+uses only the separately minted source-App token.
+
 Before token minting, pinned checkout selects `github.sha` with persisted
 credentials disabled; pinned setup-python selects Python 3.11. A credential-free
 preflight confronts checked-out Git HEAD, event SHA, approved SHA, ref and event,
@@ -178,7 +185,8 @@ markers cover:
   and attempts to print original Issue/comment/source content.
 - Workflow owner-SHA gate removal, alternate/manual triggers, repository-scope
   removal, missing Issues read, write grants, extra mints, action-pin changes,
-  preflight/job secret placement and payload-controlled authority.
+  preflight/job secret placement, payload-controlled authority and removed,
+  broadened or write-granting checkout job-token permissions.
 
 The existing three legacy scope guards and admission/prearm/runtime tests remain
 required. Static workflow snapshots intentionally constrain exact structure and
