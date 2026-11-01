@@ -79,6 +79,8 @@ class GitHubGitFileReaderTests(unittest.TestCase):
                 reader(api).observe(COMMIT, "contract.md")
         with self.assertRaisesRegex(GitHubGitFileV3Error, "EXPECTED_SHA256_MISMATCH"):
             reader(Api()).observe(COMMIT, "contract.md", "0" * 64)
+        with self.assertRaisesRegex(GitHubGitFileV3Error, "SOURCE_CREDENTIAL_IN_CONTENT"):
+            reader(Api(data=b"token")).observe(COMMIT, "contract.md")
 
     def test_invalid_commit_path_base64_utf8_and_size_fail(self):
         for commit, path, api, marker in (

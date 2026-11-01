@@ -168,6 +168,7 @@ class GitHubGitFileReaderV3:
             raise GitHubGitFileV3Error("GIT_FILE_SOURCE_SIZE_INVALID")
         header = b"blob " + str(len(original)).encode("ascii") + b"\0" + original
         if hashlib.sha1(header).hexdigest() != blob_oid: raise GitHubGitFileV3Error("GIT_FILE_BLOB_OID_MISMATCH")
+        if self._token.encode("utf-8") in original: raise GitHubGitFileV3Error("GIT_FILE_SOURCE_CREDENTIAL_IN_CONTENT")
         digest = hashlib.sha256(original).hexdigest()
         if expected_sha256 is not None and digest != expected_sha256:
             raise GitHubGitFileV3Error("GIT_FILE_EXPECTED_SHA256_MISMATCH")

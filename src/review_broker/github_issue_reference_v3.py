@@ -87,6 +87,7 @@ class GitHubIssueReferenceReaderV3:
         try: data=body.encode("utf-8"); decode_physical_lines(data)
         except (UnicodeEncodeError,PhysicalLineError): raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_UTF8_INVALID") from None
         if len(data)>_MAX: raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_BODY_TOO_LARGE")
+        if self._token.encode("utf-8") in data: raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_SOURCE_CREDENTIAL_IN_CONTENT")
         digest=hashlib.sha256(data).hexdigest()
         if expected is not None and digest!=expected: raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_EXPECTED_SHA256_MISMATCH")
         author_id=_positive(author,"ISSUE_REFERENCE_AUTHOR_INVALID"); issue_id=_positive(issue.get("id"),"ISSUE_REFERENCE_ISSUE_ID_INVALID")

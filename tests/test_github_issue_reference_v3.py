@@ -28,4 +28,5 @@ class Tests(unittest.TestCase):
    with self.subTest(marker=marker),self.assertRaisesRegex(GitHubIssueReferenceV3Error,marker):
     reader(api).observe_issue_comment(99) if comment else reader(api).observe_issue_body(43)
   with self.assertRaisesRegex(GitHubIssueReferenceV3Error,"EXPECTED_SHA256_MISMATCH"): reader(Api()).observe_issue_body(43,"0"*64)
+  with self.assertRaisesRegex(GitHubIssueReferenceV3Error,"SOURCE_CREDENTIAL_IN_CONTENT"): reader(Api(body="token")).observe_issue_body(43)
 if __name__=="__main__": unittest.main()
