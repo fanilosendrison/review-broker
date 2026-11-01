@@ -101,33 +101,35 @@ def capture_authenticated_subject_v3(scope:PullRequestScopeV3,reader:GitHubPullR
   for commit in (scope.base_sha,scope.head_sha):
    try:_run(["git","-C",str(repository_root),"fetch","origin",commit,"--depth=256"],source_environment,180)
    except GitHubSubjectCaptureV3Error:raise GitHubSubjectCaptureV3Error("SUBJECT_COMMIT_FETCH_FAILED") from None
-  local_environment={key:value for key,value in isolated.items() if key not in {"GH_TOKEN","GIT_CONFIG_COUNT","GIT_CONFIG_KEY_0","GIT_CONFIG_KEY_1","GIT_CONFIG_VALUE_0","GIT_CONFIG_VALUE_1"}}
-  local_environment.update({"GIT_NO_REPLACE_OBJECTS":"1","GIT_CONFIG_NOSYSTEM":"1","GIT_CONFIG_GLOBAL":os.devnull,"GIT_TERMINAL_PROMPT":"0"})
-  git=GitSourceReader(repository_root,environment=local_environment);merge=None
+  authenticated_environment={**source_environment,"GIT_NO_REPLACE_OBJECTS":"1"}
+  authenticated_git=GitSourceReader(repository_root,environment=authenticated_environment);merge=None
   for deepen in (0,256,512,1024,2048,4096):
-   try:merge=git._git("merge-base",scope.base_sha,scope.head_sha).decode().strip()
+   try:merge=authenticated_git._git("merge-base",scope.base_sha,scope.head_sha).decode().strip()
    except Exception:
     if deepen==4096:break
     _run(["git","-C",str(repository_root),"fetch","origin",f"--deepen={max(1,deepen)}"],source_environment,180);continue
    break
   if merge is None:raise GitHubSubjectCaptureV3Error("SUBJECT_ANCESTRY_UNAVAILABLE")
   if merge!=scope.merge_base_sha:raise GitHubSubjectCaptureV3Error("SUBJECT_MERGE_BASE_MISMATCH")
-  inventory=_inventory(git,merge,scope.head_sha)
-  if inventory!=scope.changes or git.changed_paths(merge,scope.head_sha)!={item["path"] for item in scope.changes}:raise GitHubSubjectCaptureV3Error("SUBJECT_CHANGE_SCOPE_MISMATCH")
+  inventory=_inventory(authenticated_git,merge,scope.head_sha)
+  if inventory!=scope.changes or authenticated_git.changed_paths(merge,scope.head_sha)!={item["path"] for item in scope.changes}:raise GitHubSubjectCaptureV3Error("SUBJECT_CHANGE_SCOPE_MISMATCH")
   records=[];rendered_bytes=0
   for change in inventory:
    status,path,previous=change["status"],change["path"],change["previous_path"];start=len(records)
-   if status!="added":records.append(_read_regular(git,SourceSpec(scope.repository,merge,previous or path)))
-   if status!="removed":records.append(_read_regular(git,SourceSpec(scope.repository,scope.head_sha,path)))
+   if status!="added":records.append(_read_regular(authenticated_git,SourceSpec(scope.repository,merge,previous or path)))
+   if status!="removed":records.append(_read_regular(authenticated_git,SourceSpec(scope.repository,scope.head_sha,path)))
    rendered_bytes+=sum(sum(len(line.encode("utf-8"))+9 for line in record.lines) for record in records[start:])
    if rendered_bytes>MAX_PACKET_BYTES:raise GitHubSubjectCaptureV3Error("SUBJECT_RENDERED_BYTES_EXCEEDED")
-  diff=git.diff(merge,scope.head_sha)
+  local_environment={key:value for key,value in isolated.items() if key not in {"GH_TOKEN","GIT_CONFIG_COUNT","GIT_CONFIG_KEY_0","GIT_CONFIG_KEY_1","GIT_CONFIG_VALUE_0","GIT_CONFIG_VALUE_1"}}
+  local_environment.update({"GIT_NO_REPLACE_OBJECTS":"1","GIT_NO_LAZY_FETCH":"1","GIT_CONFIG_NOSYSTEM":"1","GIT_CONFIG_GLOBAL":os.devnull,"GIT_TERMINAL_PROMPT":"0"})
+  local_git=GitSourceReader(repository_root,environment=local_environment)
+  diff=local_git.diff(merge,scope.head_sha)
   credential=source_token.encode("utf-8")
   if credential in diff or any(credential in record.original_bytes for record in records):
    raise GitHubSubjectCaptureV3Error("SOURCE_CREDENTIAL_IN_CAPTURED_BYTES")
   provisional=SubjectCaptureV2(scope.repository,scope.repository_id,scope.pull_request,scope.pull_request_id,scope.head_sha,scope.base_sha,merge,inventory,tuple(records),diff,"",repository_root,"AUTHENTICATED_SOURCE_READ_ONLY",source_authorization.evidence_id,scope.evidence_id)
   capture=replace(provisional,evidence_id=subject_capture_evidence_id_v2(provisional));reader.verify_final_identity(scope)
-  config=git._git("config","--local","--list")
+  config=local_git._git("config","--local","--list")
   if source_token.encode() in config:raise GitHubSubjectCaptureV3Error("SOURCE_TOKEN_RETAINED_IN_GIT_CONFIG")
   return capture
 def bind_authenticated_capture_v3(capture:SubjectCaptureV2,source_authorization_evidence_id:str,
