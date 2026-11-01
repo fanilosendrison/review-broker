@@ -7,8 +7,10 @@ class Issue69SourceAuthorityTests(unittest.TestCase):
  def test_I69_N01_N02_exact_mint_scope_and_authorization(self):
   authority=source_authority();scope=authority.scope_observation;authorization=authority.authorize(REPOSITORY,REPOSITORY_ID)
   self.assertEqual((scope.installation_id,scope.repository_id),(INSTALLATION_ID,REPOSITORY_ID));self.assertEqual(authorization.installation_id,INSTALLATION_ID);self.assertTrue(authority.permits_token(TOKEN,REPOSITORY,REPOSITORY_ID));self.assertNotIn(TOKEN,canonical_bytes(scope.basis()).decode())
- def test_I69_N01_scope_pagination_is_complete(self):
-  repositories=[{"full_name":REPOSITORY,"id":REPOSITORY_ID}]+[{"full_name":f"owner/repo-{i}","id":i+1} for i in range(100)];selected=frozenset(item["full_name"] for item in repositories);api=ScopeApi(repositories=repositories,links={1:'<https://api.github.com/installation/repositories?per_page=100&page=2>; rel="next"'});authority=GitHubSourceAuthorityV3(TOKEN,expected_app_slug="github-app:source",expected_installation_id=INSTALLATION_ID,repository=REPOSITORY,repository_id=REPOSITORY_ID,approved_permissions=PERMISSIONS,authorized_repositories=selected,executor=api);scope=authority.observe_scope();self.assertEqual(scope.observed_repository_count,101);self.assertEqual(api.methods,["GET","GET"])
+ def test_I69_F05_multi_page_excess_scope_is_fully_read_then_rejected(self):
+  repositories=[{"full_name":REPOSITORY,"id":REPOSITORY_ID}]+[{"full_name":f"owner/repo-{i}","id":i+1} for i in range(100)];api=ScopeApi(repositories=repositories,links={1:'<https://api.github.com/installation/repositories?per_page=100&page=2>; rel="next"'});authority=GitHubSourceAuthorityV3(TOKEN,expected_app_slug="github-app:source",expected_installation_id=INSTALLATION_ID,repository=REPOSITORY,repository_id=REPOSITORY_ID,approved_permissions=PERMISSIONS,authorized_repositories=frozenset({REPOSITORY}),executor=api)
+  with self.assertRaisesRegex(GitHubSourceAuthorityV3Error,"NOT_EXACT_REPOSITORY"):authority.observe_scope()
+  self.assertEqual(api.methods,["GET","GET"])
  def test_I69_N03_exact_requester_authorization(self):
   origin="artifact:sha256:"+"1"*64;authority=GitHubRequesterAuthorityV3(requester_id=7,broker_issue_id=69,origin_evidence_id=origin,authorized=True);value=authority.authorize(7,69,origin)
   self.assertEqual((value.requester_id,value.broker_issue_id),(7,69));self.assertIsNone(authority.authorize(8,69,origin));self.assertIsNone(authority.authorize(7,70,origin))
@@ -18,6 +20,7 @@ class Issue69SourceAuthorityTests(unittest.TestCase):
   with self.assertRaises(ValueError):GitHubSourceAuthorityV3(TOKEN,expected_app_slug="app",expected_installation_id=123,repository=REPOSITORY,repository_id=REPOSITORY_ID,approved_permissions=PERMISSIONS,authorized_repositories=frozenset(),executor=ScopeApi())
  def test_I69_F03_F05_F06_F09_F10_mint_permission_and_pagination_fail_closed(self):
   with self.assertRaises(ValueError):source_authority(permissions=PERMISSIONS-{"issues:read"})
+  with self.assertRaises(ValueError):source_authority(permissions=PERMISSIONS|{"contents:write"})
   with self.assertRaises(ValueError):source_authority(installation_id=0)
   with self.assertRaises(GitHubSourceAuthorityV3Error):source_authority(ScopeApi(total=2))
   with self.assertRaises(GitHubSourceAuthorityV3Error):source_authority(ScopeApi(status=403))
