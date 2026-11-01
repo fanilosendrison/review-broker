@@ -49,7 +49,8 @@ def capture_authenticated_subject_v3(scope:PullRequestScopeV3,reader:GitHubPullR
  source_token:str,private_root:Path,*,acquire_repository:AcquireRepositoryV3|None=None)->SubjectCaptureV2:
  """Acquire exact Git objects without checkout or reviewed-code execution."""
  expected_authorization=reader.source_authority.authorize(scope.repository,scope.repository_id)
- if (source_authorization!=expected_authorization
+ if (not reader.source_authority.permits_token(source_token,scope.repository,scope.repository_id)
+  or source_authorization!=expected_authorization
   or source_authority_scope_evidence_id!=reader.source_authority.scope_observation.evidence_id):
   raise GitHubSubjectCaptureV3Error("SUBJECT_SOURCE_AUTHORITY_MISMATCH")
  environment=require_private_source_environment(scope.repository,frozenset({scope.repository}),source_token)

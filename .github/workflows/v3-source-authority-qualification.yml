@@ -40,6 +40,7 @@ jobs:
           set -euo pipefail
           test -n "$OWNER_APPROVED_CODE_SHA"
           test "$APPROVED_CODE_SHA" = "$OWNER_APPROVED_CODE_SHA"
+          test "$GITHUB_SHA" = "$APPROVED_CODE_SHA"
           [[ "$APPROVED_CODE_SHA" =~ ^[0-9a-f]{40}$ ]]
           echo "approved=true" >> "$GITHUB_OUTPUT"
 
