@@ -360,7 +360,8 @@ def admit_initial_inline_v3(
     if eventual > 8_000_000:
         raise AdmissionV3CandidateError("EVENTUAL_RENDERED_PACKET_EXCEEDED")
     try: observations = acquire_git_file_admissions_v3(
-        request, subject, git_file_readers, source_evidence, source.installation_id)
+        request, subject, git_file_readers, source_evidence, source.installation_id,
+        8_000_000-eventual)
     except GitFileAdmissionV3Error as exc: raise AdmissionV3CandidateError(str(exc)) from None
     git_rendered = sum(sum(len(line.encode("utf-8")) + 9
                            for line in decode_physical_lines(item.original_bytes)[1])
@@ -368,7 +369,8 @@ def admit_initial_inline_v3(
     if eventual + git_rendered > 8_000_000:
         raise AdmissionV3CandidateError("EVENTUAL_RENDERED_PACKET_EXCEEDED")
     try: issue_observations = acquire_issue_reference_admissions_v3(
-        request, subject, issue_reference_readers, source_evidence, source.installation_id)
+        request, subject, issue_reference_readers, source_evidence, source.installation_id,
+        8_000_000-eventual-git_rendered)
     except IssueReferenceAdmissionV3Error as exc: raise AdmissionV3CandidateError(str(exc)) from None
     issue_rendered=sum(sum(len(line.encode("utf-8"))+9 for line in decode_physical_lines(item.original_bytes)[1]) for item in issue_observations)
     if eventual+git_rendered+issue_rendered>8_000_000: raise AdmissionV3CandidateError("EVENTUAL_RENDERED_PACKET_EXCEEDED")

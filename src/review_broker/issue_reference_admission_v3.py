@@ -1,9 +1,10 @@
 """Ordered stable-object admission for mutable GitHub Issue references."""
 from .github_issue_reference_v3 import GitHubIssueReferenceReaderV3
+from .physical import decode_physical_lines
 class IssueReferenceAdmissionV3Error(ValueError): pass
 
-def acquire_issue_reference_admissions_v3(request,subject,readers,authority_evidence_id,installation_id):
-    observed=[]
+def acquire_issue_reference_admissions_v3(request,subject,readers,authority_evidence_id,installation_id,rendered_budget):
+    observed=[];rendered=0
     for ref in request["references"]:
         source=ref["source"]; kind=source["kind"]
         if kind not in {"github_issue_body","github_issue_comment"}: continue
@@ -19,5 +20,7 @@ def acquire_issue_reference_admissions_v3(request,subject,readers,authority_evid
         if (item.qualification!="AUTHENTICATED_READ_ONLY" or item.authority_evidence_id!=authority_evidence_id
                 or item.installation_id!=installation_id or item.repository!=subject["repository"]
                 or item.repository_id!=subject["repository_id"]): raise IssueReferenceAdmissionV3Error("ISSUE_REFERENCE_AUTHORITY_MISMATCH")
+        rendered+=sum(len(line.encode("utf-8"))+9 for line in decode_physical_lines(item.original_bytes)[1])
+        if rendered>rendered_budget: raise IssueReferenceAdmissionV3Error("EVENTUAL_RENDERED_PACKET_EXCEEDED")
         observed.append(item)
     return tuple(observed)

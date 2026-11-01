@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Mapping
 
 from .github_git_file_v3 import GitHubGitFileObservationV3, GitHubGitFileReaderV3
+from .physical import decode_physical_lines
 
 
 class GitFileAdmissionV3Error(ValueError):
@@ -11,9 +12,10 @@ class GitFileAdmissionV3Error(ValueError):
 
 def acquire_git_file_admissions_v3(request: Mapping[str, object], subject: Mapping[str, object],
                                    readers: Mapping[str, GitHubGitFileReaderV3] | None,
-                                   authority_evidence_id: str, installation_id: int
+                                   authority_evidence_id: str, installation_id: int,
+                                   rendered_budget: int
                                    ) -> tuple[GitHubGitFileObservationV3, ...]:
-    observations: list[GitHubGitFileObservationV3] = []
+    observations: list[GitHubGitFileObservationV3] = [];rendered=0
     for reference in request["references"]:
         if reference["source"]["kind"] != "git_file": continue
         reader = None if readers is None else readers.get(reference["id"])
@@ -30,5 +32,7 @@ def acquire_git_file_admissions_v3(request: Mapping[str, object], subject: Mappi
             raise GitFileAdmissionV3Error("GIT_FILE_REPOSITORY_IDENTITY_MISMATCH")
         if request["atomicity"] is True and observed.commit_sha != subject["expected_head_commit"]:
             raise GitFileAdmissionV3Error("GIT_FILE_ATOMICITY_HEAD_MISMATCH")
+        rendered+=sum(len(line.encode("utf-8"))+9 for line in decode_physical_lines(observed.original_bytes)[1])
+        if rendered>rendered_budget: raise GitFileAdmissionV3Error("EVENTUAL_RENDERED_PACKET_EXCEEDED")
         observations.append(observed)
     return tuple(observations)
