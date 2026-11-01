@@ -64,8 +64,11 @@ permissions. Effective Issues access remains unestablished.
 The candidate manual workflow is `workflow_dispatch` only, requests exact
 repository-scoped read permissions through the pinned official App-token action,
 and requires an owner-protected environment plus an independently reviewed
-exact SHA. It intentionally has no successful live qualification entry point in
-this draft and was not dispatched.
+exact SHA. Its credential-free canonical receipt binds workflow/run/job and
+approved-code identities, owner-approval digest, App/installation/permission
+scope, repository/PR/base/HEAD/merge-base identities, source and requester
+evidence, every image blob/digest, diff digest, and zero-effect counters. The
+workflow remains absent from the default branch and was not dispatched.
 
 Git acquisition uses an isolated HOME/config, no ambient publication,
 Codespaces, or reviewer credential, no token-bearing remote URL, no checkout,
@@ -117,7 +120,7 @@ runtime policy, reviewer execution, ReviewResult, or production readiness.
 | I69-F01–F06 | PASS | Repository, installation, selection, pagination, and unavailable authority reject. |
 | I69-F07–F10 | PASS | Requester, permission, and qualification-token confusion reject. |
 | I69-F11–F15 | PASS | PR object, HEAD/base drift, conflicting compare, pagination, duplicate, and malformed scope reject. |
-| I69-F16–F22 | PASS | Unsafe/type, ancestry, merge-base, image, object, diff, and size failures reject. |
+| I69-F16–F22 | PASS | Unsafe/type, disconnected ancestry, merge-base, image, object, diff, and size failures reject. |
 | I69-F23–F28 | PASS | Ambiguity, role confusion, forged provenance, injected source-token bytes, and policy inflation reject. |
 | I69-F29 | PASS | Baseline synthetic Packet v2 and v1/v2 regression behavior remain unchanged. |
 | I69-F30 | PASS | Injected GitHub operations remain read-only; no model-capable effect exists. |
