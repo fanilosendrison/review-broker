@@ -19,10 +19,11 @@ their exact identities are published in the dedicated draft PR and Issue #69 rep
 The production-compatible implementation and injected offline qualification are
 complete. The credential-bearing stage was not run and is blocked because the
 accepted private-source authorization permits Contents, Pull requests, and
-Metadata reads but explicitly excludes Issues access. No App permission,
+Metadata reads but explicitly excludes Issues access. The governing specification
+also limits the source token to repository/PR/Git operations. No App permission,
 installation, secret, variable, or token was changed or exercised.
 
-`LIVE_SOURCE_APP_PERMISSION=BLOCKED_OWNER_APPROVAL`
+`LIVE_SOURCE_APP_PERMISSION=BLOCKED_AUTHORITY_CONFLICT`
 `LIVE_SOURCE_AND_SUBJECT_AUTHORITY=BLOCKED`
 
 ## Reused and new boundaries
@@ -61,14 +62,12 @@ The offline authority requires `contents:read`, `pull_requests:read`,
 adapter's fail-closed permission contract, not the installed App's effective
 permissions. Effective Issues access remains unestablished.
 
-The candidate manual workflow is `workflow_dispatch` only, requests exact
-repository-scoped read permissions through the pinned official App-token action,
-and requires an owner-protected environment plus an independently reviewed
-exact SHA. Its credential-free canonical receipt binds workflow/run/job and
-approved-code identities, owner-approval digest, App/installation/permission
-scope, repository/PR/base/HEAD/merge-base identities, source and requester
-evidence, every image blob/digest, diff digest, and zero-effect counters. The
-workflow remains absent from the default branch and was not dispatched.
+The candidate manual workflow is `workflow_dispatch` only and stops before
+credential minting or source access. It confronts the exact workflow/candidate
+SHA and records `BLOCKED_AUTHORITY_CONFLICT`. A credential-bearing workflow and
+canonical live receipt cannot be accepted until repository authority selects a
+successor credential boundary. The workflow remains absent from the default
+branch and was not dispatched.
 
 Git acquisition uses an isolated HOME/config, no ambient publication,
 Codespaces, or reviewer credential, no token-bearing remote URL, no checkout,
@@ -124,9 +123,9 @@ runtime policy, reviewer execution, ReviewResult, or production readiness.
 | I69-F23–F28 | PASS | Ambiguity, role confusion, forged provenance, injected source-token bytes, and policy inflation reject. |
 | I69-F29 | PASS | Baseline synthetic Packet v2 and v1/v2 regression behavior remain unchanged. |
 | I69-F30 | PASS | Injected GitHub operations remain read-only; no model-capable effect exists. |
-| Effective source-App Issues permission | BLOCKED | Separate owner approval and installation upgrade required. |
-| Same-token live Issue/comment read | BLOCKED | Depends on approved effective Issues permission. |
-| Live PR #71 qualification | BLOCKED | Depends on owner gate and reviewed default-branch workflow. |
+| Effective source-App Issues permission | BLOCKED | Accepted specification currently forbids this scope. |
+| Same-token live Issue/comment read | BLOCKED | Requires an accepted successor credential-boundary decision. |
+| Live PR #71 qualification | BLOCKED | Requires authority resolution, owner gate, and reviewed default-branch workflow. |
 
 ## Validation and limitations
 
@@ -145,8 +144,9 @@ activation.
 
 ## Required owner action
 
-The owner must separately approve `Issues: read` for the dedicated source App,
-approve the installation permission upgrade for only the selected repository,
-and authorize one exact reviewed default-branch `workflow_dispatch` SHA against
-PR #71 at `9258617056e9d2e20cce7f05e6be71ea82dfbd23`. Until then, #69 remains open
-and #70 cannot treat live source authority as satisfied.
+The product authority must first accept a successor credential boundary that
+resolves the conflict with the current source-token scope. Only then may the
+owner approve any corresponding App/installation configuration and one exact
+reviewed default-branch qualification SHA against PR #71 at
+`9258617056e9d2e20cce7f05e6be71ea82dfbd23`. Until both gates are satisfied,
+#69 remains open and #70 cannot treat live source authority as satisfied.
