@@ -33,8 +33,8 @@ class GitHubSourceAuthorityV3:
   if not token or token.strip()!=token or any(c in token for c in "\r\n"): raise ValueError("SOURCE_TOKEN_INVALID")
   if not expected_app_slug or type(expected_installation_id) is not int or expected_installation_id<1: raise ValueError("SOURCE_MINT_CONTEXT_INVALID")
   if _REPO.fullmatch(repository) is None or type(repository_id) is not int or repository_id<1: raise ValueError("SOURCE_REPOSITORY_IDENTITY_INVALID")
-  if repository not in authorized_repositories: raise ValueError("SOURCE_REPOSITORY_NOT_SELECTED")
-  if not _REQUIRED.issubset(approved_permissions): raise ValueError("SOURCE_APP_REQUIRED_PERMISSION_MISSING")
+  if authorized_repositories!=frozenset({repository}): raise ValueError("SOURCE_REPOSITORY_SELECTION_NOT_EXACT")
+  if approved_permissions!=_REQUIRED: raise ValueError("SOURCE_APP_PERMISSION_SET_NOT_EXACT_READ_ONLY")
   self.repository,self.repository_id=repository,repository_id;self.app_slug=expected_app_slug
   self.installation_id=expected_installation_id;self.approved_permissions=approved_permissions
   self.authorized_repositories=authorized_repositories;self._token=token
@@ -78,8 +78,7 @@ class GitHubSourceAuthorityV3:
    if not isinstance(item,dict) or not isinstance(item.get("full_name"),str) or type(item.get("id")) is not int: raise GitHubSourceAuthorityV3Error("SOURCE_SCOPE_REPOSITORY_INVALID")
    identities.append((item["full_name"],item["id"]))
   if len(identities)!=len(set(identities)) or len({name for name,_ in identities})!=len(identities): raise GitHubSourceAuthorityV3Error("SOURCE_SCOPE_REPOSITORY_DUPLICATE")
-  if (self.repository,self.repository_id) not in identities: raise GitHubSourceAuthorityV3Error("SOURCE_REPOSITORY_NOT_IN_TOKEN_SCOPE")
-  if any(name not in self.authorized_repositories for name,_ in identities): raise GitHubSourceAuthorityV3Error("SOURCE_SCOPE_EXCEEDS_SELECTION")
+  if identities!=[(self.repository,self.repository_id)]: raise GitHubSourceAuthorityV3Error("SOURCE_SCOPE_NOT_EXACT_REPOSITORY")
   provisional=SourceAppScopeObservationV3(self.app_slug,self.installation_id,self.repository,self.repository_id,tuple(sorted(self.approved_permissions)),tuple(sorted(self.authorized_repositories)),len(identities),f"{_API}/installation/repositories","")
   self._scope=replace(provisional,evidence_id=artifact_identity(canonical_bytes(provisional.basis())+b"\n"));return self._scope
  @property
