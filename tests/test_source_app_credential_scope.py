@@ -15,13 +15,19 @@ LEGACY_PERMISSIONS = {
     "permission-pull-requests": "read",
     "permission-metadata": "read",
 }
-# An independent oracle: every current source mint site is legacy, not v3.
+# Independent expected scopes: legacy sites never inherit the v3 Issues grant.
 LEGACY_SITES = {
     "review-request.yml": ("review", "${{ github.repository_owner }}", 2),
     "review-reconciler.yml": ("reconcile", "${{ github.repository_owner }}", 1),
     "private-source-qualification.yml": ("qualify", "fanilosendrison", 0),
 }
 
+V3_SITE = "v3-source-app-read-qualification.yml"
+V3_PERMISSIONS = {**LEGACY_PERMISSIONS, "permission-issues": "read"}
+# Exact, independently reviewed workflow snapshot: fixes trigger, one guarded
+# job, preflight-before-key order, pins, repository selection and token consumers.
+# Static current-tree evidence only; not a claim about live effective grants.
+V3_WORKFLOW_SHA256 = "cf7ba54f654ac869843b27b75bd201a1ad301786f73348c357c3bf03b7b84fa2"
 
 QUALIFICATION_HEADER = """name: Private source qualification
 
@@ -104,6 +110,7 @@ def literal_fields(block, indent):
 
 
 def audit_workflows(workflows):
+    sites = {**LEGACY_SITES, V3_SITE: ("qualify", "fanilosendrison", 1)}
     seen = set()
     for name, text in workflows.items():
         blocks = list(step_blocks(text))
@@ -114,11 +121,10 @@ def audit_workflows(workflows):
         if len(action_lines) != len(mint_blocks):
             raise AssertionError(f"unclassified action serialization: {name}")
         source_blocks = [block for block in blocks
-                         if "REVIEW_BROKER_SOURCE_APP_ID" in block
-                         or "REVIEW_BROKER_SOURCE_APP_PRIVATE_KEY" in block]
+                         if APP_ID in block or PRIVATE_KEY in block]
         # Every create-app-token use is inventoried, including an unknown App.
         for block in set(mint_blocks + source_blocks):
-            if name not in LEGACY_SITES or name in seen:
+            if name not in sites or name in seen:
                 raise AssertionError(f"unclassified source mint: {name}")
             seen.add(name)
             fields = literal_fields(block, 8)
@@ -129,13 +135,16 @@ def audit_workflows(workflows):
                 raise AssertionError(f"missing block input mapping: {name}")
             permissions = {key: value for key, value in inputs.items()
                            if key.startswith("permission-")}
-            if permissions != LEGACY_PERMISSIONS:
-                raise AssertionError(f"non-legacy permission subset: {name}")
-            job, owner, expected_bindings = LEGACY_SITES[name]
+            expected_permissions = V3_PERMISSIONS if name == V3_SITE else LEGACY_PERMISSIONS
+            if permissions != expected_permissions:
+                raise AssertionError(f"incorrect classified permission subset: {name}")
+            job, owner, expected_bindings = sites[name]
             expected_inputs = {
                 "app-id": APP_ID, "private-key": PRIVATE_KEY, "owner": owner,
-                **LEGACY_PERMISSIONS,
+                **expected_permissions,
             }
+            if name == V3_SITE:
+                expected_inputs["repositories"] = "review-broker"
             if inputs != expected_inputs:
                 raise AssertionError(f"source inputs changed: {name}")
             # Reject anchors, merge keys, flow maps and nested input mappings;
@@ -158,11 +167,13 @@ def audit_workflows(workflows):
                              in candidate]
                 if len(consumers) != 1 or consumers[0].get("GH_TOKEN") != TOKEN:
                     raise AssertionError("qualification token binding changed")
-        if name not in LEGACY_SITES and "REVIEW_BROKER_SOURCE_TOKEN:" in text:
+        if name not in sites and "REVIEW_BROKER_SOURCE_TOKEN:" in text:
             raise AssertionError(f"unclassified source-token consumer: {name}")
-    if seen != set(LEGACY_SITES):
+    if seen != set(sites):
         raise AssertionError("source mint inventory incomplete")
     audit_private_source_dispatch(workflows["private-source-qualification.yml"])
+    if hashlib.sha256(workflows[V3_SITE].encode()).hexdigest() != V3_WORKFLOW_SHA256:
+        raise AssertionError("v3 approved-SHA workflow structure changed")
     return seen
 
 
@@ -175,7 +186,7 @@ class SourceAppCredentialScopeTests(unittest.TestCase):
         }
 
     def test_all_source_app_mints_have_explicit_classified_legacy_scope(self):
-        self.assertEqual(audit_workflows(self.workflows), set(LEGACY_SITES))
+        self.assertEqual(audit_workflows(self.workflows), set(LEGACY_SITES) | {V3_SITE})
 
     def assert_rejected(self, name, old, new):
         workflows = dict(self.workflows)
@@ -326,6 +337,26 @@ class SourceAppCredentialScopeTests(unittest.TestCase):
                 self.assertIn(old, text)
                 with self.assertRaises(AssertionError):
                     audit_private_source_dispatch(text.replace(old, new, 1))
+
+    def test_v3_workflow_trust_and_scope_mutations_are_rejected(self):
+        mutations = [
+            ("      github.sha == vars.REVIEW_BROKER_V3_SOURCE_QUALIFICATION_SHA\n", ""),
+            ("repository_dispatch:", "workflow_dispatch:"),
+            ("on:\n", "on:\n  pull_request_target:\n"),
+            ("          repositories: review-broker\n", ""),
+            ("          permission-issues: read\n", ""),
+            ("permission-contents: read", "permission-contents: write"),
+            (ACTION, "actions/create-github-app-token@v2"),
+            ("    steps:\n", f"    steps:\n      - uses: {ACTION}\n"),
+            ("          ref: ${{ github.sha }}", "          ref: attacker-branch"),
+            ("        env:\n", f"        env:\n          KEY: {PRIVATE_KEY}\n"),
+            ("    runs-on:", f"    env:\n      KEY: {PRIVATE_KEY}\n    runs-on:"),
+            ("python scripts/qualification/v3_source_app_read.py", "reviewctl internal-prepare"),
+            ("github.event.repository.id", "github.event.client_payload.repository_id"),
+        ]
+        for old, new in mutations:
+            with self.subTest(mutation=old):
+                self.assert_rejected(V3_SITE, old, new)
 
 
 if __name__ == "__main__":
