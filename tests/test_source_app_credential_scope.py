@@ -1,4 +1,5 @@
 """Static declared-scope guards; these do not prove live installation grants."""
+import hashlib
 from pathlib import Path
 import re
 import unittest
@@ -20,6 +21,56 @@ LEGACY_SITES = {
     "review-reconciler.yml": ("reconcile", "${{ github.repository_owner }}", 1),
     "private-source-qualification.yml": ("qualify", "fanilosendrison", 0),
 }
+
+
+QUALIFICATION_HEADER = """name: Private source qualification
+
+on:
+  repository_dispatch:
+    types: [review-broker-private-source-qualification]
+
+permissions: {}
+
+concurrency:
+  group: review-broker-private-source-qualification
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    if: >-
+      github.repository == 'fanilosendrison/review-broker' &&
+      github.event_name == 'repository_dispatch' &&
+      github.event.action == 'review-broker-private-source-qualification' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+      github.event.sender.id == 30498238 &&
+      github.actor == 'fanilosendrison' &&
+      github.triggering_actor == 'fanilosendrison'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+"""
+# Independent snapshot of the entire previously accepted steps block. Preserve
+# mint order, exact permissions/output binding, source checks, isolation and
+# receipts, not just selected strings. Any change requires an explicit audit.
+QUALIFICATION_STEPS_SHA256 = (
+    "51f378720f91b47597116eaabe6003ce98b160f1db0ae34947271bd080e04dc7"
+)
+
+
+def audit_private_source_dispatch(text):
+    """Pin this credential-bearing workflow's admission and unchanged body.
+
+    Exact serialization is intentional, like the existing lexical scope guard.
+    This is not a YAML parser or proof of all repository-secret access paths.
+    The prefix admits only the guarded qualify job, with no top/job-level env;
+    the body snapshot excludes extra jobs/mints and payload-controlled behavior.
+    Full YAML syntax is validated separately.
+    """
+    if not text.startswith(QUALIFICATION_HEADER):
+        raise AssertionError("private-source dispatch admission changed")
+    steps = text[len(QUALIFICATION_HEADER):]
+    if hashlib.sha256(steps.encode("utf-8")).hexdigest() != QUALIFICATION_STEPS_SHA256:
+        raise AssertionError("private-source secret/acquisition steps changed")
 
 
 def step_blocks(text):
@@ -111,6 +162,7 @@ def audit_workflows(workflows):
             raise AssertionError(f"unclassified source-token consumer: {name}")
     if seen != set(LEGACY_SITES):
         raise AssertionError("source mint inventory incomplete")
+    audit_private_source_dispatch(workflows["private-source-qualification.yml"])
     return seen
 
 
@@ -207,6 +259,73 @@ class SourceAppCredentialScopeTests(unittest.TestCase):
                 with self.subTest(workflow=name, addition=addition):
                     self.assert_rejected(name, "          permission-metadata: read\n",
                                          "          permission-metadata: read\n" + addition)
+
+    def test_private_source_dispatch_has_exact_admission_and_preserved_body(self):
+        audit_private_source_dispatch(self.workflows["private-source-qualification.yml"])
+
+    def test_private_source_dispatch_admission_mutations_are_rejected(self):
+        text = self.workflows["private-source-qualification.yml"]
+        guard = QUALIFICATION_HEADER.split("    if: >-\n", 1)[1].split(
+            "    runs-on:", 1
+        )[0]
+        cases = {
+            "manual trigger": ("  repository_dispatch:\n", "  workflow_dispatch:\n"),
+            "alternate trigger": ("on:\n", "on:\n  push:\n"),
+            "repository": ("github.repository == 'fanilosendrison/review-broker'",
+                           "github.repository == 'other/repository'"),
+            "event type": ("types: [review-broker-private-source-qualification]",
+                           "types: [other-event]"),
+            "event name": ("github.event_name == 'repository_dispatch' &&\n", ""),
+            "action": ("github.event.action == 'review-broker-private-source-qualification'",
+                       "github.event.action == 'other-event'"),
+            "default ref": ("      github.ref == format('refs/heads/{0}', "
+                            "github.event.repository.default_branch) &&\n", ""),
+            "sender": ("github.event.sender.id == 30498238", "github.event.sender.id == 1"),
+            "actor": ("      github.actor == 'fanilosendrison' &&\n", ""),
+            "triggering actor": ("      github.triggering_actor == 'fanilosendrison'\n", ""),
+            "whole guard": ("    if: >-\n" + guard, ""),
+            "payload authority": ("github.event.sender.id", "github.event.client_payload.id"),
+            "job secret": ("    runs-on: ubuntu-24.04\n",
+                           "    env:\n      KEY: " + PRIVATE_KEY + "\n"
+                           "    runs-on: ubuntu-24.04\n"),
+        }
+        for label, (old, new) in cases.items():
+            with self.subTest(mutation=label):
+                self.assertIn(old, text)
+                with self.assertRaises(AssertionError):
+                    audit_private_source_dispatch(text.replace(old, new, 1))
+
+    def test_private_source_key_relocation_to_job_environment_is_rejected(self):
+        text = self.workflows["private-source-qualification.yml"]
+        relocated = text.replace(f"          private-key: {PRIVATE_KEY}\n", "", 1)
+        relocated = relocated.replace(
+            "jobs:\n", "jobs:\n  unguarded:\n"
+            f"    env:\n      KEY: {PRIVATE_KEY}\n", 1
+        )
+        self.assertNotEqual(text, relocated)
+        with self.assertRaises(AssertionError):
+            audit_private_source_dispatch(relocated)
+
+    def test_private_source_dispatch_secret_body_mutations_are_rejected(self):
+        text = self.workflows["private-source-qualification.yml"]
+        cases = {
+            "extra mint": ("    steps:\n", "    steps:\n"
+                           f"      - uses: {ACTION}\n"),
+            "unguarded job": ("jobs:\n", "jobs:\n  unguarded:\n"
+                              f"    env:\n      KEY: {PRIVATE_KEY}\n"),
+            "issues permission": ("          permission-metadata: read\n",
+                                  "          permission-metadata: read\n"
+                                  "          permission-issues: read\n"),
+            "job token": (TOKEN, "${{ github.token }}"),
+            "isolation removed": ("                *) unset \"$variable\" ;;", ""),
+        }
+        for permission in LEGACY_PERMISSIONS:
+            cases[permission] = (f"{permission}: read", f"{permission}: write")
+        for label, (old, new) in cases.items():
+            with self.subTest(mutation=label):
+                self.assertIn(old, text)
+                with self.assertRaises(AssertionError):
+                    audit_private_source_dispatch(text.replace(old, new, 1))
 
 
 if __name__ == "__main__":
