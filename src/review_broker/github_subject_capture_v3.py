@@ -79,6 +79,9 @@ def capture_authenticated_subject_v3(scope:PullRequestScopeV3,reader:GitHubPullR
    if status!="added":records.append(_read_regular(git,SourceSpec(scope.repository,merge,previous or path)))
    if status!="removed":records.append(_read_regular(git,SourceSpec(scope.repository,scope.head_sha,path)))
   diff=git.diff(merge,scope.head_sha)
+  credential=source_token.encode("utf-8")
+  if credential in diff or any(credential in record.original_bytes for record in records):
+   raise GitHubSubjectCaptureV3Error("SOURCE_CREDENTIAL_IN_CAPTURED_BYTES")
   provisional=SubjectCaptureV2(scope.repository,scope.repository_id,scope.pull_request,scope.pull_request_id,scope.head_sha,scope.base_sha,merge,inventory,tuple(records),diff,"",repository_root,"AUTHENTICATED_SOURCE_READ_ONLY",source_authorization.evidence_id,scope.evidence_id)
   capture=replace(provisional,evidence_id=subject_capture_evidence_id_v2(provisional));reader.verify_final_identity(scope)
   config=git._git("config","--local","--list")
