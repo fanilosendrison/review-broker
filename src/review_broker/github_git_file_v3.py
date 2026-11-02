@@ -81,13 +81,14 @@ class GitHubGitFileReaderV3:
                  source_authority: object | None = None, qualification_only: bool = False,
                  executor: HttpExecutorV3 | None = None,
                  clock: ClockV3 | None = None):
+        if (type(authority_evidence_id) is not str
+                or re.fullmatch(r"artifact:sha256:[0-9a-f]{64}", authority_evidence_id) is None):
+            raise ValueError("GITHUB_SOURCE_AUTHORITY_INVALID")
         if not token or token.strip() != token or any(c in token for c in "\r\n"):
             raise ValueError("GITHUB_TOKEN_INVALID")
         if _REPOSITORY.fullmatch(repository) is None or ".." in repository:
             raise ValueError("GITHUB_REPOSITORY_INVALID")
         _positive(repository_id, "GITHUB_REPOSITORY_ID_INVALID")
-        if (not authority_evidence_id.startswith("artifact:sha256:")
-                or len(authority_evidence_id) != 80): raise ValueError("GITHUB_SOURCE_AUTHORITY_INVALID")
         self.repository, self.repository_id, self._token = repository, repository_id, token
         if not qualification_only:
             from .github_source_authority_v3 import GitHubSourceAuthorityV3
@@ -115,8 +116,12 @@ class GitHubGitFileReaderV3:
         if response.status != 200: raise GitHubGitFileV3Error("GIT_FILE_OBJECT_UNAVAILABLE")
         return response
 
-    def _verify_credential_authority(self) -> None:
-        if self.qualification_only: return
+    def _verify_credential_authority(self) -> str:
+        supplied_evidence_id = self.authority_evidence_id
+        if (type(supplied_evidence_id) is not str
+                or re.fullmatch(r"artifact:sha256:[0-9a-f]{64}", supplied_evidence_id) is None):
+            raise GitHubGitFileV3Error("GIT_FILE_SOURCE_AUTHORIZATION_EVIDENCE_MISMATCH")
+        if self.qualification_only: return supplied_evidence_id
         from .admission_v3 import SourceRepositoryAuthorizationV3
         from .github_source_authority_v3 import GitHubSourceAuthorityV3
         if (type(self.source_authority) is not GitHubSourceAuthorityV3
@@ -124,16 +129,19 @@ class GitHubGitFileReaderV3:
                     self._token, self.repository, self.repository_id)):
             raise GitHubGitFileV3Error("GIT_FILE_SOURCE_AUTHORITY_MISMATCH")
         authorization = self.source_authority.authorize(self.repository, self.repository_id)
-        if (type(authorization) is not SourceRepositoryAuthorizationV3
+        if type(authorization) is not SourceRepositoryAuthorizationV3:
+            raise GitHubGitFileV3Error("GIT_FILE_SOURCE_AUTHORIZATION_EVIDENCE_MISMATCH")
+        actual_evidence_id = authorization.evidence_id
+        if (type(actual_evidence_id) is not str
                 or authorization.repository != self.repository
                 or type(authorization.repository_id) is not int
                 or authorization.repository_id != self.repository_id
                 or type(authorization.installation_id) is not int
                 or authorization.installation_id != self.expected_installation_id
-                or not isinstance(authorization.evidence_id, str)
-                or re.fullmatch(r"artifact:sha256:[0-9a-f]{64}", authorization.evidence_id) is None
-                or authorization.evidence_id != self.authority_evidence_id):
+                or re.fullmatch(r"artifact:sha256:[0-9a-f]{64}", actual_evidence_id) is None
+                or supplied_evidence_id != actual_evidence_id):
             raise GitHubGitFileV3Error("GIT_FILE_SOURCE_AUTHORIZATION_EVIDENCE_MISMATCH")
+        return actual_evidence_id
 
     def _verify_repository(self) -> None:
         value = _object(self._get(""), "GIT_FILE_REPOSITORY_RESPONSE_INVALID")
@@ -192,11 +200,11 @@ class GitHubGitFileReaderV3:
         if observed.tzinfo is None: raise GitHubGitFileV3Error("GIT_FILE_OBSERVATION_TIME_INVALID")
         observed_at = observed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
         api_source = f"{_API}/repos/{self.repository}/git/commits/{commit_sha}"
-        self._verify_credential_authority()
+        verified_authority_evidence_id = self._verify_credential_authority()
         provisional = GitHubGitFileObservationV3(self.repository, self.repository_id, commit_sha,
             root_tree, path, blob_oid, original, len(original), digest, observed_at, api_source,
             ("SAME_REPOSITORY_ACTIONS_QUALIFICATION" if self.qualification_only
-             else "AUTHENTICATED_READ_ONLY"), self.authority_evidence_id,
+             else "AUTHENTICATED_READ_ONLY"), verified_authority_evidence_id,
             self.expected_installation_id, "")
         evidence_id = artifact_identity(canonical_bytes(provisional.provenance_basis()) + b"\n")
         return replace(provisional, evidence_id=evidence_id)
