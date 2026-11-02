@@ -1,4 +1,6 @@
 import base64
+from dataclasses import replace
+from unittest.mock import patch
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -6,14 +8,10 @@ import unittest
 
 from review_broker.github_git_file_v3 import GitHubGitFileReaderV3, GitHubGitFileV3Error
 from review_broker.github_http_live_v3 import HttpResponseV3
-from review_broker.identity import artifact_identity, canonical_bytes
 from tests.issue69_test_support import source_authority
 
 REPO = "fanilosendrison/review-broker"; REPO_ID = 1433701208
 COMMIT = "a" * 40; TREE = "b" * 40; DATA = b"alpha\r\nbeta\n"
-AUTHORITY = artifact_identity(canonical_bytes({"schema_version": 1,
-    "evidence_type": "v3-source-repository-authorization", "repository": REPO,
-    "repository_id": REPO_ID, "principal_id": "github-app:source", "installation_id": 123}) + b"\n")
 def blob_oid(data=DATA):
     return hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
 
@@ -46,9 +44,11 @@ class Api:
         return HttpResponseV3(200, json.dumps(value).encode(), {})
 
 
-def reader(api):
-    return GitHubGitFileReaderV3("token", REPO, REPO_ID, authority_evidence_id=AUTHORITY,
-        source_authority=source_authority(), executor=api,
+def reader(api, source=None):
+    source = source_authority() if source is None else source
+    authorization = source.authorize(REPO, REPO_ID)
+    return GitHubGitFileReaderV3("token", REPO, REPO_ID, authority_evidence_id=authorization.evidence_id,
+        source_authority=source, executor=api,
         clock=lambda: datetime(2026, 11, 1, tzinfo=timezone.utc))
 
 
@@ -93,6 +93,79 @@ class GitHubGitFileReaderTests(unittest.TestCase):
             if not marker: continue
             with self.subTest(marker=marker), self.assertRaisesRegex(GitHubGitFileV3Error, marker):
                 reader(api).observe(commit, path)
+
+
+class GitFileAuthorizationBindingTests(unittest.TestCase):
+    marker = "GIT_FILE_SOURCE_AUTHORIZATION_EVIDENCE_MISMATCH"
+
+    def test_substituted_authorization_rejected_before_first_get(self):
+        source = source_authority()
+        positive = reader(Api(), source).observe(COMMIT, "contract.md")
+        self.assertEqual(positive.authority_evidence_id, source.authorize(REPO, REPO_ID).evidence_id)
+        self.assertEqual(positive.qualification, "AUTHENTICATED_READ_ONLY")
+        for substituted in ("artifact:sha256:" + "0" * 64, source.scope_observation.evidence_id):
+            with self.subTest(substituted=substituted):
+                api = Api(); value = reader(api, source)
+                value.authority_evidence_id = substituted
+                with self.assertRaisesRegex(GitHubGitFileV3Error, self.marker):
+                    value.observe(COMMIT, "contract.md")
+                self.assertEqual(api.calls, [])
+        api = Api()
+        value = GitHubGitFileReaderV3("token", REPO, REPO_ID,
+            authority_evidence_id="artifact:sha256:" + "0" * 64,
+            source_authority=source, executor=api)
+        with self.assertRaisesRegex(GitHubGitFileV3Error, self.marker):
+            value.observe(COMMIT, "contract.md")
+        self.assertEqual(api.calls, [])
+
+    def test_invalid_current_authorization_rejected_before_get(self):
+        source = source_authority(); authorization = source.authorize(REPO, REPO_ID)
+        cases = [None, {}, replace(authorization, repository="other/repository"),
+                 replace(authorization, repository_id=REPO_ID + 1),
+                 replace(authorization, installation_id=124),
+                 replace(authorization, evidence_id="artifact:sha256:" + "f" * 64)]
+        for current in cases:
+            with self.subTest(current=current):
+                api = Api(); value = reader(api, source)
+                with patch.object(source, "authorize", return_value=current):
+                    with self.assertRaisesRegex(GitHubGitFileV3Error, self.marker):
+                        value.observe(COMMIT, "contract.md")
+                self.assertEqual(api.calls, [])
+
+    def test_wrong_token_repository_installation_and_unobserved_scope(self):
+        for mutation, marker in (("token", "GIT_FILE_SOURCE_AUTHORITY_MISMATCH"),
+                                 ("repository", "GIT_FILE_SOURCE_AUTHORITY_MISMATCH"),
+                                 ("scope", "GIT_FILE_SOURCE_AUTHORITY_MISMATCH"),
+                                 ("installation", self.marker), ("evidence", self.marker)):
+            with self.subTest(mutation=mutation):
+                source = source_authority(); api = Api(); value = reader(api, source)
+                if mutation == "token": value._token = "different-token"
+                if mutation == "repository": value.repository_id += 1
+                if mutation == "scope": source._scope = None
+                if mutation == "installation": source.installation_id += 1
+                if mutation == "evidence": source.app_slug = "changed-source-app"
+                with self.assertRaisesRegex(GitHubGitFileV3Error, marker):
+                    value.observe(COMMIT, "contract.md")
+                self.assertEqual(api.calls, [])
+
+    def test_authority_rechecked_after_acquisition_before_emission(self):
+        source = source_authority(); api = Api(); value = reader(api, source)
+        def clock():
+            source.app_slug = "changed-during-acquisition"
+            return datetime(2026, 11, 1, tzinfo=timezone.utc)
+        value._clock = clock
+        with self.assertRaisesRegex(GitHubGitFileV3Error, self.marker):
+            value.observe(COMMIT, "contract.md")
+        self.assertEqual(len(api.calls), 5)
+
+    def test_historical_qualification_mode_is_not_promoted(self):
+        api = Api()
+        value = GitHubGitFileReaderV3("token", REPO, REPO_ID,
+            authority_evidence_id="artifact:sha256:" + "0" * 64,
+            qualification_only=True, expected_installation_id=123, executor=api)
+        observation = value.observe(COMMIT, "contract.md")
+        self.assertEqual(observation.qualification, "SAME_REPOSITORY_ACTIONS_QUALIFICATION")
+        self.assertEqual(observation.authority_evidence_id, "artifact:sha256:" + "0" * 64)
 
 
 if __name__ == "__main__": unittest.main()
