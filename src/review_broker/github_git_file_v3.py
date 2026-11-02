@@ -117,9 +117,23 @@ class GitHubGitFileReaderV3:
 
     def _verify_credential_authority(self) -> None:
         if self.qualification_only: return
-        permits=getattr(self.source_authority,"permits_token",None)
-        if not callable(permits) or not permits(self._token,self.repository,self.repository_id):
+        from .admission_v3 import SourceRepositoryAuthorizationV3
+        from .github_source_authority_v3 import GitHubSourceAuthorityV3
+        if (type(self.source_authority) is not GitHubSourceAuthorityV3
+                or not self.source_authority.permits_token(
+                    self._token, self.repository, self.repository_id)):
             raise GitHubGitFileV3Error("GIT_FILE_SOURCE_AUTHORITY_MISMATCH")
+        authorization = self.source_authority.authorize(self.repository, self.repository_id)
+        if (type(authorization) is not SourceRepositoryAuthorizationV3
+                or authorization.repository != self.repository
+                or type(authorization.repository_id) is not int
+                or authorization.repository_id != self.repository_id
+                or type(authorization.installation_id) is not int
+                or authorization.installation_id != self.expected_installation_id
+                or not isinstance(authorization.evidence_id, str)
+                or re.fullmatch(r"artifact:sha256:[0-9a-f]{64}", authorization.evidence_id) is None
+                or authorization.evidence_id != self.authority_evidence_id):
+            raise GitHubGitFileV3Error("GIT_FILE_SOURCE_AUTHORIZATION_EVIDENCE_MISMATCH")
 
     def _verify_repository(self) -> None:
         value = _object(self._get(""), "GIT_FILE_REPOSITORY_RESPONSE_INVALID")
@@ -178,6 +192,7 @@ class GitHubGitFileReaderV3:
         if observed.tzinfo is None: raise GitHubGitFileV3Error("GIT_FILE_OBSERVATION_TIME_INVALID")
         observed_at = observed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
         api_source = f"{_API}/repos/{self.repository}/git/commits/{commit_sha}"
+        self._verify_credential_authority()
         provisional = GitHubGitFileObservationV3(self.repository, self.repository_id, commit_sha,
             root_tree, path, blob_oid, original, len(original), digest, observed_at, api_source,
             ("SAME_REPOSITORY_ACTIONS_QUALIFICATION" if self.qualification_only

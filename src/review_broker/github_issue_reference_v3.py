@@ -73,8 +73,20 @@ class GitHubIssueReferenceReaderV3:
         return response
     def _authority(self):
         if not self.qualification_only:
-            permits=getattr(self.source_authority,"permits_token",None)
-            if not callable(permits) or not permits(self._token,self.repository,self.repository_id): raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_SOURCE_AUTHORITY_MISMATCH")
+            from .admission_v3 import SourceRepositoryAuthorizationV3
+            from .github_source_authority_v3 import GitHubSourceAuthorityV3
+            if (type(self.source_authority) is not GitHubSourceAuthorityV3
+                or not self.source_authority.permits_token(self._token,self.repository,self.repository_id)):
+                raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_SOURCE_AUTHORITY_MISMATCH")
+            authorization=self.source_authority.authorize(self.repository,self.repository_id)
+            if (type(authorization) is not SourceRepositoryAuthorizationV3
+                or authorization.repository!=self.repository
+                or type(authorization.repository_id) is not int or authorization.repository_id!=self.repository_id
+                or type(authorization.installation_id) is not int or authorization.installation_id!=self.installation_id
+                or not isinstance(authorization.evidence_id,str)
+                or re.fullmatch(r"artifact:sha256:[0-9a-f]{64}",authorization.evidence_id) is None
+                or authorization.evidence_id!=self.authority_evidence_id):
+                raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_SOURCE_AUTHORIZATION_EVIDENCE_MISMATCH")
     def _repo(self):
         value=_object(self._get(""),"ISSUE_REFERENCE_REPOSITORY_INVALID")
         if value.get("full_name")!=self.repository or _positive(value.get("id"),"ISSUE_REFERENCE_REPOSITORY_INVALID")!=self.repository_id: raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_REPOSITORY_MISMATCH")
@@ -96,6 +108,7 @@ class GitHubIssueReferenceReaderV3:
         if now.tzinfo is None: raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_OBSERVATION_TIME_INVALID")
         observed=now.astimezone(timezone.utc).isoformat().replace("+00:00","Z")
         q="SAME_REPOSITORY_ACTIONS_QUALIFICATION" if self.qualification_only else "AUTHENTICATED_READ_ONLY"
+        self._authority()
         provisional=GitHubIssueReferenceObservationV3(kind,self.repository,self.repository_id,selector,
             issue_id,issue["number"],None if comment is None else selector,author_id,data,len(data),digest,
             observed,updated,source,q,self.authority_evidence_id,self.installation_id,"")
