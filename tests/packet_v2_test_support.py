@@ -19,7 +19,7 @@ from review_broker.packets import GitSourceReader, SourceSpec
 
 
 def admitted(request_value=None, *, capture=None, head=None, git_file_readers=None,
-             issue_reference_readers=None):
+             issue_reference_readers=None, source_authority_override=None):
     authority = PrAuthority(head=head or "a" * 40)
     if capture is not None:
         sources = tuple(SubjectSourceFeasibilityV3(
@@ -43,7 +43,8 @@ def admitted(request_value=None, *, capture=None, head=None, git_file_readers=No
         origin(request_value), broker_issue_number=51,
         expected_broker_issue_id=6106789428, expected_requester_id=30498238,
         requester_authority=RequesterAuthority(), pr_authority=authority,
-        source_authority=SourceAuthority(), history_authority=HistoryAuthority(),
+        source_authority=(SourceAuthority() if source_authority_override is None
+                          else source_authority_override), history_authority=HistoryAuthority(),
         git_file_readers=git_file_readers, issue_reference_readers=issue_reference_readers,
     )
 
@@ -53,7 +54,7 @@ def inline(identifier="context", text="alpha\nbeta\n", required=True):
             "source": {"kind": "inline", "text": text}}
 
 
-def git_capture(root: Path) -> SubjectCaptureV2:
+def git_capture(root: Path, *, source_authority_override=None) -> SubjectCaptureV2:
     repository = root / "subject"
     repository.mkdir()
     subprocess.run(["git", "init", "-q", "-b", "main", str(repository)], check=True)
@@ -78,6 +79,21 @@ def git_capture(root: Path) -> SubjectCaptureV2:
         ({"status": "modified", "path": "review.md", "previous_path": None},),
         records, reader.diff(base, head), "", repository,
     )
+    if source_authority_override is not None:
+        from tests.issue69_test_support import PullApi, local_acquirer, TOKEN
+        from review_broker.github_pull_request_observation_v3 import GitHubPullRequestObservationReaderV3
+        from review_broker.github_subject_capture_v3 import capture_authenticated_subject_v3, bind_authenticated_capture_v3
+        source = source_authority_override
+        api = PullApi(base, head, base, [{"status": "modified", "filename": "review.md"}])
+        observer = GitHubPullRequestObservationReaderV3(TOKEN, value.repository,
+            value.repository_id, 71, head, source_authority=source, executor=api)
+        scope = observer.observe_scope()
+        authorization = source.authorize(value.repository, value.repository_id)
+        capture = capture_authenticated_subject_v3(scope, observer, authorization,
+            source.scope_observation.evidence_id, TOKEN, root / "authenticated-capture",
+            acquire_repository=local_acquirer(repository))
+        final = observer.finalize(scope, capture)
+        return bind_authenticated_capture_v3(capture, authorization.evidence_id, final.evidence_id)
     return replace(value, evidence_id=subject_capture_evidence_id_v2(value))
 
 
