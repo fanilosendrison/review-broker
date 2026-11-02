@@ -5,7 +5,7 @@ asset_type: "qualification-record"
 domain: "independent-review"
 severity: "strict"
 name: "Issue 69 Real V3 Adapter Preparation"
-version: "0.2.0"
+version: "0.2.1"
 ---
 
 # Issue 69 Real V3 Adapter Preparation
@@ -104,7 +104,7 @@ reads; missing references, malformed bodies and ambiguous API results; coherent
 sanitized receipt and cleanup after failure. Post-return corruption injections
 explicitly test controller rejection, not defects attributed to PR 72.
 
-Observed local results:
+Historical local results at `981a218f8846acdc72d1d8dbfa59a918d65b7193`:
 
 - Harness module: 7 test methods PASS, including positive and negative subcases.
 - Credential-scope module: 16 tests PASS; exactly five classified mint sites.
@@ -121,6 +121,50 @@ These are offline functional results, not observations of effective live token
 permissions, remote Git acquisition, an atomic GitHub snapshot, or requester
 admission. Installation identity remains trusted mint context; the repository
 listing does not independently attest it.
+
+## Clean-CI finding and fixture correction
+
+The first preparation candidate, `981a218f8846acdc72d1d8dbfa59a918d65b7193`,
+failed [exact-head CI][old-ci]: 511 tests ran with two class-setup errors.
+Both harness classes required a nonexistent, ignored `.venv` directory. A
+separate offline shallow-clone reproduction established a second failure after
+providing that directory: the main checkout lacked the experimental PR 72 Git
+object needed by both classes. The [independent NO_GO][old-review] correctly
+identified these hidden prerequisites. Neither failure is attributed to PR 72;
+the prior local PASS and the CI FAIL remain distinct historical facts.
+
+Both classes now obtain their private temporary directories from the system,
+retain cleanup, and share one explicit Git-fixture validator. System temporary
+path aliases are resolved for the controller clone before the unchanged
+import-origin assertion. No `.venv` directory is created or required by tests.
+
+`REVIEW_BROKER_PR72_TEST_CHECKOUT` must name an absolute, existing, nonsymbolic
+Git checkout root at the exact experimental SHA and tree listed above. Missing,
+invalid, wrong-SHA and wrong-tree fixtures fail with explicit preparation markers,
+not skips or fallback to the main repository. Both identity comparisons have
+independent negative oracles. The provenance class archives the validated local
+fixture; the controller class clones it locally, detaches the exact commit and
+rechecks SHA/tree. All seven integration methods and their assertions remain.
+Three additional fixture-validation methods cover positive and negative setup.
+
+CI prepares `artifacts/pr72-test-checkout` using the existing pinned checkout
+action, exact experimental SHA, depth one and `persist-credentials: false`.
+A credential-free step checks HEAD, tree and detached state before tests. The
+existing test step receives only the absolute fixture path. Events, Python,
+Contents-read permissions, installation, compilation and JSON checks remain
+unchanged; no App credential or dependency is added. Code acquisition belongs to
+CI preparation; the tests themselves perform only local Git and injected HTTP.
+This fixture is test infrastructure, not a real source-App qualification.
+
+The corrected local suite passes 521 tests: the seven integration methods,
+three fixture-validation methods, 16 scope tests and remaining regressions.
+A separate depth-one main clone with the three-file correction overlaid passes
+all 26 targeted tests and all 521 tests. Its `.venv` remains absent and its Git
+object store lacks PR 72 both before and after execution. The experimental
+fixture is a separate, clean, detached local checkout. No network acquisition is
+needed for this reproduction. Exact published-commit reproduction, new exact-SHA
+CI and a fresh independent review are mandatory acceptance gates; their receipts
+are published on [PR 75][preparation-pr]. The old NO_GO is never reused as GO.
 
 ## Workflow and credential boundary
 
@@ -176,3 +220,6 @@ ISSUE69_CLOSED=NO
 ```
 
 [correction]: https://github.com/fanilosendrison/review-broker/issues/69#issuecomment-6566591457
+[old-ci]: https://github.com/fanilosendrison/review-broker/actions/runs/41412195177
+[old-review]: https://github.com/fanilosendrison/review-broker/pull/75#issuecomment-6572533174
+[preparation-pr]: https://github.com/fanilosendrison/review-broker/pull/75
