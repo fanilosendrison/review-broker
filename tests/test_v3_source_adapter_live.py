@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SHA = "e65e4db932cb59d7a0fcfbd442ba19e548fc141d"
@@ -47,16 +48,45 @@ else:
 '''
 
 
+def pinned_pr72_test_checkout():
+    """Require an explicitly provisioned local Git fixture; never acquire code."""
+    supplied = os.environ.get("REVIEW_BROKER_PR72_TEST_CHECKOUT")
+    if not supplied:
+        raise AssertionError("PR72_TEST_FIXTURE_REQUIRED")
+    root = Path(supplied)
+    if not root.is_absolute() or root.is_symlink() or not root.is_dir():
+        raise AssertionError("PR72_TEST_FIXTURE_PATH_INVALID")
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment.update({"GIT_NO_REPLACE_OBJECTS": "1", "GIT_CONFIG_NOSYSTEM": "1",
+                        "GIT_CONFIG_GLOBAL": os.devnull})
+
+    def revision(expression):
+        try:
+            raw = subprocess.check_output(["git", "-C", str(root), "rev-parse", expression],
+                                          env=environment, stderr=subprocess.PIPE, timeout=30)
+        except (OSError, subprocess.SubprocessError):
+            raise AssertionError("PR72_TEST_FIXTURE_GIT_INVALID") from None
+        if not raw.endswith(b"\n"):
+            raise AssertionError("PR72_TEST_FIXTURE_GIT_INVALID")
+        return os.fsdecode(raw[:-1])
+
+    if Path(revision("--show-toplevel")).resolve() != root.resolve():
+        raise AssertionError("PR72_TEST_FIXTURE_GIT_INVALID")
+    if revision("HEAD") != SHA:
+        raise AssertionError("PR72_TEST_FIXTURE_SHA_MISMATCH")
+    if revision("HEAD^{tree}") != TREE:
+        raise AssertionError("PR72_TEST_FIXTURE_TREE_MISMATCH")
+    return root
+
+
 class PinnedAdapterAuthorizationBindingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temporary = tempfile.TemporaryDirectory(prefix="adapter-provenance-", dir=ROOT / ".venv")
+        checkout = pinned_pr72_test_checkout()
+        cls.temporary = tempfile.TemporaryDirectory(prefix="adapter-provenance-")
         cls.addClassCleanup(cls.temporary.cleanup)
         cls.candidate = Path(cls.temporary.name)
-        tree = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", SHA + "^{tree}"], text=True)
-        if tree.strip() != TREE:
-            raise AssertionError("PINNED_CANDIDATE_TREE_MISMATCH")
-        archive = subprocess.check_output(["git", "-C", str(ROOT), "archive", SHA])
+        archive = subprocess.check_output(["git", "-C", str(checkout), "archive", SHA])
         subprocess.run(["tar", "-x", "-C", str(cls.candidate)], input=archive, check=True)
 
     def probe(self, adapter, mode):
@@ -229,12 +259,16 @@ with tempfile.TemporaryDirectory() as temporary:
 class ControllerIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temporary = tempfile.TemporaryDirectory(prefix="adapter-controller-", dir=ROOT / ".venv")
+        checkout = pinned_pr72_test_checkout()
+        cls.temporary = tempfile.TemporaryDirectory(prefix="adapter-controller-")
         cls.addClassCleanup(cls.temporary.cleanup)
-        cls.candidate = Path(cls.temporary.name) / "candidate"
-        subprocess.run(["git", "clone", "-q", "--shared", "--no-checkout", str(ROOT),
+        cls.candidate = Path(cls.temporary.name).resolve() / "candidate"
+        subprocess.run(["git", "clone", "-q", "--shared", "--no-checkout", str(checkout),
                         str(cls.candidate)], check=True)
         subprocess.run(["git", "-C", str(cls.candidate), "checkout", "-q", "--detach", SHA], check=True)
+        with patch.dict(os.environ, {"REVIEW_BROKER_PR72_TEST_CHECKOUT": str(cls.candidate)}):
+            if pinned_pr72_test_checkout() != cls.candidate:
+                raise AssertionError("PR72_TEST_CLONE_INVALID")
 
     def run_case(self, scenario):
         environment = {key: os.environ[key] for key in ("PATH", "HOME") if key in os.environ}
@@ -282,6 +316,39 @@ class ControllerIntegrationTests(unittest.TestCase):
                 workflows[V3_ADAPTER_SITE] = original.replace(old, new, 1)
                 with self.assertRaises(AssertionError):
                     audit_workflows(workflows)
+
+
+class PinnedFixturePreparationTests(unittest.TestCase):
+    def test_explicit_fixture_positive_and_invalid_paths(self):
+        self.assertEqual(str(pinned_pr72_test_checkout()),
+                         os.environ["REVIEW_BROKER_PR72_TEST_CHECKOUT"])
+        with tempfile.TemporaryDirectory(prefix="adapter-fixture-validation-") as temporary:
+            root = Path(temporary)
+            link = root / "link"
+            link.symlink_to(os.environ["REVIEW_BROKER_PR72_TEST_CHECKOUT"], target_is_directory=True)
+            for value in ("relative", str(root / "missing"), str(link)):
+                with self.subTest(path=value), patch.dict(os.environ, {"REVIEW_BROKER_PR72_TEST_CHECKOUT": value}):
+                    with self.assertRaisesRegex(AssertionError, "PR72_TEST_FIXTURE_PATH_INVALID"):
+                        pinned_pr72_test_checkout()
+            with patch.dict(os.environ, {"REVIEW_BROKER_PR72_TEST_CHECKOUT": str(root)}):
+                with self.assertRaisesRegex(AssertionError, "PR72_TEST_FIXTURE_GIT_INVALID"):
+                    pinned_pr72_test_checkout()
+
+    def test_missing_fixture_is_preparation_failure_not_skip(self):
+        with patch.dict(os.environ):
+            os.environ.pop("REVIEW_BROKER_PR72_TEST_CHECKOUT", None)
+            with self.assertRaisesRegex(AssertionError, "PR72_TEST_FIXTURE_REQUIRED"):
+                pinned_pr72_test_checkout()
+
+    def test_each_exact_revision_comparison_is_required(self):
+        with patch.dict(os.environ, {"REVIEW_BROKER_PR72_TEST_CHECKOUT": str(ROOT)}):
+            with self.assertRaisesRegex(AssertionError, "PR72_TEST_FIXTURE_SHA_MISMATCH"):
+                pinned_pr72_test_checkout()
+        # Independently vary each expected identity against the real Git fixture.
+        for constant, marker in (("SHA", "SHA_MISMATCH"), ("TREE", "TREE_MISMATCH")):
+            with self.subTest(constant=constant), patch(__name__ + "." + constant, "0" * 40):
+                with self.assertRaisesRegex(AssertionError, "PR72_TEST_FIXTURE_" + marker):
+                    pinned_pr72_test_checkout()
 
 
 if __name__ == "__main__":
