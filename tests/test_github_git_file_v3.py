@@ -7,6 +7,7 @@ import json
 import unittest
 
 from review_broker.github_git_file_v3 import GitHubGitFileReaderV3, GitHubGitFileV3Error
+from review_broker.identity import artifact_identity, canonical_bytes
 from review_broker.github_http_live_v3 import HttpResponseV3
 from tests.issue69_test_support import source_authority
 
@@ -166,6 +167,142 @@ class GitFileAuthorizationBindingTests(unittest.TestCase):
         observation = value.observe(COMMIT, "contract.md")
         self.assertEqual(observation.qualification, "SAME_REPOSITORY_ACTIONS_QUALIFICATION")
         self.assertEqual(observation.authority_evidence_id, "artifact:sha256:" + "0" * 64)
+
+
+class SwapOnSecondComparison(str):
+    def arm(self, reader):
+        self.reader = reader
+        self.comparisons = 0
+
+    def __ne__(self, other):
+        self.comparisons += 1
+        if self.comparisons == 2:
+            self.reader.authority_evidence_id = self.encode("ascii").decode("ascii")
+        return False
+
+
+class PlainString(str):
+    pass
+
+
+class TrapString(str):
+    def forbidden(self, *args, **kwargs):
+        raise AssertionError("SUBCLASS_METHOD_MUST_NOT_EXECUTE")
+    __eq__ = __ne__ = __str__ = __len__ = startswith = encode = forbidden
+
+
+class GitFileStringSubclassTests(unittest.TestCase):
+    marker = "GIT_FILE_SOURCE_AUTHORIZATION_EVIDENCE_MISMATCH"
+
+    def test_constructor_rejects_all_subclasses_without_methods(self):
+        source = source_authority(); actual = source.authorize(REPO, REPO_ID).evidence_id
+        for kind in (PlainString, TrapString):
+            for qualification in (False, True):
+                with self.subTest(kind=kind.__name__, qualification=qualification):
+                    api = Api()
+                    with self.assertRaisesRegex(ValueError, "GITHUB_SOURCE_AUTHORITY_INVALID"):
+                        GitHubGitFileReaderV3("token", REPO, REPO_ID,
+                            authority_evidence_id=kind(actual), source_authority=source,
+                            qualification_only=qualification, executor=api)
+                    self.assertEqual(api.calls, [])
+
+    def test_post_construction_subclass_rejected_without_get_or_methods(self):
+        for kind in (PlainString, TrapString, SwapOnSecondComparison):
+            with self.subTest(kind=kind.__name__):
+                source = source_authority(); api = Api(); value = reader(api, source)
+                value.authority_evidence_id = kind(value.authority_evidence_id)
+                with self.assertRaisesRegex(GitHubGitFileV3Error, self.marker):
+                    value.observe(COMMIT, "contract.md")
+                self.assertEqual(api.calls, [])
+
+    def test_actual_authorization_subclass_rejected_before_get(self):
+        for kind in (PlainString, TrapString, SwapOnSecondComparison):
+            with self.subTest(kind=kind.__name__):
+                source = source_authority(); api = Api(); value = reader(api, source)
+                actual = source.authorize(REPO, REPO_ID)
+                with patch.object(source, "authorize", return_value=replace(
+                        actual, evidence_id=kind(actual.evidence_id))):
+                    with self.assertRaisesRegex(GitHubGitFileV3Error, self.marker):
+                        value.observe(COMMIT, "contract.md")
+                self.assertEqual(api.calls, [])
+
+    def test_field_mutation_during_acquisition_rejected(self):
+        for kind in (str, PlainString, TrapString):
+            with self.subTest(kind=kind.__name__):
+                source = source_authority(); api = Api(); value = reader(api, source)
+                def clock():
+                    value.authority_evidence_id = kind("artifact:sha256:" + "0" * 64)
+                    return datetime(2026, 11, 1, tzinfo=timezone.utc)
+                value._clock = clock
+                with self.assertRaisesRegex(GitHubGitFileV3Error, self.marker):
+                    value.observe(COMMIT, "contract.md")
+                self.assertEqual(len(api.calls), 5)
+
+    def test_actual_authorization_subclass_at_final_check_rejected(self):
+        source = source_authority(); api = Api(); value = reader(api, source)
+        actual = source.authorize(REPO, REPO_ID)
+        with patch.object(source, "authorize", side_effect=[actual,
+                replace(actual, evidence_id=TrapString(actual.evidence_id))]):
+            with self.assertRaisesRegex(GitHubGitFileV3Error, self.marker):
+                value.observe(COMMIT, "contract.md")
+        self.assertEqual(len(api.calls), 5)
+
+    def test_emission_uses_verified_local_id_not_mutated_field(self):
+        source = source_authority(); value = reader(Api(), source)
+        actual = source.authorize(REPO, REPO_ID).evidence_id
+        original = value._verify_credential_authority
+        calls = []
+        def verify_then_mutate():
+            verified = original(); calls.append(verified)
+            if len(calls) == 2:
+                value.authority_evidence_id = "artifact:sha256:" + "0" * 64
+            return verified
+        value._verify_credential_authority = verify_then_mutate
+        observed = value.observe(COMMIT, "contract.md")
+        self.assertEqual(len(calls), 2)
+        self.assertNotEqual(value.authority_evidence_id, actual)
+        self.assertIs(type(observed.authority_evidence_id), str)
+        self.assertEqual(observed.authority_evidence_id, actual)
+        basis = observed.provenance_basis()
+        self.assertEqual(basis["authority_evidence_id"], actual)
+        encoded = canonical_bytes(basis) + b"\n"
+        self.assertEqual(observed.evidence_id, artifact_identity(encoded))
+        self.assertNotIn(b"token", encoded)
+
+    def test_canonical_native_id_and_historical_emission(self):
+        source = source_authority(); actual = source.authorize(REPO, REPO_ID).evidence_id
+        for qualification in (False, True):
+            value = GitHubGitFileReaderV3("token", REPO, REPO_ID,
+                authority_evidence_id=actual, source_authority=source,
+                qualification_only=qualification, executor=Api())
+            observed = value.observe(COMMIT, "contract.md")
+            self.assertIs(type(observed.authority_evidence_id), str)
+            self.assertEqual(observed.authority_evidence_id, actual)
+            self.assertEqual(observed.qualification, "SAME_REPOSITORY_ACTIONS_QUALIFICATION"
+                             if qualification else "AUTHENTICATED_READ_ONLY")
+        for invalid in ("artifact:sha256:" + "g" * 64, "artifact:sha256:0"):
+            with self.assertRaisesRegex(ValueError, "GITHUB_SOURCE_AUTHORITY_INVALID"):
+                GitHubGitFileReaderV3("token", REPO, REPO_ID,
+                    authority_evidence_id=invalid, source_authority=source, executor=Api())
+
+    def test_exact_reviewer_witness_rejected(self):
+        source = source_authority(); api = Api()
+        actual = source.authorize(REPO, REPO_ID).evidence_id
+        bad_text = "artifact:sha256:" + "0" * 64
+        self.assertNotEqual(actual, bad_text)
+        supplied = SwapOnSecondComparison(bad_text)
+        with self.assertRaisesRegex(ValueError, "GITHUB_SOURCE_AUTHORITY_INVALID"):
+            value = GitHubGitFileReaderV3("token", REPO, REPO_ID,
+                authority_evidence_id=supplied, source_authority=source, executor=api)
+            supplied.arm(value)
+            observed = value.observe(COMMIT, "contract.md")
+            # On the old code, establish that the exact witness emits a forged
+            # built-in string before the expected-rejection assertion goes RED.
+            self.assertEqual(observed.qualification, "AUTHENTICATED_READ_ONLY")
+            self.assertIs(type(observed.authority_evidence_id), str)
+            self.assertEqual(observed.authority_evidence_id, bad_text)
+            self.assertNotEqual(observed.authority_evidence_id, actual)
+        self.assertEqual(api.calls, [])
 
 
 if __name__ == "__main__": unittest.main()
