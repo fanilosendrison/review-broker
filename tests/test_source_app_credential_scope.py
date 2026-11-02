@@ -23,6 +23,8 @@ LEGACY_SITES = {
 }
 
 V3_SITE = "v3-source-app-read-qualification.yml"
+V3_ADAPTER_SITE = "v3-source-adapter-qualification.yml"
+V3_ADAPTER_WORKFLOW_SHA256 = "9ae51909cdc6eb62d1e03b02848c28a2b346bfb2b2cdca65a16b8093b3824490"
 V3_PERMISSIONS = {**LEGACY_PERMISSIONS, "permission-issues": "read"}
 # Exact, independently reviewed workflow snapshot: fixes trigger, one guarded
 # job, preflight-before-key order, pins, repository selection and token consumers.
@@ -110,7 +112,8 @@ def literal_fields(block, indent):
 
 
 def audit_workflows(workflows):
-    sites = {**LEGACY_SITES, V3_SITE: ("qualify", "fanilosendrison", 1)}
+    sites = {**LEGACY_SITES, V3_SITE: ("qualify", "fanilosendrison", 1),
+             V3_ADAPTER_SITE: ("qualify", "fanilosendrison", 1)}
     seen = set()
     for name, text in workflows.items():
         blocks = list(step_blocks(text))
@@ -135,7 +138,8 @@ def audit_workflows(workflows):
                 raise AssertionError(f"missing block input mapping: {name}")
             permissions = {key: value for key, value in inputs.items()
                            if key.startswith("permission-")}
-            expected_permissions = V3_PERMISSIONS if name == V3_SITE else LEGACY_PERMISSIONS
+            expected_permissions = (V3_PERMISSIONS if name in {V3_SITE, V3_ADAPTER_SITE}
+                                    else LEGACY_PERMISSIONS)
             if permissions != expected_permissions:
                 raise AssertionError(f"incorrect classified permission subset: {name}")
             job, owner, expected_bindings = sites[name]
@@ -143,7 +147,7 @@ def audit_workflows(workflows):
                 "app-id": APP_ID, "private-key": PRIVATE_KEY, "owner": owner,
                 **expected_permissions,
             }
-            if name == V3_SITE:
+            if name in {V3_SITE, V3_ADAPTER_SITE}:
                 expected_inputs["repositories"] = "review-broker"
             if inputs != expected_inputs:
                 raise AssertionError(f"source inputs changed: {name}")
@@ -174,6 +178,8 @@ def audit_workflows(workflows):
     audit_private_source_dispatch(workflows["private-source-qualification.yml"])
     if hashlib.sha256(workflows[V3_SITE].encode()).hexdigest() != V3_WORKFLOW_SHA256:
         raise AssertionError("v3 approved-SHA workflow structure changed")
+    if hashlib.sha256(workflows[V3_ADAPTER_SITE].encode()).hexdigest() != V3_ADAPTER_WORKFLOW_SHA256:
+        raise AssertionError("v3 adapter approved-SHA workflow structure changed")
     return seen
 
 
@@ -186,7 +192,7 @@ class SourceAppCredentialScopeTests(unittest.TestCase):
         }
 
     def test_all_source_app_mints_have_explicit_classified_legacy_scope(self):
-        self.assertEqual(audit_workflows(self.workflows), set(LEGACY_SITES) | {V3_SITE})
+        self.assertEqual(audit_workflows(self.workflows), set(LEGACY_SITES) | {V3_SITE, V3_ADAPTER_SITE})
 
     def assert_rejected(self, name, old, new):
         workflows = dict(self.workflows)
