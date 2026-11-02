@@ -23,10 +23,10 @@ class Issue69AdversarialTests(unittest.TestCase):
    root=Path(temporary);capture,admission,_=self.integrated(root);oid=capture.records[-1].git_blob_oid;object_path=capture.repository_root/".git/objects"/oid[:2]/oid[2:];self.assertTrue(object_path.exists());object_path.chmod(0o600);object_path.write_bytes(b"corrupt")
    with self.assertRaisesRegex(PacketV2CandidateError,"LOCAL_GIT_PROOF_INVALID"):build_packet_v2_candidate(admission,capture,profile(),root/"packet")
  def test_I69_F22_remote_reference_budget_stops_incrementally(self):
-  from tests.test_github_git_file_v3 import Api,AUTHORITY,COMMIT,reader
+  from tests.test_github_git_file_v3 import Api,COMMIT,reader
   from review_broker.git_file_admission_v3 import acquire_git_file_admissions_v3,GitFileAdmissionV3Error
   api=Api(data=b"x"*2_000_000);trusted=reader(api);references=[{"id":f"ref-{i}","required":True,"source":{"kind":"git_file","repository":REPOSITORY,"path":"contract.md","commit":COMMIT}} for i in range(997)];request={"references":references,"atomicity":False};subject={"repository":REPOSITORY,"repository_id":REPOSITORY_ID,"expected_head_commit":"f"*40}
-  with self.assertRaisesRegex(GitFileAdmissionV3Error,"RENDERED_PACKET_EXCEEDED"):acquire_git_file_admissions_v3(request,subject,{item["id"]:trusted for item in references},AUTHORITY,INSTALLATION_ID,7_000_000)
+  with self.assertRaisesRegex(GitFileAdmissionV3Error,"RENDERED_PACKET_EXCEEDED"):acquire_git_file_admissions_v3(request,subject,{item["id"]:trusted for item in references},trusted.authority_evidence_id,INSTALLATION_ID,7_000_000)
   self.assertLess(len(api.calls),50)
  def test_I69_F22_source_count_rejected_before_acquisition(self):
   with tempfile.TemporaryDirectory() as temporary:
