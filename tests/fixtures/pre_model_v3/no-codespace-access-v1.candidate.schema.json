@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fanilosendrison/review-broker/tests/fixtures/pre_model_v3/no-codespace-access-v1.candidate.schema.json",
+  "title": "UNACCEPTED experimental v3 pre-model no Codespace access terminal evidence",
+  "description": "Receipt shape only: claims no Codespace-side effect by this worker after authoritative workflow-run trace and mandatory start gate validation; it does not prove absence by itself, nor global Shutdown.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_type",
+    "request_id",
+    "attempt_id",
+    "admission_evidence_id",
+    "generation",
+    "reservation_id",
+    "workflow_run_id",
+    "workflow_run_attempt",
+    "codespace_name",
+    "workflow_trace_evidence_id",
+    "start_gate_evidence_id",
+    "codespace_access_attempted",
+    "observed_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "evidence_type": {
+      "const": "pre-model-no-codespace-access"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^request:sha256:[0-9a-f]{64}$"
+    },
+    "attempt_id": {
+      "type": "string",
+      "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+    },
+    "admission_evidence_id": {
+      "type": "string",
+      "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "reservation_id": {
+      "type": "string",
+      "pattern": "^preparation-dispatch:sha256:[0-9a-f]{64}$"
+    },
+    "workflow_run_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "workflow_run_attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "codespace_name": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9-]{1,128}$"
+    },
+    "workflow_trace_evidence_id": {
+      "type": "string",
+      "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+    },
+    "start_gate_evidence_id": {
+      "type": "string",
+      "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+    },
+    "codespace_access_attempted": {
+      "const": false
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
