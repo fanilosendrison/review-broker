@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 from dataclasses import replace
 import json
+import secrets
 import subprocess
 from typing import Any, Callable, Mapping
 
@@ -53,14 +54,13 @@ class GitHubRefJournal:
         )
         base_sha = self._ref_sha(f"heads/{self.base_branch}")
         commit_sha = self._state_commit(base_sha, record)
-        result = self._api(
+        self._api(
             "POST",
             f"repos/{self.repository}/git/refs",
             {"ref": self._claim_ref(request_id), "sha": commit_sha},
             check=False,
         )
-        if result.returncode == 0:
-            return record
+        # Ref creation, like updates, requires an independently observed outcome.
         winner = self._read(request_id)
         if winner is None:
             raise StateTransitionError("ATOMIC_CLAIM_FAILED")
@@ -73,6 +73,12 @@ class GitHubRefJournal:
         if found is None:
             raise KeyError(request_id)
         return found[1]
+
+    def get_snapshot(self, request_id: str) -> tuple[str, AttemptRecord]:
+        found = self._read(request_id)
+        if found is None:
+            raise KeyError(request_id)
+        return found
 
     def transition(
         self,
@@ -282,6 +288,9 @@ class GitHubRefJournal:
         )
         if result.returncode != 0:
             raise StateTransitionError("STATE_COMPARE_AND_SWAP_FAILED")
+        observed = self._read(request_id)
+        if observed is None or observed[0] != commit_sha or observed[1] != updated:
+            raise StateTransitionError("STATE_COMPARE_AND_SWAP_NOT_OBSERVED")
 
     def _read(self, request_id: str) -> tuple[str, AttemptRecord] | None:
         ref = self._api(
@@ -345,7 +354,8 @@ class GitHubRefJournal:
         commit = json.loads(self._api(
             "POST",
             f"repos/{self.repository}/git/commits",
-            {"message": f"state: {record.state.value} {record.attempt_id}", "tree": tree, "parents": [parent_sha]},
+            {"message": f"state: {record.state.value} {record.attempt_id}\n\ntransaction: {secrets.token_hex(32)}",
+             "tree": tree, "parents": [parent_sha]},
         ).stdout)
         return commit["sha"]
 

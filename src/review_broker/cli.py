@@ -114,6 +114,7 @@ def _parser() -> argparse.ArgumentParser:
     invoke.add_argument("--broker-wheel-sha256", required=True)
     invoke.add_argument("--trusted-workspace", required=True, type=Path)
     invoke.add_argument("--codex-runtime-root", required=True, type=Path)
+    invoke.add_argument("--authorization-stdin", action="store_true")
     recover = subcommands.add_parser("internal-recover")
     recover.add_argument("--codespace", required=True)
     recover.add_argument("--remote-dir", required=True)
@@ -233,7 +234,7 @@ def main(argv: list[str] | None = None) -> int:
             if observed["packet_id"] != args.expected_packet_id:
                 raise CliError("PACKET_ID_MISMATCH")
             return 0
-        if args.command in {"internal-input-capacity", "internal-arm"}:
+        if args.command in {"internal-input-capacity", "internal-arm", "internal-arm-authorize"}:
             print(canonical_bytes(run_capacity_command(args)).decode("utf-8"))
             return 0
         if args.command == "internal-install-reviewer-profile":
@@ -263,6 +264,7 @@ def main(argv: list[str] | None = None) -> int:
                 broker_wheel_sha256=args.broker_wheel_sha256,
                 trusted_workspace=args.trusted_workspace,
                 codex_runtime_root=args.codex_runtime_root,
+                authorization_bundle=sys.stdin.buffer.read(100_001) if args.authorization_stdin else None,
             )
             return 0
         if args.command == "internal-recover":

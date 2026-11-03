@@ -20,15 +20,16 @@ def prepare_packet(
     source_reader: GitSourceReader | None = None,
 ) -> dict[str, Any]:
     """A prepared claim selects by its exact old evidence, never by a new default."""
-    formats = [ADDED_IMAGES_V1, None] if all(c["status"] == "added" for c in changes) else [None]
-
-    modes = None
-    if formats[0] == ADDED_IMAGES_V1:
-        if source_reader is None:
-            raise PacketError("ACTUAL_ADDED_SCOPE_OBSERVATION_REQUIRED")
-        modes = source_reader.added_change_modes(merge_base, head)
+    compact_applicable = bool(changes) and all(c["status"] == "added" for c in changes)
+    formats = ([None, ADDED_IMAGES_V1] if compact_applicable else [None]) if prepared_evidence_ids else (
+        [ADDED_IMAGES_V1] if compact_applicable else [None])
 
     def construct(directory: Path, mode: str | None) -> dict[str, Any]:
+        modes = None
+        if mode == ADDED_IMAGES_V1:
+            if source_reader is None:
+                raise PacketError("ACTUAL_ADDED_SCOPE_OBSERVATION_REQUIRED")
+            modes = source_reader.added_change_modes(merge_base, head)
         return build_packet(
             records, request_id=request_id, subject_id=subject_id,
             mission_instruction=mission_instruction, profile=profile,
@@ -40,11 +41,18 @@ def prepare_packet(
     selected = formats[0]
     if prepared_evidence_ids:
         for mode in formats:
-            with tempfile.TemporaryDirectory(prefix="review-broker-rebuild-") as temporary:
-                manifest = construct(Path(temporary), mode)
+            try:
+                with tempfile.TemporaryDirectory(prefix="review-broker-rebuild-") as temporary:
+                    manifest = construct(Path(temporary), mode)
+            except PacketError:
+                # Failure grants nothing. Only an independently matching candidate can be selected.
+                continue
             if artifact_identity(canonical_bytes(manifest)) in prepared_evidence_ids:
                 selected = mode
                 break
         else:
             raise PacketError("PREPARED_PACKET_EVIDENCE_MISMATCH")
-    return construct(output_directory, selected)
+    result = construct(output_directory, selected)
+    if prepared_evidence_ids and artifact_identity(canonical_bytes(result)) not in prepared_evidence_ids:
+        raise PacketError("PREPARED_PACKET_EVIDENCE_MISMATCH")
+    return result

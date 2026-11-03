@@ -1,6 +1,8 @@
 """Exact Codex permission profile for credential-isolated review execution."""
 from __future__ import annotations
 
+from .arm_authority_contract import AUTHORITY_ROOT, STATE_DIRECTORY
+
 import hashlib
 import json
 import os
@@ -47,7 +49,9 @@ def profile_bytes(reviewer_home: Path, trusted_workspace: Path, packet_directory
         '":minimal" = "read"\n'
         f"{quote(packet)} = \"read\"\n"
         f"{quote(home)} = \"deny\"\n"
-        f"{quote(workspace)} = \"deny\"\n\n"
+        f"{quote(workspace)} = \"deny\"\n"
+        f"{quote(AUTHORITY_ROOT)} = \"deny\"\n"
+        f"{quote(STATE_DIRECTORY)} = \"deny\"\n\n"
         f"[permissions.{name}.network]\n"
         "enabled = false\n"
     ).encode("utf-8")

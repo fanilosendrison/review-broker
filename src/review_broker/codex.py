@@ -16,14 +16,15 @@ from .codex_runtime_identity import (
     verify_codex_runtime,
 )
 from .codexfailure import classify_diagnostic_text, observe_codex_failure_files
+from .arm_authority_contract import ArmAuthorityError
+from .arm_execution import authorize_execution
 from .identity import canonical_bytes
 from .codex_policy import (
     CodexPolicy, InvocationError, REQUIRED_FLAGS, REMOVED_ENVIRONMENT_KEYS,
     REMOVED_ENVIRONMENT_PREFIXES, build_command, ensure_cli_compatibility, sanitized_environment,
 )
 from .packets import PacketError, verify_packet
-from .input_capacity import CapacityError, MAX_CHARS, capacity_receipt, measure_input, read_verified_input
-from .fileobservation import read_regular_file_bounded
+from .input_capacity import CapacityError, MAX_CHARS, measure_input, read_verified_input
 from .reviewer_profile import (
     profile_name,
     ReviewerProfileError,
@@ -94,15 +95,19 @@ def invoke_once(
     trusted_workspace: Path,
     codex_runtime_root: Path,
     policy: CodexPolicy = CodexPolicy(),
-    armed: bool = True,
+    authorization_bundle: bytes | None = None,
+    armed: bool | None = None,
     runner: Runner = subprocess.run,
     runtime_verifier: RuntimeVerifier = verify_codex_runtime,
     timeout_seconds: int = 3600,
     environment: Mapping[str, str] | None = None,
 ) -> None:
-    """Invoke Codex at most once for a caller-durably-armed attempt."""
-    if not armed:
+    """Invoke only after authenticated workload delegation and durable local consumption."""
+    # Legacy false is a veto only; true/None never supplies execution authority.
+    if armed is False:
         raise InvocationError("NOT_ARMED")
+    if policy != CodexPolicy():
+        raise InvocationError("INVOCATION_POLICY_SUBSTITUTION")
     if (
         len(broker_wheel_sha256) != 64
         or any(character not in "0123456789abcdef" for character in broker_wheel_sha256)
@@ -152,22 +157,12 @@ def invoke_once(
             raise InvocationError("INPUT_CAPACITY_REJECTED:" + canonical_bytes(counts).decode("utf-8"))
         if counts["input_sha256"] != prompt_before:
             raise InvocationError("INPUT_CHANGED_BEFORE_EXECUTION")
-        metadata_path = packet_directory / "broker-metadata.json"
-        if metadata_path.exists():
-            raw_metadata = read_regular_file_bounded(metadata_path, 100_000)
-            metadata = json.loads(raw_metadata)
-            if not isinstance(metadata, dict) or raw_metadata != canonical_bytes(metadata) + b"\n":
-                raise InvocationError("INVOCATION_CAPACITY_BINDING_INVALID")
-            capacity = capacity_receipt(prompt_bytes, request_id=observed_packet["request_id"],
-                packet_id=expected_packet_id, attempt_id=attempt_id,
-                executing_broker_sha=metadata["executing_broker_sha"])
-            if (metadata.get("request_id") != observed_packet["request_id"]
-                or metadata.get("attempt_id") != attempt_id
-                or read_regular_file_bounded(packet_directory / "input-capacity.json", 100_000)
-                != canonical_bytes(capacity) + b"\n"):
-                raise InvocationError("INVOCATION_CAPACITY_BINDING_INVALID")
-    except (CapacityError, OSError, KeyError, TypeError, ValueError) as exc:
-        raise InvocationError("INVOCATION_INPUT_CAPACITY_INVALID") from exc
+        authorize_execution(authorization_bundle, directory=packet_directory,
+            packet_id=expected_packet_id, attempt_id=attempt_id,
+            request_id=observed_packet["request_id"], input_bytes=prompt_bytes,
+            reviewer_home=reviewer_home, trusted_workspace=trusted_workspace)
+    except (ArmAuthorityError, CapacityError, OSError, KeyError, TypeError, ValueError) as exc:
+        raise InvocationError("INVOCATION_CAPACITY_OR_ARM_AUTHORITY_INVALID") from exc
     attempt = {
         "schema_version": 1,
         "attempt_id": attempt_id,
