@@ -1,6 +1,7 @@
 """Execute the actual workflow delivery script against offline GitHub/SSH oracles."""
 from dataclasses import asdict
 import copy
+import itertools
 import json
 import os
 from pathlib import Path
@@ -15,8 +16,10 @@ from tests.test_prearm_workflow_cleanup import workflow_step
 
 class IdentityDeliveryWorkflowTests(unittest.TestCase):
     def test_actual_delivery_script_revalidates_every_binding_before_ssh(self):
-        for scenario in ['valid','missing','id','owner-id','owner-login','repo-id','repo-name','name','ambiguous']:
-            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as tmp:
+        for phase,scenario in itertools.product(
+                ['Invoke Codex once','Verify bounded low-sensitivity pre-arm evidence'],
+                ['valid','missing','id','owner-id','owner-login','repo-id','repo-name','name','ambiguous','record-missing','malformed-name','expected-id']):
+            with self.subTest(phase=phase,scenario=scenario), tempfile.TemporaryDirectory() as tmp:
                 root=Path(tmp)
                 value={'id':12,'name':'fixture-space','owner':{'login':'owner','id':23},
                        'repository':{'full_name':'sample/broker','id':34}}
@@ -32,6 +35,8 @@ class IdentityDeliveryWorkflowTests(unittest.TestCase):
                 elif scenario=='repo-id':current['repository']['id']=35
                 elif scenario=='repo-name':current['repository']['full_name']='other/broker'
                 elif scenario=='name':current['name']='different-space'
+                elif scenario=='malformed-name':current['name']='fixture-space;$(not-code)'
+                elif scenario=='record-missing':(root/'review-broker-recipient.json').unlink()
                 api_calls=[];transports=[]
                 def runner(command,**kwargs):
                     if command[:2]==['gh','api']:
@@ -45,21 +50,31 @@ class IdentityDeliveryWorkflowTests(unittest.TestCase):
                     tokens=shlex.split(command[-1])
                     self.assertEqual(tokens[:4],['env','-u','PYTHONPATH','CODESPACE_NAME=fixture-space'])
                     self.assertNotIn('CODESPACES=true',tokens)
-                    self.assertEqual(kwargs['stdin'].read(),b'synthetic-nonproduction')
+                    if phase=='Invoke Codex once':
+                        self.assertEqual(kwargs['stdin'].read(),b'synthetic-nonproduction')
+                    else:
+                        self.assertNotIn('stdin',kwargs)
+                        kwargs['stdout'].write(b'synthetic-transport-only')
                     self.assertIn("attempt;$(not-executed)'",tokens)
                     transports.append(command)
                     return subprocess.CompletedProcess(command,0)
-                step=workflow_step('Invoke Codex once')
+                (root/'evidence').mkdir()
+                step=workflow_step(phase)
                 code=textwrap.dedent(step.split('        run: |\n',1)[1])
                 code=code.split("python - <<'PY'\n",1)[1].rsplit('\nPY',1)[0]
-                env=dict(RUNNER_TEMP=tmp,EXPECTED_CODESPACE_ID='12',CODESPACE_NAME='fixture-space',
+                env=dict(RUNNER_TEMP=tmp,EXPECTED_CODESPACE_ID='13' if scenario=='expected-id' else '12',CODESPACE_NAME='fixture-space',
                     GITHUB_REPOSITORY='sample/broker',GITHUB_REPOSITORY_ID='34',REMOTE_ROOT='/tmp/fixture',
                     ATTEMPT_ID="attempt;$(not-executed)'",PACKET_ID='packet',BROKER_WHEEL_SHA256='f'*64,
-                    CODEX_RUNTIME_ROOT='/fixture/runtime')
-                with patch.dict(os.environ,env),patch('subprocess.run',side_effect=runner):
-                    if scenario=='valid':exec(compile(code,'workflow-invoke','exec'),{})
-                    else:
-                        with self.assertRaises(ValueError):exec(compile(code,'workflow-invoke','exec'),{})
+                    CODEX_RUNTIME_ROOT='/fixture/runtime',GITHUB_SHA='a'*40)
+                previous=Path.cwd()
+                try:
+                    os.chdir(root)
+                    with patch.dict(os.environ,env),patch('subprocess.run',side_effect=runner):
+                        if scenario=='valid':exec(compile(code,'workflow-delivery','exec'),{})
+                        else:
+                            with self.assertRaises((ValueError,OSError)):
+                                exec(compile(code,'workflow-delivery','exec'),{})
+                finally:os.chdir(previous)
                 self.assertEqual(len(transports),1 if scenario=='valid' else 0,'Unauthorized SSH/model transport forbidden')
 
     def test_existing_event_guard_is_unchanged(self):
