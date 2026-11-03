@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from importlib import resources
 import json
 import os
 from pathlib import Path
@@ -20,7 +19,8 @@ from .admission import (
     select_operational_admission,
 )
 from .identity import artifact_identity, canonical_bytes
-from .packets import GitSourceReader, SourceSpec, build_packet
+from .packets import GitSourceReader, SourceSpec
+from .packet_preparation import prepare_packet as build_packet
 from .github_journal import GitHubRefJournal
 from .predecessor import github_predecessor_authority, verify_v2_operation
 from .publication import (
@@ -36,6 +36,7 @@ from .recovery import (
     verify_rebuilt_packet,
 )
 from .request import parse_issue_body
+from .review_program import review_instruction as _review_instruction, load_profile as _load_profile
 from .source_authorization import (
     SourceAuthorizationError as OrchestrationError,
     _source_environment_for_repository,
@@ -103,10 +104,13 @@ def prepare_issue(
     attempt = journal.claim(resolved["request_id"], admission)
     admission_evidence = artifact_identity(canonical_bytes(resolved))
     preparation_action = decide_preparation_recovery(attempt, admission_evidence)
-    if preparation_action is PreparationRecoveryAction.DUPLICATE_TERMINAL_OR_MODEL_CAPABLE:
+    if preparation_action in {PreparationRecoveryAction.DUPLICATE_TERMINAL_OR_MODEL_CAPABLE,
+                              PreparationRecoveryAction.BLOCKED_INPUT_CAPACITY}:
         return {
             "duplicate": True, "attempt": attempt.as_dict(),
             "resolved_request": resolved, "admission_mode": admission_mode,
+            **({"capacity_rejected": True, "input_capacity": attempt.input_capacity}
+               if preparation_action is PreparationRecoveryAction.BLOCKED_INPUT_CAPACITY else {}),
         }
     if preparation_action is PreparationRecoveryAction.ADMIT_AND_BUILD:
         attempt = journal.transition(
@@ -200,6 +204,9 @@ def prepare_issue(
             change_diff=reader.diff(merge_base, head),
             merge_base=merge_base,
             head=head,
+            source_reader=reader,
+            prepared_evidence_ids=(attempt.evidence_ids if preparation_action is
+                PreparationRecoveryAction.REBUILD_PREPARED else ()),
         )
     resolved["source_manifest_id"] = manifest["source_manifest_id"]
     metadata = {
@@ -292,32 +299,6 @@ def publish_validated_result(
     )
     journal.record_publication(resolved["request_id"], receipt)
     return publication_result
-
-
-def _review_instruction(request: dict[str, Any], profile: dict[str, Any]) -> str:
-    mission = request["mission"]
-    profile_rules = "\n".join(f"- {rule}" for rule in profile["mandatory_behavior"])
-    criteria = "\n".join(f"- {criterion}" for criterion in mission["criteria"])
-    return (
-        f"OBJECTIVE: {mission['objective']}\n"
-        f"REQUESTER INSTRUCTIONS: {mission['instructions']}\n"
-        f"MANDATORY PROFILE BEHAVIOR:\n{profile_rules}\n"
-        f"EXAMINATION CRITERIA:\n{criteria}\n"
-        "The custom mission may strengthen but never disable mandatory profile behavior."
-    )
-
-
-def _load_profile(profile_id: str, version: int) -> dict[str, Any]:
-    target = resources.files("review_broker.profiles").joinpath(f"{profile_id}-v{version}.json")
-    try:
-        profile = json.loads(target.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError) as exc:
-        raise OrchestrationError("PROFILE_UNAVAILABLE") from exc
-    if profile.get("id") != profile_id or profile.get("version") != version:
-        raise OrchestrationError("PROFILE_IDENTITY_MISMATCH")
-    if profile.get("custom_mission_may_disable") is not False:
-        raise OrchestrationError("PROFILE_WEAKENING_FORBIDDEN")
-    return profile
 
 
 def _pull_request_files(

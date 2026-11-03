@@ -160,7 +160,10 @@ class BoundedAdmissionTests(unittest.TestCase):
         wire = ROOT / "src/review_broker/schemas/reviewer-findings-v1.codex-wire.schema.json"
         self.assertEqual(hashlib.sha256(wire.read_bytes()).hexdigest(),
                          "ca4449b3b0e4431938d3d1ab0226c0031e8596fc4a21ca3106c6ae0d44f124ab")
-        codex = (ROOT / "src/review_broker/codex.py").read_text()
+        from review_broker import codex as adapter, codex_policy
+        self.assertIs(adapter.CodexPolicy, codex_policy.CodexPolicy)
+        self.assertIs(adapter.build_command, codex_policy.build_command)
+        codex = (ROOT / "src/review_broker/codex_policy.py").read_text()
         self.assertIn('"gpt-5.6-sol"', codex)
         self.assertIn('reasoning_effort: str = "xhigh"', codex)
         self.assertIn("features.shell_tool=false", codex)

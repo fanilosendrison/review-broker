@@ -16,6 +16,7 @@ from .codex import (
 )
 from .codex_runtime_identity import VerifiedCodexRuntime, verify_codex_runtime
 from .identity import canonical_bytes
+from .input_capacity import CapacityError, capacity_receipt, read_verified_input, validate_capacity_receipt
 from .packets import verify_packet
 from .reviewer_profile import profile_name, reviewer_home_from_environment, verify_reviewer_profile
 
@@ -82,6 +83,11 @@ def build_bounded_preflight(
         or not _sha(broker_wheel_sha256, 64)
     ):
         raise BoundedPreflightError("PREFLIGHT_IDENTITY_MISMATCH")
+    _, input_bytes = read_verified_input(packet_directory, expected_packet_id)
+    capacity = capacity_receipt(input_bytes, request_id=manifest["request_id"],
+        packet_id=expected_packet_id, attempt_id=attempt_id, executing_broker_sha=executing_broker_sha)
+    if capacity["status"] != "PASS":
+        raise BoundedPreflightError("INPUT_CAPACITY_REJECTED:" + canonical_bytes(capacity).decode("utf-8"))
     policy = CodexPolicy()
     command = build_command(
         runtime.executable,
@@ -105,6 +111,7 @@ def build_bounded_preflight(
         "effective_codex_policy_attestation": "UNAVAILABLE",
         **identities,
         "subject_id": manifest["subject_id"],
+        "input_capacity": capacity,
         "permission_profile": expected_profile,
         "permission_profile_sha256": hashlib.sha256(profile.read_bytes()).hexdigest(),
         "broker_wheel_sha256": broker_wheel_sha256,
@@ -181,6 +188,17 @@ def validate_bounded_preflight_receipt(
         "BOUNDED_PREFLIGHT_FIELD_INVALID:" + key
         for key, value in required.items() if receipt.get(key) != value
     ]
+    capacity = receipt.get("input_capacity")
+    if "input_capacity" in receipt:
+        try:
+            validate_capacity_receipt(capacity)
+            if (capacity["status"] != "PASS" or any(capacity[k] != v for k, v in {
+                "request_id": request_id, "attempt_id": attempt_id,
+                "packet_id": packet_id, "executing_broker_sha": executing_broker_sha,
+            }.items())):
+                raise CapacityError("CAPACITY_BINDING_INVALID")
+        except (CapacityError, TypeError, KeyError):
+            errors.append("BOUNDED_PREFLIGHT_INPUT_CAPACITY_INVALID")
     receipt_mode = receipt.get("admission_mode")
     if admission_mode == BOUNDED_PRIVATE_V1_ADMISSION:
         if receipt_mode != admission_mode:

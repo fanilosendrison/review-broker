@@ -12,39 +12,20 @@ from .artifact_locator import (
     validate_evidence_artifact_plan,
 )
 from .identity import attempt_identity, canonical_bytes
+from .github_contents import decode_github_contents_base64 as _decode_github_contents_base64
 from .publication import validate_publication_intent, validate_publication_receipt
 from .queue import (
     AttemptRecord,
     AttemptState,
     StateTransitionError,
     record_publication_transition,
+    record_capacity_assessment,
     record_shutdown_transition,
     record_terminal_capture_transition,
     transition_record,
 )
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
-_BASE64_ALPHABET = frozenset(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
-_BASE64_WHITESPACE = frozenset(b" \t\r\n")
-
-
-def _decode_github_contents_base64(encoded: str) -> bytes:
-    """Strictly decode standard Base64 with GitHub's ASCII line formatting."""
-    if not isinstance(encoded, str):
-        raise ValueError("GITHUB_CONTENT_BASE64_INVALID")
-    try:
-        formatted = encoded.encode("ascii")
-    except UnicodeEncodeError as exc:
-        raise ValueError("GITHUB_CONTENT_BASE64_INVALID") from exc
-    compact = bytes(value for value in formatted if value not in _BASE64_WHITESPACE)
-    if any(value not in _BASE64_ALPHABET for value in compact):
-        raise ValueError("GITHUB_CONTENT_BASE64_INVALID")
-    raw = base64.b64decode(compact, validate=True)
-    if base64.b64encode(raw) != compact:
-        raise ValueError("GITHUB_CONTENT_BASE64_NONCANONICAL")
-    return raw
-
-
 class GitHubRefJournal:
     """Git-ref-backed journal using create-ref and fast-forward as atomic operations."""
 
@@ -106,6 +87,11 @@ class GitHubRefJournal:
         updated = transition_record(current, target, evidence_ids)
         self._compare_and_swap(request_id, current_sha, updated)
         return updated
+
+    def record_capacity(self, request_id: str, receipt: Mapping[str, Any]) -> AttemptRecord:
+        return self._record_verified_transition(
+            request_id, lambda current: record_capacity_assessment(current, receipt),
+        )
 
     def record_terminal_capture(
         self,

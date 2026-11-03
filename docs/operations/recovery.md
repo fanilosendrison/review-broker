@@ -5,7 +5,7 @@ asset_type: "operations"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Recovery Runbook"
-version: "0.1.0"
+version: "0.2.0"
 ---
 
 # Review Broker Recovery Runbook
@@ -19,7 +19,12 @@ terminal execution truth.
 
 ## Safe recovery by state
 
-- `REQUESTED`, `ADMITTED`, or `PREPARED`: resume the same attempt before the
+- `PREPARED` with a rejected `input_capacity` receipt: preserve the packet,
+  exact counts and claim, keep invocation count zero, and report
+  `BLOCKED_INPUT_CAPACITY`. Do not arm, automatically dispatch, manufacture a
+  model verdict or reset that receipt. A remedy requires separately authorized
+  work under the [capacity contract](../contracts/added-source-rendering-capacity.md).
+- `REQUESTED`, `ADMITTED`, or `PREPARED` without a capacity rejection: resume the same attempt before the
   model boundary. Re-admission must reproduce the recorded resolved-request
   evidence identity. A rebuilt prepared packet must reproduce the recorded
   packet evidence identity before execution can continue.

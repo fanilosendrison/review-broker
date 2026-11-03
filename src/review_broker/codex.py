@@ -1,7 +1,6 @@
 """Pinned one-shot Codex CLI adapter with failure-preserving evidence."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 import datetime as dt
 import hashlib
 import json
@@ -18,7 +17,13 @@ from .codex_runtime_identity import (
 )
 from .codexfailure import classify_diagnostic_text, observe_codex_failure_files
 from .identity import canonical_bytes
+from .codex_policy import (
+    CodexPolicy, InvocationError, REQUIRED_FLAGS, REMOVED_ENVIRONMENT_KEYS,
+    REMOVED_ENVIRONMENT_PREFIXES, build_command, ensure_cli_compatibility, sanitized_environment,
+)
 from .packets import PacketError, verify_packet
+from .input_capacity import CapacityError, MAX_CHARS, capacity_receipt, measure_input, read_verified_input
+from .fileobservation import read_regular_file_bounded
 from .reviewer_profile import (
     profile_name,
     ReviewerProfileError,
@@ -26,55 +31,6 @@ from .reviewer_profile import (
     verify_reviewer_profile,
 )
 
-
-class InvocationError(RuntimeError):
-    """Codex invocation was rejected or did not complete successfully."""
-
-    def __init__(self, message: str, *,
-                 failure_observation: Mapping[str, object] | None = None) -> None:
-        super().__init__(message)
-        self.failure_observation = (
-            dict(failure_observation) if failure_observation is not None else None
-        )
-
-
-@dataclass(frozen=True)
-class CodexPolicy:
-    distribution: str = "@openai/codex"
-    distribution_version: str = "0.164.0"
-    model: str = "gpt-5.6-sol"
-    reasoning_effort: str = "xhigh"
-    sandbox: str = "credential-isolated-read-only"
-
-
-REQUIRED_FLAGS = (
-    "--json",
-    "--ephemeral",
-    "--profile",
-    "--strict-config",
-    "--ignore-rules",
-    "--skip-git-repo-check",
-    "--model",
-    "--output-schema",
-    "--output-last-message",
-)
-
-REMOVED_ENVIRONMENT_KEYS = (
-    "OPENAI_API_KEY",
-    "CODEX_API_KEY",
-    "OPENAI_BASE_URL",
-    "OPENAI_ORG_ID",
-    "OPENAI_PROJECT_ID",
-    "GH_TOKEN",
-    "GITHUB_TOKEN",
-    "NODE_OPTIONS",
-    "NODE_PATH",
-    "CODEX_MANAGED_PACKAGE_ROOT",
-    "CODEX_MANAGED_BY_BUN",
-    "CODEX_MANAGED_BY_PNPM",
-    "CODEX_MANAGED_BY_VITE_PLUS",
-)
-REMOVED_ENVIRONMENT_PREFIXES = ("LD_", "DYLD_")
 
 _INVOCATION_ARTIFACTS = frozenset({
     "attempt.json",
@@ -89,56 +45,6 @@ _INVOCATION_ARTIFACTS = frozenset({
 
 Runner = Callable[..., subprocess.CompletedProcess[bytes]]
 RuntimeVerifier = Callable[[Mapping[str, str], Path], VerifiedCodexRuntime]
-
-
-def build_command(
-    executable: Path,
-    schema_path: Path,
-    output_path: Path,
-    policy: CodexPolicy,
-    permission_profile: str,
-) -> list[str]:
-    if not executable.is_absolute():
-        raise InvocationError("CODEX_EXECUTABLE_PATH_INVALID")
-    return [
-        str(executable),
-        "exec",
-        "--json",
-        "--ephemeral",
-        "--profile",
-        permission_profile,
-        "--strict-config",
-        "--ignore-rules",
-        "--skip-git-repo-check",
-        "--model",
-        policy.model,
-        "-c",
-        "features.shell_tool=false",
-        "-c",
-        f'model_reasoning_effort="{policy.reasoning_effort}"',
-        "--output-schema",
-        str(schema_path.resolve()),
-        "--output-last-message",
-        str(output_path.resolve()),
-        "-",
-    ]
-
-
-def ensure_cli_compatibility(help_text: str) -> None:
-    for flag in REQUIRED_FLAGS:
-        if flag not in help_text:
-            raise InvocationError(f"UNSUPPORTED_FLAG:{flag}")
-
-
-def sanitized_environment(source: Mapping[str, str]) -> tuple[dict[str, str], tuple[str, ...]]:
-    environment = dict(source)
-    removed: list[str] = []
-    for key in tuple(environment):
-        if key in REMOVED_ENVIRONMENT_KEYS or key.startswith(REMOVED_ENVIRONMENT_PREFIXES):
-            removed.append(key)
-            environment.pop(key)
-    environment["CODEX_MANAGED_BY_NPM"] = "1"
-    return environment, tuple(sorted(removed))
 
 
 def preflight_codex_runtime(
@@ -239,6 +145,29 @@ def invoke_once(
         raise InvocationError("INVOCATION_PACKET_INVALID") from exc
     if observed_packet["packet_id"] != expected_packet_id:
         raise InvocationError("INVOCATION_PACKET_ID_MISMATCH")
+    try:
+        _, prompt_bytes = read_verified_input(packet_directory, expected_packet_id)
+        counts = measure_input(prompt_bytes)
+        if counts["capacity_units"] > MAX_CHARS:
+            raise InvocationError("INPUT_CAPACITY_REJECTED:" + canonical_bytes(counts).decode("utf-8"))
+        if counts["input_sha256"] != prompt_before:
+            raise InvocationError("INPUT_CHANGED_BEFORE_EXECUTION")
+        metadata_path = packet_directory / "broker-metadata.json"
+        if metadata_path.exists():
+            raw_metadata = read_regular_file_bounded(metadata_path, 100_000)
+            metadata = json.loads(raw_metadata)
+            if not isinstance(metadata, dict) or raw_metadata != canonical_bytes(metadata) + b"\n":
+                raise InvocationError("INVOCATION_CAPACITY_BINDING_INVALID")
+            capacity = capacity_receipt(prompt_bytes, request_id=observed_packet["request_id"],
+                packet_id=expected_packet_id, attempt_id=attempt_id,
+                executing_broker_sha=metadata["executing_broker_sha"])
+            if (metadata.get("request_id") != observed_packet["request_id"]
+                or metadata.get("attempt_id") != attempt_id
+                or read_regular_file_bounded(packet_directory / "input-capacity.json", 100_000)
+                != canonical_bytes(capacity) + b"\n"):
+                raise InvocationError("INVOCATION_CAPACITY_BINDING_INVALID")
+    except (CapacityError, OSError, KeyError, TypeError, ValueError) as exc:
+        raise InvocationError("INVOCATION_INPUT_CAPACITY_INVALID") from exc
     attempt = {
         "schema_version": 1,
         "attempt_id": attempt_id,
@@ -275,12 +204,12 @@ def invoke_once(
     exit_value = "NOT_STARTED"
     transport: str | None = None
     try:
-        with prompt_path.open("rb") as source, _exclusive_stream(packet_directory / "codex-events.jsonl") as events, _exclusive_stream(packet_directory / "codex-stderr.txt") as stderr:
+        with _exclusive_stream(packet_directory / "codex-events.jsonl") as events, _exclusive_stream(packet_directory / "codex-stderr.txt") as stderr:
             try:
                 result = runner(
                     command,
                     cwd=str(packet_directory),
-                    stdin=source,
+                    input=prompt_bytes,
                     stdout=events,
                     stderr=stderr,
                     env=child_environment,
@@ -363,7 +292,7 @@ def verify_packet_tree(
     except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
         raise InvocationError("PACKET_TREE_MANIFEST_INVALID") from exc
     allowed = {"input.txt", "input-manifest.json", "resolved-request.json",
-               "broker-metadata.json", *allowed_artifacts}
+               "broker-metadata.json", "input-capacity.json", *allowed_artifacts}
     if "changes" in manifest:
         allowed.add("changes.patch")
     if schema_path.parent == directory:

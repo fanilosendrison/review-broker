@@ -8,6 +8,7 @@ import sys
 
 from .bounded_preflight import add_bounded_preflight_arguments, run_bounded_preflight_command
 from .codex import invoke_once, preflight_codex_runtime
+from .capacity_cli import add_capacity_arguments, run_capacity_command
 from .evidence import quarantine_contaminated_evidence
 from .codespace import CodespaceController
 from .execution_recovery import (
@@ -94,9 +95,7 @@ def _parser() -> argparse.ArgumentParser:
     verify = subcommands.add_parser("internal-verify-packet")
     verify.add_argument("--packet-dir", required=True, type=Path)
     verify.add_argument("--expected-packet-id", required=True)
-    arm = subcommands.add_parser("internal-arm")
-    arm.add_argument("--request", required=True)
-    arm.add_argument("--packet-id", required=True)
+    add_capacity_arguments(subcommands)
     install_profile = subcommands.add_parser("internal-install-reviewer-profile")
     install_profile.add_argument("--trusted-workspace", required=True, type=Path)
     install_profile.add_argument("--packet-dir", required=True, type=Path)
@@ -234,10 +233,8 @@ def main(argv: list[str] | None = None) -> int:
             if observed["packet_id"] != args.expected_packet_id:
                 raise CliError("PACKET_ID_MISMATCH")
             return 0
-        if args.command == "internal-arm":
-            journal = GitHubRefJournal(args.broker_repo)
-            journal.transition(args.request, AttemptState.ARMED, [args.packet_id])
-            journal.record_invocation(args.request)
+        if args.command in {"internal-input-capacity", "internal-arm"}:
+            print(canonical_bytes(run_capacity_command(args)).decode("utf-8"))
             return 0
         if args.command == "internal-install-reviewer-profile":
             home = reviewer_home_from_environment(dict(os.environ))
@@ -349,6 +346,8 @@ def main(argv: list[str] | None = None) -> int:
             print(canonical_bytes(value).decode("utf-8"))
             return 0
         if args.command == "internal-transition":
+            if args.state == AttemptState.ARMED.value:
+                raise CliError("CAPACITY_GATED_ARMAMENT_REQUIRED")
             GitHubRefJournal(args.broker_repo).transition(
                 args.request, AttemptState(args.state), [args.evidence]
             )

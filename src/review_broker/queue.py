@@ -12,6 +12,7 @@ from .evidence import (
     validate_terminal_capture_receipt,
 )
 from .identity import attempt_identity
+from .input_capacity import validate_capacity_receipt
 
 
 class AttemptState(str, Enum):
@@ -67,6 +68,7 @@ class AttemptRecord:
     publication_receipt: dict[str, Any] | None = None
     admission: dict[str, Any] | None = None
     history: tuple[dict[str, Any], ...] = ()
+    input_capacity: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         value = {
@@ -84,10 +86,16 @@ class AttemptRecord:
         }
         if self.admission is not None:
             value["admission"] = self.admission
+        if self.input_capacity is not None:
+            value["input_capacity"] = self.input_capacity
         return value
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "AttemptRecord":
+        if "input_capacity" in value:
+            validate_capacity_receipt(value["input_capacity"])
+            if any(value["input_capacity"][k] != value[k] for k in ("request_id", "attempt_id")):
+                raise StateTransitionError("CAPACITY_RECORD_IDENTITY_MISMATCH")
         return cls(
             request_id=value["request_id"],
             attempt_id=value["attempt_id"],
@@ -100,6 +108,7 @@ class AttemptRecord:
             publication_receipt=value.get("publication_receipt"),
             admission=value.get("admission"),
             history=tuple(value.get("history", [])),
+            input_capacity=value.get("input_capacity"),
         )
 
 
@@ -179,6 +188,12 @@ class InMemoryJournal:
             updated = record_shutdown_transition(current, receipt)
             if self._armed_attempt == attempt_id:
                 self._armed_attempt = None
+            self._save(updated)
+            return updated
+
+    def record_capacity(self, attempt_id: str, receipt: Mapping[str, Any]) -> AttemptRecord:
+        with self._lock:
+            updated = record_capacity_assessment(self._by_attempt[attempt_id], receipt)
             self._save(updated)
             return updated
 
@@ -267,6 +282,8 @@ def _verified_transition_record(
     evidence_ids: list[str] | tuple[str, ...],
 ) -> AttemptRecord:
     evidence = tuple(evidence_ids)
+    if current.input_capacity is not None and current.input_capacity["status"] == "REJECTED":
+        raise StateTransitionError("INPUT_CAPACITY_REJECTED_PRE_MODEL")
     if not evidence:
         raise StateTransitionError("EVIDENCE_REQUIRED")
     if target not in LEGAL_TRANSITIONS[current.state]:
@@ -278,3 +295,21 @@ def _verified_transition_record(
         evidence_ids=current.evidence_ids + evidence,
         history=current.history + (history_entry,),
     )
+
+
+def record_capacity_assessment(current: AttemptRecord, receipt: Mapping[str, Any]) -> AttemptRecord:
+    """Bind a pre-model decision without inventing a state or incrementing invocation count."""
+    value = dict(receipt)
+    evidence_id = validate_capacity_receipt(value)
+    if value["request_id"] != current.request_id or value["attempt_id"] != current.attempt_id:
+        raise StateTransitionError("CAPACITY_RECORD_IDENTITY_MISMATCH")
+    if current.input_capacity is not None:
+        if current.input_capacity != value:
+            raise StateTransitionError("CAPACITY_RECORD_CONFLICT")
+        return current
+    if current.state is not AttemptState.PREPARED or current.invocation_count != 0:
+        raise StateTransitionError("CAPACITY_RECORD_STATE_INVALID")
+    return replace(current, input_capacity=value,
+                   evidence_ids=current.evidence_ids + (evidence_id,),
+                   history=current.history + ({"event": "INPUT_CAPACITY_ASSESSED",
+                                               "evidence_ids": [evidence_id]},))

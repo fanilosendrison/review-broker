@@ -5,7 +5,7 @@ asset_type: "contract"
 domain: "independent-review"
 severity: "strict"
 name: "Review Execution v1 Contract"
-version: "0.2.0"
+version: "0.3.0"
 ---
 
 # Review Execution v1 Contract
@@ -45,6 +45,18 @@ operations. `REPORTED` additionally requires a precommitted publication intent
 and an independently observed exact GitHub comment receipt. A failed
 or ambiguous shutdown observation records an infrastructure incident and does
 not create `STOPPED`.
+
+## Rendered-input capacity before armament
+
+Current armament additionally applies the
+[rendering/capacity contract](added-source-rendering-capacity.md). A versioned
+capacity receipt binds the exact input, request, packet, attempt, executing
+broker and pinned limit policy. Rejection is immutable metadata on PREPARED
+with `invocation_count=0`, not another journal state or a model verdict.
+Preparation and reconciliation block it explicitly. Final armament rereads the
+input rather than trusting an earlier receipt; generic CLI ARM transitions are
+forbidden. Historical records and reports without this metadata remain valid.
+No consumed historical attempt is reopened by a new rendering.
 
 ## Atomic claim and idempotence
 
