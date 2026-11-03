@@ -124,6 +124,17 @@ jobs:
           path: evidence
           if-no-files-found: error
           retention-days: 30
+      - name: Assess exact rendered-input capacity before lifecycle
+        id: capacity
+        if: steps.prepare.outputs.duplicate == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          reviewctl --broker-repo "$BROKER_REPOSITORY" internal-input-capacity \
+            --request '${{ steps.prepare.outputs.request_id }}' \
+            --packet-id '${{ steps.prepare.outputs.packet_id }}' \
+            --packet-dir evidence \
+            --executing-broker-sha "$GITHUB_SHA" > evidence/input-capacity.json
       - name: Enforce selected operational admission
         if: steps.prepare.outputs.duplicate == 'false'
         env:
@@ -226,10 +237,12 @@ jobs:
         run: |
           reviewctl --broker-repo "$BROKER_REPOSITORY" internal-arm \
             --request '${{ steps.prepare.outputs.request_id }}' \
-            --packet-id '${{ steps.prepare.outputs.packet_id }}'
+            --packet-id '${{ steps.prepare.outputs.packet_id }}' \
+            --packet-dir evidence \
+            --executing-broker-sha "$GITHUB_SHA"
       - name: Invoke Codex once
         id: invoke
-        if: steps.prepare.outputs.duplicate == 'false'
+        if: steps.prepare.outputs.duplicate == 'false' && steps.arm.outcome == 'success'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
