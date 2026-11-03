@@ -1,0 +1,24 @@
+name: Experimental v3 pre-model Worker (disarmed)
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        required: true
+        type: string
+      reservation_id:
+        required: true
+        type: string
+      generation:
+        required: true
+        type: number
+
+permissions: {}
+
+jobs:
+  worker:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inert preparation artifact
+        run: ":"
