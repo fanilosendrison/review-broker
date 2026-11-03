@@ -2,13 +2,11 @@
 from dataclasses import replace
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
+import hashlib
 import json
 import os
 from pathlib import Path
 import shutil
-import subprocess
-import sys
-import types
 from contextlib import ExitStack
 import tempfile
 import unittest
@@ -105,33 +103,33 @@ class AuthorizedColdTests(unittest.TestCase):
 
     def test_N03_historical_synthetic_packet_is_byte_identical_to_base(self):
         from tests.packet_v2_test_support import profile
-        s = self.scenario.inputs
-        base = "60faf3fc892321f6887572402f189215f222ea6d"
-        source = subprocess.check_output(["git", "show", f"{base}:src/review_broker/packet_v2.py"])
-        name = "review_broker._rwp03_historical_packet_fixture"
-        historical = types.ModuleType(name)
-        historical.__package__ = "review_broker"
-        sys.modules[name] = historical
-        self.addCleanup(sys.modules.pop, name, None)
-        # Trusted immutable broker implementation, never reviewed consumer code.
-        exec(compile(source, "historical-broker-packet-v2", "exec"), historical.__dict__)
-        old_profile = historical.TechnicalProfileSnapshotV2(
-            profile().expected_name, profile().actual_name, profile().original_bytes,
-            profile().evidence_id)
-        before, after = self.root/"historical", self.root/"synthetic-current"
-        original = historical.build_packet_v2_candidate(s.admission, s.capture, old_profile,
-                                                        before, s.issue_readers)
-        current = build_packet_v2_candidate(s.admission, s.capture, profile(), after, s.issue_readers)
-        self.assertEqual(current, original)
-        old_schema = json.loads(subprocess.check_output([
-            "git", "show", f"{base}:src/review_broker/schemas/packet-v2.candidate.schema.json"]))
-        current_schema = json.loads((Path(__file__).resolve().parents[1]/
+        # Independent immutable oracle generated using the exact base implementation
+        # 60faf3fc892321f6887572402f189215f222ea6d, whose packet_v2.py SHA-256 is
+        # 4e7f14fe0ea7e0fa8b1a45bfbb7291401075e1619a4b59162fdce28c8eac48c3.
+        # Never regenerate this oracle from candidate output. No historical Git
+        # objects or network access are required in a shallow CI checkout.
+        expected = {
+            "changes.patch": "6fac6d8810ecee7bf674bf673f5a91e1c6827324dc6461a539a1a34293ef6db4",
+            "input-manifest.json": "4620992cbacfc137ef16d867413f05b94125683925d0971475f4482cc73a4ebf",
+            "input.txt": "3054ba54ae873677b07fa2986bc44b616006ef5bd225aee3285d8048c6f6a6fe",
+            "sources/S001.bin": "a6456ed3bde94789512c42c563637b929da22b9b5611962bd2c8ff63343d8195",
+            "sources/S002.bin": "7b9a72466d3960eb2aacccfc848939453490db0678bd4725def3f789b891c919",
+            "sources/S003.bin": "404e8f6684e7b3ec413e8bbb0c3d2100000717e7d301827836525145945a152c",
+            "sources/S004.bin": "4f85d1b0cff7bb76f0c9a58366030c6dc1eb8e1243e3709c72452278ddce7c13",
+            "sources/S005.bin": "2e599d46723a6e7f099e12d2bd8f8b8d77a2e043fde6f9a9c8149b204360b2b2",
+            "sources/S006.bin": "038b5e1a18d4c8097abfe67baf4ee19e1d1ea5f646d537fc0795df7a2c5f6e30",
+        }
+        s, output = self.scenario.inputs, self.root/"synthetic-current"
+        manifest = build_packet_v2_candidate(s.admission, s.capture, profile(), output, s.issue_readers)
+        actual = {str(path.relative_to(output)): hashlib.sha256(path.read_bytes()).hexdigest()
+                  for path in output.rglob("*") if path.is_file()}
+        self.assertEqual(actual, expected)
+        self.assertEqual(manifest["packet_id"],
+                         "packet:sha256:cbeb6096002da9fdd16f731f569c89f2e1c7d409474eabf8a194e51450429584")
+        schema = json.loads((Path(__file__).resolve().parents[1]/
             "src/review_broker/schemas/packet-v2.candidate.schema.json").read_bytes())
-        self.assertEqual(old_schema["$defs"]["technicalPolicy"],
-                         current_schema["$defs"]["syntheticTechnicalPolicy"])
-        for path in before.rglob("*"):
-            if path.is_file():
-                self.assertEqual(path.read_bytes(), (after/path.relative_to(before)).read_bytes())
+        self.assertEqual(hashlib.sha256(canonical_bytes(schema["$defs"]["syntheticTechnicalPolicy"])).hexdigest(),
+                         "a80872216b5666d6990ce274b571c618f38016920328dd1d8daa5598c2e0509f")
 
     def test_F31_pr_head_drift_changed_merge_base_or_invalid_diff(self):
         s = self.scenario
