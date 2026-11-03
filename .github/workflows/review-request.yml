@@ -229,18 +229,31 @@ jobs:
           steps.prepare.outputs.admission_mode == 'bounded-private-v1')
         env:
           GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
+          EXPECTED_CODESPACE_ID: ${{ steps.start.outputs.codespace_id }}
+          ATTEMPT_ID: ${{ steps.prepare.outputs.attempt_id }}
+          PACKET_ID: ${{ steps.prepare.outputs.packet_id }}
         run: |
-          gh codespace ssh -c "$CODESPACE_NAME" -- \
-            env -u PYTHONPATH python3 -P -m review_broker.cli internal-bounded-v1-preflight \
-            --packet-dir "$REMOTE_ROOT/evidence" \
-            --schema "$REMOTE_ROOT/broker-dist/reviewer-findings-v1.codex-wire.schema.json" \
-            --attempt '${{ steps.prepare.outputs.attempt_id }}' \
-            --packet-id '${{ steps.prepare.outputs.packet_id }}' \
-            --broker-wheel-sha256 "$BROKER_WHEEL_SHA256" \
-            --trusted-workspace /workspaces/review-broker \
-            --codex-runtime-root "$CODEX_RUNTIME_ROOT" \
-            --executing-broker-sha "$GITHUB_SHA" \
-            > evidence/bounded-v1-preflight.json
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import subprocess
+          from review_broker.codespace_identity import context_command, revalidate_recipient
+          identity = revalidate_recipient(Path(os.environ['RUNNER_TEMP']) / 'review-broker-recipient.json',
+              expected_id=os.environ['EXPECTED_CODESPACE_ID'], selection=os.environ['CODESPACE_NAME'],
+              repository=os.environ['GITHUB_REPOSITORY'], repository_id=os.environ['GITHUB_REPOSITORY_ID'])
+          root = os.environ['REMOTE_ROOT']
+          command = ['python3', '-P', '-m', 'review_broker.cli', 'internal-bounded-v1-preflight',
+              '--packet-dir', root + '/evidence',
+              '--schema', root + '/broker-dist/reviewer-findings-v1.codex-wire.schema.json',
+              '--attempt', os.environ['ATTEMPT_ID'], '--packet-id', os.environ['PACKET_ID'],
+              '--broker-wheel-sha256', os.environ['BROKER_WHEEL_SHA256'],
+              '--trusted-workspace', '/workspaces/review-broker',
+              '--codex-runtime-root', os.environ['CODEX_RUNTIME_ROOT'],
+              '--executing-broker-sha', os.environ['GITHUB_SHA']]
+          with Path('evidence/bounded-v1-preflight.json').open('wb') as receipt:
+              subprocess.run(['gh', 'codespace', 'ssh', '-c', identity.name, '--',
+                  context_command(identity, command)], stdout=receipt, check=True)
+          PY
       - name: Run comprehensive reviewer isolation probe
         if: >-
           steps.prepare.outputs.duplicate == 'false' &&
