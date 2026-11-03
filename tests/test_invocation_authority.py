@@ -2,6 +2,7 @@
 from contextlib import redirect_stderr
 import copy
 import io
+import os
 import shutil
 import subprocess
 import unittest
@@ -50,7 +51,8 @@ class InvocationAuthorityTests(unittest.TestCase):
     def test_each_invalid_operational_authority_has_zero_model_runner_calls(self):
         for scenario in ['metadata', 'capacity', 'wrong-attempt', 'wrong-request', 'wrong-packet',
                          'wrong-broker', 'changed-input', 'missing-authorization', 'forged-jwt', 'stale-jwt',
-                         'caller-armed-true', 'policy-substitution']:
+                         'caller-armed-true', 'policy-substitution', 'runtime-name-missing',
+                         'native-absent', 'native-false', 'trust-id', 'capacity-mismatch']:
             with self.subTest(scenario=scenario):
                 factory = fixtures.CapacityBoundaryTests()
                 factory.setUp()
@@ -80,11 +82,19 @@ class InvocationAuthorityTests(unittest.TestCase):
                     bundle['jwt'] = 'not.a.signature'
                 elif scenario == 'stale-jwt':
                     bundle['jwt'] = auth.sign(bundle['envelope'], {'exp': 1})
+                if scenario == 'trust-id':trust['codespace_id'] = '999'
+                if scenario == 'capacity-mismatch':
+                    receipt = copy.deepcopy(bundle['envelope']['capacity_receipt'])
+                    receipt['input_sha256'] = 'f' * 64
+                    (directory/'input-capacity.json').write_bytes(canonical_bytes(receipt)+b'\n')
                 calls = []
                 def runner(*args, **kwargs):
                     calls.append(args)
                     raise AssertionError('model transport forbidden')
                 with auth.trusted_fixture(trust), self.assertRaises((InvocationError, ValueError)):
+                    if scenario == 'runtime-name-missing':os.environ.pop('CODESPACE_NAME',None)
+                    if scenario == 'native-absent':os.environ.pop('CODESPACES',None)
+                    if scenario == 'native-false':os.environ['CODESPACES'] = 'false'
                     invoke_once(directory, schema, ATTEMPT, runner=runner,
                         authorization_bundle=None if scenario in {'missing-authorization', 'caller-armed-true'} else canonical_bytes(bundle)+b'\n',
                         **arguments)
@@ -100,11 +110,17 @@ class InvocationAuthorityTests(unittest.TestCase):
         duplicate = directory.with_name('second-packet')
         shutil.copytree(directory, duplicate)
         install_reviewer_profile(directory.parent/'home', arguments['trusted_workspace'], duplicate)
-        arguments['environment']['ACTIONS_ID_TOKEN_REQUEST_TOKEN'] = 'forbidden-control-token'
+        arguments['environment'].update(CODESPACE_NAME='fixture-space', CODESPACES='true',
+            ACTIONS_ID_TOKEN_REQUEST_TOKEN='forbidden-oidc-token', GH_TOKEN='forbidden-control-token',
+            GITHUB_TOKEN='forbidden-publication-token')
         calls = []
         def runner(command, **kwargs):
             self.assertNotIn(bundle['jwt'].encode(), kwargs['input'])
-            self.assertNotIn('ACTIONS_ID_TOKEN_REQUEST_TOKEN', kwargs['env'])
+            self.assertEqual(os.environ['CODESPACE_NAME'], 'fixture-space')
+            self.assertNotIn('CODESPACE_NAME', kwargs['env'])
+            self.assertEqual(kwargs['env']['CODESPACES'], 'true')
+            for name in ['ACTIONS_ID_TOKEN_REQUEST_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN']:
+                self.assertNotIn(name, kwargs['env'])
             self.assertNotIn(bundle['jwt'], ' '.join(command))
             calls.append(command)
             (directory/'codex-final.json').write_bytes(b'{}')
