@@ -5,7 +5,7 @@ asset_type: "qualification-record"
 domain: "independent-review"
 severity: "strict"
 name: "Issue 83 offline capacity and lossless rendering qualification"
-version: "0.1.0"
+version: "0.2.0"
 ---
 
 # Issue 83 offline capacity and lossless rendering qualification
@@ -78,7 +78,9 @@ PR #72 fixture. An initial run without that fixture failed with
 assertions. The new rendered-mode test was observed RED before implementation,
 and the capacity test failed before its module existed.
 
-The complete candidate suite passes 552 tests. New tests exercise real Git
+The previously reviewed candidate passed 552 tests. The corrected 0.7.0
+construction passes 579 tests. The new qualification preserves the earlier
+measurements and does not rewrite the original independent NO_GO. Tests exercise real Git
 repositories, byte/mode-preserving patch/index proofs, exact legacy/new PREPARED
 reconstruction, copy heuristics, empty executable files, canonical mixed-scope
 rejection, missing/reused images and path/commit/OID/diff/input mutations.
@@ -109,14 +111,48 @@ REVIEW_BROKER_PR72_TEST_CHECKOUT="<absolute-detached-fixture>" \
 git diff --check
 ```
 
+## OIDC and NO_GO remediation qualification
+
+The original independent review of `eac68bd52c2811cc41191cbfab98bd4634a49c9d`
+returned NO_GO with RB85-001 through RB85-003. That attributed result remains
+immutable. RB85-001's identical Git commit counterexample was reproduced with
+fixed timestamps and real local Git objects/refs before transaction-unique
+proposal messages and exact outcome observation were added. The missing-metadata
+CLI regression reached one fake runner before correction. The noprefix legacy
+recovery regression was observed failing before legacy-first selection.
+
+The corrected suite uses real synthetic RS256 signatures, purpose-bound
+audiences and closed envelope checks. Controller tests perform actual local Git
+journal reservations before synthetic issuance, then pass the bundle through
+real remote signature/binding/consumption code. Losing reservations cannot
+request tokens. Existing API success/no-op races, missing or changed bindings,
+issuer/key/signature/claim failures, forged or absent grants, and consumed
+attempts remain fail-closed. Operational negative tests require zero runner
+calls; a valid grant permits one fake call and refuses a pristine second packet
+directory. No boolean or unsigned envelope supplies authority.
+
+Separate-process POSIX tests establish one exclusive consumer and persistence
+failure/refusal behavior. Protected-root bootstrap tests explicitly simulate
+root metadata while preserving coherent file observations; they are not proof
+of real root-owned deployment. All tests are offline. No live Actions OIDC
+JWT, real Codespace operation or production model was used.
+
+The [OIDC contract](../contracts/oidc-arm-authority.md) records the accepted
+trust assumptions, exact bindings, persistence scope and limitations. No new
+static key, App, reader token or external service is provisioned.
+
 ## Remaining gates and immutability
 
-Independent hostile construction review is still required on the exact final PR
-head. No eligible separately authorized read-only reviewer is exposed to this
-implementation session. The historically documented bootstrap mechanism is not
-an admissible substitute. No production admission is enabled to self-review the
-broker. The external review request accompanies the exact-head PR; no GO is
-claimed here. CI and repository acceptance also remain publication gates.
+One fresh independent Pi review is required on the exact corrected PR head;
+its attributed result, exact-head CI and repository acceptance remain separate
+gates. No corrected-head GO is claimed by this authored report. The production
+broker is not used to review itself.
+
+Actual Actions OIDC availability, protected Codespace bootstrap, filesystem
+persistence and secret-safe stdin delivery require a distinct owner-authorized
+non-inference qualification on the intended pinned deployment. No offline PASS
+establishes that gate or permits admission activation. PR #85 and Issue #83
+remain open unless all applicable acceptance requirements actually pass.
 
 The original #82 claim, STOPPED-after-INDETERMINATE history, count of one and
 retained artifacts remain unchanged. A different rendered packet does not reset

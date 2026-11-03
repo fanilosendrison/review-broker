@@ -5,7 +5,7 @@ asset_type: "implementation-contract"
 domain: "independent-review"
 severity: "strict"
 name: "Added-source rendering and pre-arm input capacity"
-version: "0.1.0"
+version: "0.2.0"
 ---
 
 # Added-source rendering and pre-arm input capacity
@@ -105,6 +105,10 @@ PREPARED manifest evidence, and binds the observation idempotently. It repeats
 the observation after journal I/O immediately before durable ARM. Generic
 `internal-transition --state ARMED` is forbidden. The existing legal state map
 and at-most-once reservation/counting boundary otherwise remain unchanged.
+
+Current transport also requires [OIDC-bound arm authority](oidc-arm-authority.md),
+complete canonical broker metadata and protected one-use consumption. A capacity
+receipt or caller-supplied arm boolean is not execution authority.
 
 The final adapter verifies the packet and positive capacity receipt again and
 transmits the checked immutable bytes in memory, not a subsequently reopened

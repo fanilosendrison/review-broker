@@ -5,7 +5,7 @@ asset_type: "readme"
 domain: "independent-review"
 severity: "guideline"
 name: "Review Broker"
-version: "0.2.0"
+version: "0.3.0"
 ---
 
 # Review Broker
@@ -23,6 +23,12 @@ reviewer profile passes a producer-run non-secret isolation probe. Independent
 security and construction reviews, a dedicated Codespaces-control credential,
 and live execution qualification remain incomplete. Automatic workflows fail
 closed until external security evidence is registered.
+
+The 0.7.0 construction adds [OIDC-bound arm authority](docs/contracts/oidc-arm-authority.md).
+Offline signature, reservation and consumption tests do not qualify live Actions
+OIDC or the dedicated Codespace's protected persistent substrate. Operational
+invocation now requires the authenticated grant; old evidence validation does
+not grant new historical execution. No production activation is implied.
 
 ## Install the requester CLI
 

@@ -5,7 +5,7 @@ asset_type: "agent-instructions"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Agent Instructions"
-version: "0.4.0"
+version: "0.5.0"
 ---
 
 # Review Broker Agent Instructions
@@ -63,6 +63,16 @@ Preserve a rejected capacity receipt on PREPARED with zero invocations; never
 reclassify it as a model-capable indeterminate execution or dispatch it again.
 Do not bypass the specialized armament entry point. Treat offline qualification
 as construction evidence only, not a reviewer GO or operational admission.
+
+## Workload-bound execution authority
+
+Apply [OIDC arm authority](docs/contracts/oidc-arm-authority.md) to current execution.
+Keep JWTs outside packet, evidence, reviewer argv and environment. Accept only
+pinned GitHub issuer/workflow identity bound to a controller-observed exclusive
+reservation. Require protected trust bootstrap and durable one-use consumption;
+never automatically initialize, repair or clear missing state. Preserve consumed
+ARMED attempts after every authorization failure. Do not infer live OIDC,
+Codespace durability or production qualification from offline tests.
 
 ## Engineering Project profile
 
