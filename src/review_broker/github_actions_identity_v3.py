@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import json
 import re
 from typing import Callable, Mapping, Protocol
-from urllib.parse import quote, urlparse, parse_qs
+from urllib.parse import quote
 from urllib.request import Request
 from .codespace_gate_v3 import (
     CodespaceAccessRequestV3, CodespaceEffectV3, TrustedWorkerContextV3,
@@ -19,7 +19,7 @@ _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _SHA = re.compile(r"^[0-9a-f]{40}$")
 _WORKFLOW_PATH = re.compile(r"^\.github/workflows/[A-Za-z0-9_.-]+\.ya?ml$")
 _EVENT = re.compile(r"^[a-z_]+$")
-_SUPPORTED_EVENTS = {"pull_request"}
+_SUPPORTED_EVENTS = {"pull_request", "workflow_dispatch"}
 class GitHubActionsIdentityV3Error(RuntimeError):
     """The Actions execution identity could not be authenticated exactly."""
 def _positive(value: object, marker: str) -> int:
@@ -43,6 +43,7 @@ class GitHubActionsRuntimeClaimV3:
     event_name: str
     pull_request_head_sha: str | None = None
     synthetic_merge_sha: str | None = None
+    worker_dispatch: bool = False
 
     def __post_init__(self) -> None:
         numeric = (self.repository_id, self.run_id, self.run_attempt)
@@ -52,7 +53,9 @@ class GitHubActionsRuntimeClaimV3:
                 or any(not isinstance(value, str) or not value for value in strings)
                 or _SHA.fullmatch(self.workflow_sha) is None
                 or _SHA.fullmatch(self.checked_out_source_sha) is None
-                or self.event_name not in _SUPPORTED_EVENTS):
+                or self.event_name not in _SUPPORTED_EVENTS
+                or type(self.worker_dispatch) is not bool
+                or (self.event_name == "workflow_dispatch") != self.worker_dispatch):
             raise ValueError("GITHUB_ACTIONS_RUNTIME_CLAIM_INVALID")
 class TrustedExecutionBoundaryV3(Protocol):
     """Designated harness boundary; ordinary caller values are insufficient."""
@@ -70,6 +73,8 @@ class GitHubActionsExpectationV3:
     executing_source_sha: str
     job_key: str
     job_name: str
+    worker_dispatch: bool = False
+    workflow_name: str | None = None
 
     def __post_init__(self) -> None:
         numeric = (self.repository_id, self.workflow_id)
@@ -80,6 +85,10 @@ class GitHubActionsExpectationV3:
                 or _WORKFLOW_PATH.fullmatch(self.workflow_path) is None
                 or not self.workflow_execution_ref.startswith("refs/heads/")
                 or self.event_name not in _SUPPORTED_EVENTS
+                or type(self.worker_dispatch) is not bool
+                or (self.event_name == "workflow_dispatch") != self.worker_dispatch
+                or self.worker_dispatch and (not isinstance(self.workflow_name, str)
+                                              or not self.workflow_name)
                 or _SHA.fullmatch(self.workflow_definition_sha) is None
                 or _SHA.fullmatch(self.executing_source_sha) is None):
             raise ValueError("GITHUB_ACTIONS_EXPECTATION_INVALID")
@@ -115,7 +124,10 @@ class TrustedWorkerBindingV3(Protocol):
     """Trusted workflow-input binding, separate from API run existence."""
     def authenticates(self, request: CodespaceAccessRequestV3,
                       observation: GitHubActionsRunObservationV3) -> bool: ...
-class GitHubActionsIdentityReaderV3:
+from .github_actions_jobs_v3 import GitHubActionsJobsReaderV3
+
+
+class GitHubActionsIdentityReaderV3(GitHubActionsJobsReaderV3):
     """Confront a boundary-authenticated runtime claim with fresh run/job APIs."""
     def __init__(self, token: str, repository: str, repository_id: int, *,
                  executor: HttpExecutorV3 | None = None,
@@ -129,6 +141,7 @@ class GitHubActionsIdentityReaderV3:
         self.repository = repository
         self.repository_id = repository_id
         self._executor = executor or urllib_executor
+        self.injected_transport = executor is not None
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._owner, self._name = repository.split("/", 1)
     def _get(self, suffix: str) -> HttpResponseV3:
@@ -163,63 +176,6 @@ class GitHubActionsIdentityReaderV3:
         if not isinstance(value, dict):
             raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_JSON_INVALID")
         return value
-    def _next_page(self, headers: Mapping[str, str], run_id: int,
-                   run_attempt: int) -> int | None:
-        link = next((value for key, value in headers.items() if key.lower() == "link"), None)
-        if link is None:
-            return None
-        next_links = [part.strip() for part in link.split(",") if 'rel="next"' in part]
-        if len(next_links) != 1:
-            raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_PAGINATION_INVALID")
-        match = re.fullmatch(r"<([^>]+)>;\s*rel=\"next\"", next_links[0])
-        if match is None:
-            raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_PAGINATION_INVALID")
-        parsed = urlparse(match.group(1))
-        expected_path = (
-            f"/repos/{self.repository}/actions/runs/{run_id}/attempts/{run_attempt}/jobs"
-        )
-        if (parsed.scheme != "https" or parsed.netloc != "api.github.com"
-                or parsed.path != expected_path
-                or parse_qs(parsed.query).get("per_page") != ["100"]):
-            raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_PAGINATION_INVALID")
-        page_values = parse_qs(parsed.query).get("page")
-        if page_values is None or len(page_values) != 1 or not page_values[0].isdigit():
-            raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_PAGINATION_INVALID")
-        return _positive(int(page_values[0]), "GITHUB_ACTIONS_PAGINATION_INVALID")
-    def _jobs(self, run_id: int, run_attempt: int) -> list[Mapping[str, object]]:
-        page = 1
-        total: int | None = None
-        jobs: list[Mapping[str, object]] = []
-        while True:
-            response = self._get(
-                f"/actions/runs/{run_id}/attempts/{run_attempt}/jobs?per_page=100&page={page}"
-            )
-            if response.status != 200:
-                raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_JOBS_UNAVAILABLE")
-            body = self._json(response)
-            observed_total = body.get("total_count")
-            raw_jobs = body.get("jobs")
-            if type(observed_total) is not int or observed_total < 0 or not isinstance(raw_jobs, list):
-                raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_JOBS_INVALID")
-            if total is None:
-                total = observed_total
-            if total != observed_total or any(not isinstance(job, dict) for job in raw_jobs):
-                raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_JOBS_INCONSISTENT")
-            jobs.extend(raw_jobs)
-            next_page = self._next_page(response.headers, run_id, run_attempt)
-            if len(jobs) < total:
-                if next_page != page + 1 or not raw_jobs:
-                    raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_PAGINATION_INCOMPLETE")
-                page = next_page
-                continue
-            if len(jobs) != total or next_page is not None:
-                raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_PAGINATION_INCONSISTENT")
-            identifiers = [job.get("id") for job in jobs]
-            if any(type(identifier) is not int or identifier < 1 for identifier in identifiers):
-                raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_JOB_ID_INVALID")
-            if len(identifiers) != len(set(identifiers)):
-                raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_JOB_ID_DUPLICATE")
-            return jobs
     def observe(self, claim: GitHubActionsRuntimeClaimV3,
                 expected: GitHubActionsExpectationV3,
                 boundary: TrustedExecutionBoundaryV3) -> GitHubActionsRunObservationV3:
@@ -306,11 +262,18 @@ class GitHubActionsIdentityReaderV3:
                 raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_PR_HEAD_UNVERIFIED")
         elif pr_head is not None or merge_sha is not None:
             raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_EVENT_CONTEXT_INVALID")
+        if expected.event_name == "workflow_dispatch":
+            from .github_actions_workflow_dispatch_v3 import validate_worker_dispatch_run
+            validate_worker_dispatch_run(run, expected)
         jobs = self._jobs(run_id, run_attempt)
         matches = [job for job in jobs if job.get("name") == expected.job_name]
         if len(matches) != 1:
             raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_JOB_IDENTITY_AMBIGUOUS")
         job_id = _positive(matches[0].get("id"), "GITHUB_ACTIONS_JOB_ID_INVALID")
+        if expected.event_name == "workflow_dispatch":
+            from .github_actions_workflow_dispatch_v3 import validate_worker_dispatch_job
+            validate_worker_dispatch_job(matches[0], run_id=run_id,
+                                        run_attempt=run_attempt, source_sha=run_head_sha)
         observed = self._clock()
         if observed.tzinfo is None:
             raise GitHubActionsIdentityV3Error("GITHUB_OBSERVATION_TIME_INVALID")
