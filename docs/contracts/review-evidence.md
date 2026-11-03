@@ -5,7 +5,7 @@ asset_type: "contract"
 domain: "independent-review"
 severity: "strict"
 name: "Review Evidence v1 Contract"
-version: "0.1.2"
+version: "0.2.0"
 ---
 
 # Review Evidence v1 Contract
@@ -36,6 +36,13 @@ byte length. Renames and copies bind their previous paths. A packet with an
 unavailable image, unsupported path or size, or changed-path mismatch fails
 closed rather than claiming complete change coverage. No diff citation is
 qualified as a physical source-line citation; findings cite the bound images.
+
+The owner-approved optional `added-source-images-v1` presentation is specified
+in [the rendering/capacity contract](added-source-rendering-capacity.md). It binds
+its explicit marker and modes into a new packet identity, retains the entire
+original diff unchanged, and presents every complete added image once. A legacy
+manifest without the marker continues to reconstruct its exact legacy prompt
+and identity. This changes presentation, not source or request identity.
 
 ## Attempt artifacts
 
@@ -68,8 +75,9 @@ result may publish a detected contaminated finding or nested validation data.
 `attempt.json` binds the exact trusted broker wheel SHA-256 used by the remote
 process and its attempt-bound permission-profile name and SHA-256.
 `reviewer-security-probe.json` binds that same profile name and SHA-256 to
-controlled non-secret filesystem, environment, write, and network observations. A missing or mismatched identity invalidates the evidence; a
-passing producer receipt does not replace independent security review.
+controlled non-secret filesystem, environment, write, and network observations.
+A missing or mismatched identity invalidates the evidence; a passing producer
+receipt does not replace independent security review.
 
 Attempted recovery writes `recovery-manifest.json` with a success or sanitized
 failure record for every required runtime artifact. Partial recovery is
