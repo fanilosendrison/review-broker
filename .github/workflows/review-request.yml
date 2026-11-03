@@ -165,12 +165,28 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
         run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from review_broker.codespace_identity import capture_recipient
+          capture_recipient(Path(os.environ['RUNNER_TEMP']) / 'review-broker-recipient.json',
+              selection=os.environ['CODESPACE_NAME'], repository=os.environ['GITHUB_REPOSITORY'],
+              repository_id=os.environ['GITHUB_REPOSITORY_ID'])
+          PY
+          echo "start_requested=true" >> "$GITHUB_OUTPUT"
           gh api --method POST "user/codespaces/$CODESPACE_NAME/start" --silent
           for attempt in $(seq 1 30); do
             state="$(gh codespace view -c "$CODESPACE_NAME" --json state --jq .state)"
             if test "$state" = "Available"; then
-              gh api "user/codespaces/$CODESPACE_NAME" \
-                --jq '"codespace_id=" + (.id | tostring)' >> "$GITHUB_OUTPUT"
+              python - <<'PY' >> "$GITHUB_OUTPUT"
+          import os
+          from pathlib import Path
+          from review_broker.codespace_identity import revalidate_recipient
+          identity = revalidate_recipient(Path(os.environ['RUNNER_TEMP']) / 'review-broker-recipient.json',
+              selection=os.environ['CODESPACE_NAME'], repository=os.environ['GITHUB_REPOSITORY'],
+              repository_id=os.environ['GITHUB_REPOSITORY_ID'])
+          print('codespace_id=' + str(identity.codespace_id))
+          PY
               exit 0
             fi
             sleep 5
@@ -258,20 +274,33 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
+          EXPECTED_CODESPACE_ID: ${{ steps.start.outputs.codespace_id }}
+          ATTEMPT_ID: ${{ steps.prepare.outputs.attempt_id }}
+          PACKET_ID: ${{ steps.prepare.outputs.packet_id }}
         run: |
-          gh codespace ssh -c "$CODESPACE_NAME" -- \
-            env -u PYTHONPATH python3 -P -m review_broker.cli internal-invoke \
-            --packet-dir "$REMOTE_ROOT/evidence" \
-            --schema "$REMOTE_ROOT/broker-dist/reviewer-findings-v1.codex-wire.schema.json" \
-            --attempt '${{ steps.prepare.outputs.attempt_id }}' \
-            --packet-id '${{ steps.prepare.outputs.packet_id }}' \
-            --broker-wheel-sha256 "$BROKER_WHEEL_SHA256" \
-            --trusted-workspace /workspaces/review-broker \
-            --codex-runtime-root "$CODEX_RUNTIME_ROOT" \
-            --authorization-stdin < "$RUNNER_TEMP/review-broker-arm-authorization.json"
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import subprocess
+          from review_broker.codespace_identity import context_command, revalidate_recipient
+          identity = revalidate_recipient(Path(os.environ['RUNNER_TEMP']) / 'review-broker-recipient.json',
+              expected_id=os.environ['EXPECTED_CODESPACE_ID'], selection=os.environ['CODESPACE_NAME'],
+              repository=os.environ['GITHUB_REPOSITORY'], repository_id=os.environ['GITHUB_REPOSITORY_ID'])
+          root = os.environ['REMOTE_ROOT']
+          command = ['python3', '-P', '-m', 'review_broker.cli', 'internal-invoke',
+              '--packet-dir', root + '/evidence',
+              '--schema', root + '/broker-dist/reviewer-findings-v1.codex-wire.schema.json',
+              '--attempt', os.environ['ATTEMPT_ID'], '--packet-id', os.environ['PACKET_ID'],
+              '--broker-wheel-sha256', os.environ['BROKER_WHEEL_SHA256'],
+              '--trusted-workspace', '/workspaces/review-broker',
+              '--codex-runtime-root', os.environ['CODEX_RUNTIME_ROOT'], '--authorization-stdin']
+          with (Path(os.environ['RUNNER_TEMP']) / 'review-broker-arm-authorization.json').open('rb') as bundle:
+              subprocess.run(['gh', 'codespace', 'ssh', '-c', identity.name, '--',
+                  context_command(identity, command)], stdin=bundle, check=True)
+          PY
       - name: Recover available runtime evidence
         id: recover
-        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.start.outcome != 'skipped'
+        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.start.outputs.start_requested == 'true'
         env:
           GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
         run: |
@@ -283,7 +312,7 @@ jobs:
             --attempt '${{ steps.prepare.outputs.attempt_id }}'
       - name: Quarantine detected runtime material
         id: runtime_quarantine
-        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.start.outcome != 'skipped'
+        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.start.outputs.start_requested == 'true'
         run: |
           reviewctl internal-quarantine-evidence --evidence-dir evidence \
             --request '${{ steps.prepare.outputs.request_id }}' \
@@ -367,7 +396,7 @@ jobs:
         run: reviewctl --broker-repo "$BROKER_REPOSITORY" internal-publish --packet-dir evidence
       - name: Stop and independently observe Shutdown
         id: stop
-        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.start.outcome != 'skipped'
+        if: steps.prepare.outputs.duplicate == 'false' && always() && steps.start.outputs.start_requested == 'true'
         env:
           GH_TOKEN: ${{ secrets.REVIEW_BROKER_CODESPACE_TOKEN }}
         run: |
