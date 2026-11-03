@@ -178,6 +178,23 @@ class InputCapacityTests(unittest.TestCase):
             with self.assertRaises(CapacityError):
                 validate_capacity_receipt(changed)
 
+    def test_contradictory_rejected_journal_cannot_hide_recovery_or_armament(self):
+        from dataclasses import replace
+        directory, manifest, journal = self.packet("x" * MAX_CHARS)
+        with self.assertRaises(CapacityRejected):
+            self.check(directory, manifest, journal)
+        valid = journal.get(REQUEST)
+        for state, count in [(AttemptState.ARMED, 1), (AttemptState.STOPPED, 0),
+                             (AttemptState.REQUESTED, 0), (AttemptState.PREPARED, 1)]:
+            with self.subTest(state=state, count=count):
+                corrupt = replace(valid, state=state, invocation_count=count)
+                with self.assertRaisesRegex(StateTransitionError, "CAPACITY_JOURNAL_STATE_INVALID"):
+                    type(valid).from_dict(corrupt.as_dict())
+                with self.assertRaisesRegex(StateTransitionError, "CAPACITY_JOURNAL_STATE_INVALID"):
+                    decide_recovery(corrupt, codespace_state="Available")
+                with self.assertRaisesRegex(StateTransitionError, "CAPACITY_JOURNAL_STATE_INVALID"):
+                    decide_preparation_recovery(corrupt, "unused")
+
     def test_historical_journal_serialization_has_no_new_null_field(self):
         _, _, journal = self.packet()
         self.assertNotIn("input_capacity", journal.get(REQUEST).as_dict())

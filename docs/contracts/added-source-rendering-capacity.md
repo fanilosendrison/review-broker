@@ -95,7 +95,9 @@ A rejection remains PREPARED with `invocation_count=0`. It is explicitly
 `REJECTED`, not model-capable INDETERMINATE, a successful review, or a new
 journal state. Preparation and scheduling return `BLOCKED_INPUT_CAPACITY`.
 Neither manual generic arm transitions nor automatic recovery bypass a recorded
-rejection. No new attempt or automatic dispatch is allocated.
+rejection. Contradictory capacity/state/count metadata fails journal decoding
+and recovery explicitly; it cannot conceal ARMED/STOPPED cleanup anomalies as
+a pre-model block. No new attempt or automatic dispatch is allocated.
 
 `internal-arm` requires the packet directory and executing broker SHA. It
 reconstructs and coherently rereads the exact input, verifies the original

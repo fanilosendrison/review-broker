@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from .queue import AttemptRecord, AttemptState
+from .queue import AttemptRecord, AttemptState, has_capacity_rejection
 
 
 class PreparationRecoveryAction(str, Enum):
@@ -37,7 +37,7 @@ def decide_preparation_recovery(
     record: AttemptRecord,
     admission_evidence_id: str,
 ) -> PreparationRecoveryAction:
-    if record.input_capacity is not None and record.input_capacity["status"] == "REJECTED":
+    if has_capacity_rejection(record):
         return PreparationRecoveryAction.BLOCKED_INPUT_CAPACITY
     if record.state is AttemptState.REQUESTED:
         return PreparationRecoveryAction.ADMIT_AND_BUILD
@@ -59,7 +59,7 @@ def verify_rebuilt_packet(record: AttemptRecord, packet_evidence_id: str) -> Non
 
 
 def decide_recovery(record: AttemptRecord, *, codespace_state: str) -> RecoveryDecision:
-    if record.input_capacity is not None and record.input_capacity["status"] == "REJECTED":
+    if has_capacity_rejection(record):
         return RecoveryDecision(RecoveryAction.BLOCKED_INPUT_CAPACITY,
                                 "INPUT_CAPACITY_REJECTED: retained pre-model evidence; no automatic dispatch.")
     state = record.state

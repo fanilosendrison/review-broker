@@ -8,7 +8,7 @@ from typing import Any, Mapping, Protocol
 
 from .identity import artifact_identity, canonical_bytes
 from .input_capacity import CapacityError, assess_packet_capacity
-from .queue import AttemptRecord, AttemptState
+from .queue import AttemptRecord, AttemptState, has_capacity_rejection
 
 
 class CapacityJournal(Protocol):
@@ -30,7 +30,7 @@ def check_prepared_capacity(
     packet_id: str, executing_broker_sha: str, arm: bool = False,
 ) -> dict[str, Any]:
     current = journal.get(request_id)
-    if current.input_capacity is not None and current.input_capacity["status"] == "REJECTED":
+    if has_capacity_rejection(current):
         raise CapacityRejected(current.input_capacity)
     if current.state is not AttemptState.PREPARED or current.invocation_count != 0:
         raise CapacityError("CAPACITY_REQUIRES_UNCONSUMED_PREPARED")

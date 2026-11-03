@@ -96,7 +96,7 @@ class AttemptRecord:
             validate_capacity_receipt(value["input_capacity"])
             if any(value["input_capacity"][k] != value[k] for k in ("request_id", "attempt_id")):
                 raise StateTransitionError("CAPACITY_RECORD_IDENTITY_MISMATCH")
-        return cls(
+        record = cls(
             request_id=value["request_id"],
             attempt_id=value["attempt_id"],
             state=AttemptState(value["state"]),
@@ -110,6 +110,22 @@ class AttemptRecord:
             history=tuple(value.get("history", [])),
             input_capacity=value.get("input_capacity"),
         )
+        has_capacity_rejection(record)
+        return record
+
+
+def has_capacity_rejection(record: AttemptRecord) -> bool:
+    """A corrupt capacity/state combination is an error, never a recovery decision."""
+    capacity = record.input_capacity
+    if capacity is None:
+        return False
+    rejected = capacity["status"] == "REJECTED"
+    if (type(record.invocation_count) is not int or record.invocation_count not in {0, 1}
+        or record.state in {AttemptState.REQUESTED, AttemptState.ADMITTED}
+        or record.state is AttemptState.PREPARED and record.invocation_count != 0
+        or rejected and (record.state is not AttemptState.PREPARED or record.invocation_count != 0)):
+        raise StateTransitionError("CAPACITY_JOURNAL_STATE_INVALID")
+    return rejected
 
 
 class InMemoryJournal:
@@ -282,7 +298,7 @@ def _verified_transition_record(
     evidence_ids: list[str] | tuple[str, ...],
 ) -> AttemptRecord:
     evidence = tuple(evidence_ids)
-    if current.input_capacity is not None and current.input_capacity["status"] == "REJECTED":
+    if has_capacity_rejection(current):
         raise StateTransitionError("INPUT_CAPACITY_REJECTED_PRE_MODEL")
     if not evidence:
         raise StateTransitionError("EVIDENCE_REQUIRED")

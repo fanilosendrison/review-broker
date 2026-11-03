@@ -78,15 +78,16 @@ PR #72 fixture. An initial run without that fixture failed with
 assertions. The new rendered-mode test was observed RED before implementation,
 and the capacity test failed before its module existed.
 
-The complete candidate suite passes 551 tests. New tests exercise real Git
+The complete candidate suite passes 552 tests. New tests exercise real Git
 repositories, byte/mode-preserving patch/index proofs, exact legacy/new PREPARED
 reconstruction, copy heuristics, empty executable files, canonical mixed-scope
 rejection, missing/reused images and path/commit/OID/diff/input mutations.
 
 Capacity tests exercise real packet construction at below/exact/above limits,
 non-ASCII conservative rejection, invalid UTF-8, receipt tampering, broker/packet
-identity changes, mutation during journal binding, zero invocation reservation
-on rejection, generic-CLI arm refusal, real reconciliation with no redispatch,
+identity changes, mutation during journal binding, contradictory rejection/state
+metadata, zero invocation reservation on rejection, generic-CLI arm refusal,
+real reconciliation with no redispatch,
 and frozen-memory transport through an injected runner. No synthetic outcome is
 represented as a live reviewer verdict.
 
