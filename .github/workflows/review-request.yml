@@ -21,6 +21,11 @@ concurrency:
 
 jobs:
   review:
+    permissions:
+      actions: read
+      contents: write
+      issues: write
+      id-token: write
     if: >-
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
       (github.event_name == 'workflow_dispatch' ||
@@ -163,7 +168,11 @@ jobs:
           gh api --method POST "user/codespaces/$CODESPACE_NAME/start" --silent
           for attempt in $(seq 1 30); do
             state="$(gh codespace view -c "$CODESPACE_NAME" --json state --jq .state)"
-            test "$state" = "Available" && exit 0
+            if test "$state" = "Available"; then
+              gh api "user/codespaces/$CODESPACE_NAME" \
+                --jq '"codespace_id=" + (.id | tostring)' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             sleep 5
           done
           echo "CODESPACE_AVAILABLE_NOT_OBSERVED"
@@ -235,7 +244,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          reviewctl --broker-repo "$BROKER_REPOSITORY" internal-arm \
+          reviewctl --broker-repo "$BROKER_REPOSITORY" internal-arm-authorize \
+            --codespace-name "$CODESPACE_NAME" \
+            --codespace-id '${{ steps.start.outputs.codespace_id }}' \
+            --authorization-file "$RUNNER_TEMP/review-broker-arm-authorization.json" \
             --request '${{ steps.prepare.outputs.request_id }}' \
             --packet-id '${{ steps.prepare.outputs.packet_id }}' \
             --packet-dir evidence \
@@ -255,7 +267,8 @@ jobs:
             --packet-id '${{ steps.prepare.outputs.packet_id }}' \
             --broker-wheel-sha256 "$BROKER_WHEEL_SHA256" \
             --trusted-workspace /workspaces/review-broker \
-            --codex-runtime-root "$CODEX_RUNTIME_ROOT"
+            --codex-runtime-root "$CODEX_RUNTIME_ROOT" \
+            --authorization-stdin < "$RUNNER_TEMP/review-broker-arm-authorization.json"
       - name: Recover available runtime evidence
         id: recover
         if: steps.prepare.outputs.duplicate == 'false' && always() && steps.start.outcome != 'skipped'
