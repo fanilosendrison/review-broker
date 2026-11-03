@@ -22,6 +22,7 @@ from .pre_model_control_v3 import (
     transition_state,
 )
 from .queue import AttemptState
+from .pre_model_dispatch_ack_v3 import DispatchAcknowledgmentV3, DispatchAcknowledgmentAuthorityV3
 
 
 class GitHubJournalV3Error(RuntimeError):
@@ -65,28 +66,8 @@ class GitHubJournalV3:
         return cls.CLAIM_PREFIX + digest
 
     def _verified(self, claim_ref: str, transport: TransportSnapshotV3) -> VerifiedJournalSnapshotV3:
-        if not self._is_sha(transport.commit_sha) or not self._is_sha(transport.parent_sha):
-            raise GitHubJournalV3Error("JOURNAL_COMMIT_IDENTITY_INVALID")
-        try:
-            record = decode_journal_v2(transport.journal_bytes)
-        except JournalRecordV3Error as exc:
-            raise GitHubJournalV3Error(str(exc)) from exc
-        expected_ref = self.claim_ref(record.attempt.request_id)
-        if claim_ref != expected_ref:
-            raise GitHubJournalV3Error("JOURNAL_CLAIM_REF_MISMATCH")
-        evidence = self.predecessor_authority.evidence_id(
-            repository=self.repository, claim_ref=claim_ref, snapshot=transport
-        )
-        if evidence is not None and not (
-            evidence.startswith("artifact:sha256:") and len(evidence) == 80
-            and all(character in "0123456789abcdef" for character in evidence[16:])
-        ):
-            raise GitHubJournalV3Error("PREDECESSOR_WRITER_EVIDENCE_INVALID")
-        return VerifiedJournalSnapshotV3(
-            self.repository, self.repository_node_id, claim_ref,
-            transport.commit_sha, transport.parent_sha,
-            transport.journal_bytes, record, evidence,
-        )
+        from .github_journal_snapshot_v3 import verify_journal_snapshot
+        return verify_journal_snapshot(self, claim_ref, transport)
 
     def read(self, request_id: str) -> VerifiedJournalSnapshotV3:
         claim_ref = self.claim_ref(request_id)
@@ -341,9 +322,24 @@ class GitHubJournalV3:
     def reserve_initial(self, current: VerifiedJournalSnapshotV3) -> JournalOutcomeV3:
         return self._transition(current, reserve_initial)
 
+    def acknowledge_dispatch(self, current: VerifiedJournalSnapshotV3,
+                             receipt: DispatchAcknowledgmentV3,
+                             authority: DispatchAcknowledgmentAuthorityV3) -> JournalOutcomeV3:
+        from .pre_model_control_v3 import acknowledge_dispatch
+        if (receipt.reservation_commit_sha != current.commit_sha
+                or receipt.broker_repository != self.repository
+                or authority.permits_ack(current, receipt) is not True):
+            raise GitHubJournalV3Error("DISPATCH_ACK_AUTHORITY_UNTRUSTED")
+        return self._transition(current, lambda record: acknowledge_dispatch(record, receipt))
+
     def register_worker(self, current: VerifiedJournalSnapshotV3, reservation_id: str,
                         generation: int, worker: WorkerIdentityV3,
                         authority: WorkerAuthorityV3) -> JournalOutcomeV3:
+        from .pre_model_dispatch_ack_v3 import check_worker_ack_authority
+        try:
+            check_worker_ack_authority(current, authority)
+        except ValueError as exc:
+            raise GitHubJournalV3Error(str(exc)) from exc
         attempt = current.record.attempt
         authority_evidence_id = authority.evidence_id(
             repository=self.repository, request_id=attempt.request_id,
