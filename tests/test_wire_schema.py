@@ -160,9 +160,9 @@ class WireSchemaCompatibilityTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/review-request.yml").read_text()
         self.assertEqual(workflow.count("reviewer-findings-v1.codex-wire.schema.json"), 6)
         self.assertNotIn("broker-dist/reviewer-findings-v1.schema.json", workflow)
-        self.assertIn(
-            '--schema "$REMOTE_ROOT/broker-dist/reviewer-findings-v1.codex-wire.schema.json"',
-            workflow,
+        self.assertEqual(
+            workflow.count("'--schema', root + '/broker-dist/reviewer-findings-v1.codex-wire.schema.json'"),
+            2,  # Both Python-controlled preflight and invocation retain the wire schema.
         )
 
     def test_package_resources_expose_both_schemas(self):
