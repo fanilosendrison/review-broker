@@ -16,6 +16,7 @@ from .journal_record_v3 import (
 )
 from .pre_model_failure_v3 import PreModelFailureV3Error, validate_permanent_failure_receipt
 from .queue import AttemptState, StateTransitionError, transition_record
+from .pre_model_dispatch_ack_v3 import DispatchAcknowledgmentV3
 
 
 _ARTIFACT = re.compile(r"artifact:sha256:[0-9a-f]{64}\Z")
@@ -63,6 +64,24 @@ def reserve_initial(record: JournalRecordV3) -> JournalRecordV3:
         1, "RESERVED", reservation, record.attempt.request_id, None, None
     ))
     return _event(updated, "PRE_MODEL_DISPATCH_RESERVED")
+
+
+def acknowledge_dispatch(record: JournalRecordV3,
+                         receipt: DispatchAcknowledgmentV3) -> JournalRecordV3:
+    from .pre_model_dispatch_ack_v3 import (
+        ACK_EVENT, DispatchAcknowledgmentV3, acknowledgment_from_record,
+    )
+    _require(type(receipt) is DispatchAcknowledgmentV3, "DISPATCH_ACK_RECEIPT_REQUIRED")
+    control = record.control
+    _require(record.attempt.state is AttemptState.REQUESTED
+             and control.disposition == "RESERVED" and control.generation == 1
+             and control.worker is None
+             and acknowledgment_from_record(record) is None
+             and receipt.request_id == record.attempt.request_id
+             and receipt.attempt_id == record.attempt.attempt_id
+             and receipt.reservation_id == control.reservation_id,
+             "DISPATCH_ACK_TRANSITION_REJECTED")
+    return _event(record, ACK_EVENT, receipt=receipt.as_dict())
 
 
 def register_worker(record: JournalRecordV3, reservation_id: str, generation: int,
