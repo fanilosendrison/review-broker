@@ -1,6 +1,5 @@
 """Offline construction and full verification of candidate Reviewer Packet v2."""
 from __future__ import annotations
-from dataclasses import dataclass
 import hashlib
 from importlib import resources
 import json
@@ -21,6 +20,10 @@ from .issue_reference_reconstruction_v3 import reconstruct_issue_observations_v3
 from .packet_v2_reference import build_reference_entries_v2
 from .packet_v2_renderer import RENDERER_ID, render_packet_v2_prompt
 from .packet_v2_subject import SubjectCaptureV2
+from .packet_v2_technical_policy import (
+    AuthorizedPolicyVerificationV3, PacketV2CandidateError, PolicySnapshotV2,
+    TechnicalProfileSnapshotV2, technical_policy_v2,
+)
 from .packet_v2_subject_provenance import evidence_basis_v2,manifest_fields_v2,validate_capture_provenance_v2
 from .packets import (
     GitSourceReader, MAX_PACKET_BYTES, MAX_SOURCE_BYTES, MAX_SOURCE_COUNT,
@@ -34,13 +37,6 @@ from .reviewer_output_contract import CANONICAL_REVIEWER_OUTPUT_INSTRUCTIONS
 _SOURCE_ID = re.compile(r"S[0-9]{3}\Z")
 _SHA = re.compile(r"[0-9a-f]{40}\Z")
 _HEX = re.compile(r"[0-9a-f]{64}\Z")
-class PacketV2CandidateError(ValueError):
-    """Candidate packet construction or verification failed closed."""
-@dataclass(frozen=True)
-class TechnicalProfileSnapshotV2:
-    expected_name: str; actual_name: str
-    original_bytes: bytes; evidence_id: str
-    verification: str = "SYNTHETIC_OFFLINE_VERIFIED"
 def _fail(marker: str, cause: BaseException | None = None) -> None:
     if cause is None:
         raise PacketV2CandidateError(marker)
@@ -153,6 +149,10 @@ def _validate_capture(capture: SubjectCaptureV2, admission: PreclaimAdmissionV3,
     if (reread != capture.records or exact != capture.diff or changed_paths != set(paths)
             or merge_base != capture.merge_base_sha or inventory != list(capture.changes)):
         _fail("PACKET_V2_LOCAL_GIT_PROOF_MISMATCH")
+def validate_subject_capture_v2(admission: PreclaimAdmissionV3, capture: SubjectCaptureV2) -> None:
+    """Reuse the full admitted subject and local-Git proof before policy selection."""
+    request, _ = _admission(admission)
+    _validate_capture(capture, admission, request, prove_local_git=True)
 def _subject_entries(capture: SubjectCaptureV2) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     entries, changes, cursor = [], [], 0
     for change in capture.changes:
@@ -195,18 +195,6 @@ def _subject_entries(capture: SubjectCaptureV2) -> tuple[list[dict[str, object]]
     except ChangeScopeError as exc:
         _fail(str(exc), exc)
     return entries, changes
-def _technical_policy(profile: TechnicalProfileSnapshotV2) -> dict[str, object]:
-    if (not isinstance(profile, TechnicalProfileSnapshotV2)
-            or profile.verification != "SYNTHETIC_OFFLINE_VERIFIED"
-            or not profile.expected_name or profile.actual_name != profile.expected_name
-            or not isinstance(profile.original_bytes, bytes)
-            or profile.evidence_id != artifact_identity(profile.original_bytes)):
-        _fail("PACKET_V2_TECHNICAL_PROFILE_INVALID")
-    basis = {"identity_schema_version": 1, "permission_profile_name": profile.actual_name,
-             "permission_profile_sha256": hashlib.sha256(profile.original_bytes).hexdigest()}
-    return {"technical_policy_id": _hash("technical-policy", basis), "basis": basis,
-            "profile_evidence_id": profile.evidence_id,
-            "qualification": "SYNTHETIC_OFFLINE_ONLY"}
 def _program(request: Mapping[str, object], policy: Mapping[str, object]) -> dict[str, object]:
     return {"mission": request["mission"], "reviewer": request["reviewer"],
             "technical_policy_id": policy["technical_policy_id"],
@@ -227,8 +215,9 @@ def _exclusive(path: Path, data: bytes) -> None:
     except BaseException:
         path.unlink(missing_ok=True); raise
 def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCaptureV2,
-                              profile: TechnicalProfileSnapshotV2, output_directory: Path,
-                              issue_reference_readers: Mapping[str, GitHubIssueReferenceReaderV3] | None = None) -> dict[str, object]:
+                              profile: PolicySnapshotV2, output_directory: Path,
+                              issue_reference_readers: Mapping[str, GitHubIssueReferenceReaderV3] | None = None,
+                              *, policy_verification: AuthorizedPolicyVerificationV3 | None = None) -> dict[str, object]:
     """Build atomically without network, execution, inference, or publication."""
     request, _ = _admission(admission)
     _validate_capture(capture, admission, request, prove_local_git=True)
@@ -238,7 +227,7 @@ def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCa
         request, len(subject_sources) + 1, tuple(remote))
     if len(subject_sources) + len(reference_sources) > MAX_SOURCE_COUNT:
         _fail("PACKET_V2_SOURCE_COUNT_EXCEEDED")
-    policy = _technical_policy(profile); program = _program(request, policy)
+    policy = technical_policy_v2(profile, request, policy_verification); program = _program(request, policy)
     change_basis, _ = build_change_basis(changes, subject_sources,
         merge_base=capture.merge_base_sha, head=capture.head_sha, diff=capture.diff)
     change_scope = {**change_basis, "diff_snapshot": "changes.patch",
@@ -275,18 +264,22 @@ def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCa
     if output_directory.is_symlink() or (output_directory.exists()
             and (not output_directory.is_dir() or any(output_directory.iterdir()))):
         _fail("PACKET_V2_OUTPUT_NOT_EMPTY")
-    output_directory.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(prefix=".packet-v2-", dir=output_directory.parent))
+    def guard() -> None:
+        if policy_verification is not None: policy_verification.before_effect()
+    def write(path: Path, data: bytes) -> None:
+        guard(); _exclusive(path, data)
+    guard(); output_directory.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    guard(); staging = Path(tempfile.mkdtemp(prefix=".packet-v2-", dir=output_directory.parent))
     try:
         for entry, record in zip(subject_sources, capture.records):
-            _exclusive(staging / entry["snapshot"], record.original_bytes)
+            write(staging / entry["snapshot"], record.original_bytes)
         for entry, data in zip(reference_sources, reference_data):
-            _exclusive(staging / entry["snapshot"], data)
-        _exclusive(staging / "changes.patch", capture.diff)
-        _exclusive(staging / "input.txt", prompt)
-        _exclusive(staging / "input-manifest.json", canonical_bytes(manifest) + b"\n")
-        if output_directory.exists(): output_directory.rmdir()
-        os.replace(staging, output_directory)
+            write(staging / entry["snapshot"], data)
+        write(staging / "changes.patch", capture.diff)
+        write(staging / "input.txt", prompt)
+        write(staging / "input-manifest.json", canonical_bytes(manifest) + b"\n")
+        if output_directory.exists(): guard(); output_directory.rmdir()
+        guard(); os.replace(staging, output_directory)
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True); raise
     return manifest
@@ -310,8 +303,9 @@ def _read_snapshot(directory: Path, entry: Mapping[str, object], *, git: bool) -
             _fail("PACKET_V2_GIT_BLOB_MISMATCH")
     return data, lines
 def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmissionV3,
-                               capture: SubjectCaptureV2, profile: TechnicalProfileSnapshotV2,
-                               issue_reference_observations: tuple[object,...]=()) -> dict[str, object]:
+                               capture: SubjectCaptureV2, profile: PolicySnapshotV2,
+                               issue_reference_observations: tuple[object,...]=(),
+                               *, policy_verification: AuthorizedPolicyVerificationV3 | None = None) -> dict[str, object]:
     """Independently reconstruct every candidate packet identity and byte."""
     manifest_path, prompt_path = output_directory / "input-manifest.json", output_directory / "input.txt"
     if (output_directory.is_symlink() or (output_directory / "sources").is_symlink()
@@ -381,7 +375,8 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
         _fail("PACKET_V2_DIFF_MISMATCH")
     source_manifest = {key: manifest[key] for key in (
         "subject_sources", "reference_sources", "reference_outcomes")}
-    policy, program = _technical_policy(profile), _program(request, _technical_policy(profile))
+    policy = technical_policy_v2(profile, request, policy_verification)
+    program = _program(request, policy)
     if (manifest["source_manifest_id"] != _hash("source-manifest", source_manifest)
             or manifest["technical_policy"] != policy or manifest["program"] != program
             or manifest["program_id"] != _hash("program", program)

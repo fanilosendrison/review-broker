@@ -115,6 +115,12 @@
       "properties": {"id": {"type": "string", "minLength": 1}, "status": {"const": "captured"}, "source_id": {"$ref": "#/$defs/sourceId"}}
     },
     "technicalPolicy": {
+      "oneOf": [
+        {"$ref": "#/$defs/syntheticTechnicalPolicy"},
+        {"$ref": "#/$defs/authorizedTechnicalPolicy"}
+      ]
+    },
+    "syntheticTechnicalPolicy": {
       "type": "object", "additionalProperties": false,
       "required": ["technical_policy_id", "basis", "profile_evidence_id", "qualification"],
       "properties": {
@@ -122,6 +128,18 @@
         "basis": {"type": "object", "additionalProperties": false, "required": ["identity_schema_version", "permission_profile_name", "permission_profile_sha256"],
           "properties": {"identity_schema_version": {"const": 1}, "permission_profile_name": {"type": "string", "minLength": 1}, "permission_profile_sha256": {"$ref": "#/$defs/digest"}}},
         "profile_evidence_id": {"$ref": "#/$defs/artifactId"}, "qualification": {"const": "SYNTHETIC_OFFLINE_ONLY"}
+      }
+    },
+    "authorizedTechnicalPolicy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["technical_policy_id", "basis", "profile_evidence_id", "qualification", "policy_source_evidence_id", "selection_authorization_evidence_id"],
+      "properties": {
+        "technical_policy_id": {"type": "string", "pattern": "^technical-policy:sha256:[0-9a-f]{64}$"},
+        "basis": {"$ref": "#/$defs/syntheticTechnicalPolicy/properties/basis"},
+        "profile_evidence_id": {"$ref": "#/$defs/artifactId"},
+        "qualification": {"const": "PREMODEL_POLICY_SOURCE_VERIFIED_ONLY"},
+        "policy_source_evidence_id": {"$ref": "#/$defs/artifactId"},
+        "selection_authorization_evidence_id": {"$ref": "#/$defs/artifactId"}
       }
     },
     "mission": {

@@ -15,6 +15,11 @@ from .queue import AttemptState
 from .packet_v2 import (SubjectCaptureV2,TechnicalProfileSnapshotV2,build_packet_v2_candidate,
                         subject_capture_evidence_id_v2,verify_packet_v2_candidate)
 from .packets import SourceRecord
+from .packet_v2_technical_policy import AuthorizedPolicySnapshotV3, AuthorizedPolicyVerificationV3, PolicySnapshotV2
+from .pre_model_policy_evidence_retention_v3 import (
+ POLICY_EVIDENCE_NAMES, load_policy_evidence_v3, persist_policy_evidence_v3,
+ require_private_policy_tree_v3, rename_exclusive_policy_tree_v3,
+)
 from .packet_v2_subject_provenance import (SubjectCaptureProvenanceV2Error,
                                          validate_capture_provenance_v2)
 
@@ -33,8 +38,10 @@ def _private_tree(root:Path)->None:
   if path.is_symlink(): raise PacketRetentionV3Error("RETAINED_SYMLINK_FORBIDDEN")
   os.chmod(path,0o700 if path.is_dir() else 0o600)
 def persist_packet_evidence_v3(admission:PreclaimAdmissionV3,capture:SubjectCaptureV2,
- profile:TechnicalProfileSnapshotV2,retention_base:Path,snapshot:VerifiedJournalSnapshotV3,
- journal:GitHubJournalV3,issue_reference_readers:Mapping|None=None)->dict[str,object]:
+ profile:PolicySnapshotV2,retention_base:Path,snapshot:VerifiedJournalSnapshotV3,
+ journal:GitHubJournalV3,issue_reference_readers:Mapping|None=None,*,
+ policy_verification:AuthorizedPolicyVerificationV3|None=None,
+ candidate_directory:Path|None=None)->dict[str,object]:
  """Build and verify the unique ADMITTED claim locator, then expose it atomically."""
  if (snapshot.record.attempt.state is not AttemptState.ADMITTED
   or snapshot.record.attempt.admission!=admission.journal_admission()):
@@ -42,22 +49,46 @@ def persist_packet_evidence_v3(admission:PreclaimAdmissionV3,capture:SubjectCapt
  current=journal.read(admission.request_id)
  if current.commit_sha!=snapshot.commit_sha or current.record.attempt.state is not AttemptState.ADMITTED:
   raise PacketRetentionV3Error("RETENTION_CURRENT_ADMITTED_SNAPSHOT_REQUIRED")
+ authorized=type(profile) is AuthorizedPolicySnapshotV3
+ def guard():
+  if authorized:
+   if type(policy_verification) is not AuthorizedPolicyVerificationV3 or policy_verification.snapshot!=snapshot or policy_verification.journal is not journal:
+    raise PacketRetentionV3Error("RETENTION_POLICY_AUTHORITY_REQUIRED")
+   policy_verification.before_effect()
+ def write(path,data):
+  guard();_exclusive(path,data);guard()
+ guard()
  retention_root=packet_retention_locator_v3(retention_base,snapshot.claim_ref)
  if retention_base.is_symlink() or retention_root.is_symlink() or retention_root.exists(): raise PacketRetentionV3Error("RETENTION_TARGET_EXISTS")
- retention_base.mkdir(mode=0o700,parents=True,exist_ok=True);os.chmod(retention_base,0o700)
- staging=Path(tempfile.mkdtemp(prefix=".retained-v3-",dir=retention_base))
+ guard();retention_base.mkdir(mode=0o700,parents=True,exist_ok=True)
+ guard();os.chmod(retention_base,0o700)
+ guard();staging=Path(tempfile.mkdtemp(prefix=".retained-v3-",dir=retention_base))
  try:
-  manifest=build_packet_v2_candidate(admission,capture,profile,staging/"packet",issue_reference_readers)
-  verify_packet_v2_candidate(staging/"packet",admission,capture,profile)
-  _exclusive(staging/"evidence/origin-body.bin",admission.origin_body_bytes)
-  _exclusive(staging/"evidence/technical-profile.bin",profile.original_bytes)
+  if authorized:
+   if candidate_directory is None: raise PacketRetentionV3Error("RETENTION_VERIFIED_CANDIDATE_REQUIRED")
+   require_private_policy_tree_v3(candidate_directory)
+   manifest=verify_packet_v2_candidate(candidate_directory,admission,capture,profile,policy_verification=policy_verification)
+   for path in sorted(candidate_directory.rglob("*")):
+    if path.is_file(): write(staging/"packet"/path.relative_to(candidate_directory),path.read_bytes())
+  else:
+   manifest=build_packet_v2_candidate(admission,capture,profile,staging/"packet",issue_reference_readers)
+   verify_packet_v2_candidate(staging/"packet",admission,capture,profile)
+  write(staging/"evidence/origin-body.bin",admission.origin_body_bytes)
+  if authorized: persist_policy_evidence_v3(staging/"evidence",profile,policy_verification)
+  else: write(staging/"evidence/technical-profile.bin",profile.original_bytes)
   remote={item["id"]:item for item in admission.request["references"] if item["source"]["kind"]!="inline"}
   git=iter(admission.git_file_observations);issues=iter(admission.issue_reference_observations)
   for identifier,reference in remote.items():
    if _SAFE_ID.fullmatch(identifier) is None: raise PacketRetentionV3Error("REFERENCE_ID_PATH_UNSAFE")
    observation=next(git) if reference["source"]["kind"]=="git_file" else next(issues)
-   _exclusive(staging/f"evidence/admitted-references/{identifier}.bin",observation.original_bytes)
-  _private_tree(staging);os.replace(staging,retention_root)
+   write(staging/f"evidence/admitted-references/{identifier}.bin",observation.original_bytes)
+  if authorized:
+   guard();(staging/"evidence/admitted-references").mkdir(mode=0o700,exist_ok=True)
+   verify_packet_v2_candidate(staging/"packet",admission,capture,profile,policy_verification=policy_verification)
+  guard();_private_tree(staging)
+  guard()
+  if authorized: rename_exclusive_policy_tree_v3(staging,retention_root)
+  else: os.replace(staging,retention_root)
   return manifest
  except BaseException:
   shutil.rmtree(staging,ignore_errors=True);raise
@@ -80,7 +111,8 @@ def _issue_observation(meta:dict[str,object],data:bytes)->GitHubIssueReferenceOb
  if artifact_identity(canonical_bytes(value.provenance_basis())+b"\n")!=value.evidence_id: raise PacketRetentionV3Error("RETAINED_ISSUE_EVIDENCE_MISMATCH")
  return value
 
-def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,object])->tuple[PreclaimAdmissionV3,SubjectCaptureV2,TechnicalProfileSnapshotV2,dict[str,object]]:
+def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,object],*,
+ policy_verification:AuthorizedPolicyVerificationV3|None=None)->tuple[PreclaimAdmissionV3,SubjectCaptureV2,PolicySnapshotV2,dict[str,object]]:
  """Cold-reconstruct verifier inputs from journal authority and retained bytes only."""
  packet,evidence=retention_root/"packet",retention_root/"evidence"
  if retention_root.is_symlink() or packet.is_symlink() or evidence.is_symlink(): raise PacketRetentionV3Error("RETAINED_SYMLINK_FORBIDDEN")
@@ -91,8 +123,13 @@ def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,ob
  try: manifest=json.loads(_read_private(packet/"input-manifest.json"))
  except (UnicodeError,json.JSONDecodeError) as exc: raise PacketRetentionV3Error("RETAINED_MANIFEST_INVALID") from exc
  request=validated["canonical_request"];refs={item["id"]:item for item in request["references"] if item["source"]["kind"]!="inline"}
+ authorized=manifest["technical_policy"]["qualification"]=="PREMODEL_POLICY_SOURCE_VERIFIED_ONLY"
  expected={"origin-body.bin","technical-profile.bin","admitted-references"}
- if {item.name for item in evidence.iterdir()}-({"preparation-receipt.json"}|expected): raise PacketRetentionV3Error("RETAINED_EVIDENCE_INVENTORY_INVALID")
+ if authorized:
+  require_private_policy_tree_v3(retention_root)
+  expected={"origin-body.bin","admitted-references"}|POLICY_EVIDENCE_NAMES
+  if {item.name for item in evidence.iterdir()}!=expected: raise PacketRetentionV3Error("RETAINED_POLICY_INVENTORY_INVALID")
+ elif {item.name for item in evidence.iterdir()}-({"preparation-receipt.json"}|expected): raise PacketRetentionV3Error("RETAINED_EVIDENCE_INVENTORY_INVALID")
  admitted_dir=evidence/"admitted-references";expected_files={f"{key}.bin" for key in refs}
  if (admitted_dir.is_symlink() or not admitted_dir.is_dir() or admitted_dir.stat().st_mode&0o077
   or {item.name for item in admitted_dir.iterdir()}!=expected_files):
@@ -122,7 +159,10 @@ def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,ob
  try: validate_capture_provenance_v2(capture,source,admission.source_scope_evidence_id)
  except SubjectCaptureProvenanceV2Error as exc: raise PacketRetentionV3Error(str(exc)) from exc
  if subject_capture_evidence_id_v2(capture)!=capture.evidence_id: raise PacketRetentionV3Error("RETAINED_SUBJECT_EVIDENCE_MISMATCH")
- profile_bytes=_read_private(evidence/"technical-profile.bin");name=manifest["technical_policy"]["basis"]["permission_profile_name"]
- profile=TechnicalProfileSnapshotV2(name,name,profile_bytes,artifact_identity(profile_bytes),"SYNTHETIC_OFFLINE_VERIFIED")
- verify_packet_v2_candidate(packet,admission,capture,profile)
+ if authorized:
+  profile=load_policy_evidence_v3(evidence,policy_verification,admission)
+ else:
+  profile_bytes=_read_private(evidence/"technical-profile.bin");name=manifest["technical_policy"]["basis"]["permission_profile_name"]
+  profile=TechnicalProfileSnapshotV2(name,name,profile_bytes,artifact_identity(profile_bytes),"SYNTHETIC_OFFLINE_VERIFIED")
+ verify_packet_v2_candidate(packet,admission,capture,profile,policy_verification=policy_verification)
  return admission,capture,profile,manifest
