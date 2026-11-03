@@ -1,5 +1,5 @@
 """Offline operational-entry regression: packet data is not durable execution authority."""
-from contextlib import redirect_stderr
+from contextlib import ExitStack, redirect_stderr
 import copy
 import io
 import os
@@ -52,7 +52,8 @@ class InvocationAuthorityTests(unittest.TestCase):
         for scenario in ['metadata', 'capacity', 'wrong-attempt', 'wrong-request', 'wrong-packet',
                          'wrong-broker', 'changed-input', 'missing-authorization', 'forged-jwt', 'stale-jwt',
                          'caller-armed-true', 'policy-substitution', 'runtime-name-missing',
-                         'native-absent', 'native-false', 'trust-id', 'capacity-mismatch']:
+                         'native-absent', 'native-false', 'trust-id', 'capacity-mismatch',
+                         'wrong-audience', 'missing-trust']:
             with self.subTest(scenario=scenario):
                 factory = fixtures.CapacityBoundaryTests()
                 factory.setUp()
@@ -61,7 +62,7 @@ class InvocationAuthorityTests(unittest.TestCase):
                 bundle, trust = auth.authorization(directory, manifest, ATTEMPT)
                 if scenario in ['metadata', 'capacity']:
                     (directory / ('broker-metadata.json' if scenario == 'metadata' else 'input-capacity.json')).unlink()
-                elif scenario.startswith('wrong-'):
+                elif scenario in {'wrong-attempt','wrong-request','wrong-packet','wrong-broker'}:
                     field = {'wrong-attempt': 'attempt_id', 'wrong-request': 'request_id',
                              'wrong-packet': 'packet_id', 'wrong-broker': 'executing_broker_sha'}[scenario]
                     value = copy.deepcopy(bundle['envelope']['capacity_receipt'])
@@ -82,6 +83,8 @@ class InvocationAuthorityTests(unittest.TestCase):
                     bundle['jwt'] = 'not.a.signature'
                 elif scenario == 'stale-jwt':
                     bundle['jwt'] = auth.sign(bundle['envelope'], {'exp': 1})
+                elif scenario == 'wrong-audience':
+                    bundle['jwt'] = auth.sign(bundle['envelope'], {'aud': 'urn:wrong:audience'})
                 if scenario == 'trust-id':trust['codespace_id'] = '999'
                 if scenario == 'capacity-mismatch':
                     receipt = copy.deepcopy(bundle['envelope']['capacity_receipt'])
@@ -91,7 +94,11 @@ class InvocationAuthorityTests(unittest.TestCase):
                 def runner(*args, **kwargs):
                     calls.append(args)
                     raise AssertionError('model transport forbidden')
-                with auth.trusted_fixture(trust), self.assertRaises((InvocationError, ValueError)):
+                with ExitStack() as stack, auth.trusted_fixture(trust), self.assertRaises((InvocationError, ValueError)):
+                    if scenario == 'missing-trust':
+                        from review_broker.arm_authority_contract import ArmAuthorityError
+                        stack.enter_context(patch('review_broker.arm_execution.load_trust',
+                            side_effect=ArmAuthorityError('ARM_TRUST_BOOTSTRAP_UNQUALIFIED_OR_UNAVAILABLE')))
                     if scenario == 'runtime-name-missing':os.environ.pop('CODESPACE_NAME',None)
                     if scenario == 'native-absent':os.environ.pop('CODESPACES',None)
                     if scenario == 'native-false':os.environ['CODESPACES'] = 'false'
