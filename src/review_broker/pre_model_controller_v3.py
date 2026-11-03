@@ -22,6 +22,7 @@ from .pre_model_dispatch_v3 import (
     InitialDispatchTargetV3, InitialDispatchTransportV3,
 )
 from .queue import AttemptState
+from .pre_model_dispatch_ack_v3 import DispatchAcknowledgmentAuthorityV3
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,7 @@ class ControllerStatusV3(str, Enum):
     RESERVATION_REJECTED = "RESERVATION_REJECTED"
     RESERVATION_UNRESOLVED = "RESERVATION_UNRESOLVED"
     DISPATCH_OBSERVED = "DISPATCH_OBSERVED"
+    DISPATCH_ACKNOWLEDGED = "DISPATCH_ACKNOWLEDGED"
     DISPATCH_UNRESOLVED = "DISPATCH_UNRESOLVED"
 
 
@@ -61,6 +63,7 @@ class ControllerResultV3:
     reservation_outcome: JournalOutcomeV3 | None = None
     dispatch_request: InitialDispatchRequestV3 | None = None
     dispatch_result: InitialDispatchResultV3 | None = None
+    acknowledgment_outcome: JournalOutcomeV3 | None = None
 
 
 class PreModelControllerV3:
@@ -73,13 +76,15 @@ class PreModelControllerV3:
 
     def __init__(self, journal: GitHubJournalV3, target: InitialDispatchTargetV3,
                  dispatch_transport: InitialDispatchTransportV3,
-                 authority: ControllerAuthorityV3 | None):
+                 authority: ControllerAuthorityV3 | None,
+                 acknowledgment_authority: DispatchAcknowledgmentAuthorityV3 | None = None):
         if type(journal) is not GitHubJournalV3 or type(target) is not InitialDispatchTargetV3:
             raise ValueError("INITIAL_CONTROLLER_COMPONENT_INVALID")
         self.journal = journal
         self.target = target
         self.dispatch_transport = dispatch_transport
         self.authority = authority
+        self.acknowledgment_authority = acknowledgment_authority
         self._attempted: dict[str, bytes] = {}
         self._completed: dict[str, ControllerResultV3] = {}
         self._attempt_lock = Lock()
@@ -180,6 +185,7 @@ class PreModelControllerV3:
                                               "LOCAL_OPERATION_UNRESOLVED_NO_RETRY")
                 if previous.status not in {
                     ControllerStatusV3.DISPATCH_OBSERVED, ControllerStatusV3.ALREADY_HANDLED,
+                    ControllerStatusV3.DISPATCH_ACKNOWLEDGED,
                 }:
                     return replace(previous, reason="PRIOR_OPERATION_RETAINED_NO_RETRY")
                 return ControllerResultV3(ControllerStatusV3.ALREADY_HANDLED,
@@ -260,6 +266,27 @@ class PreModelControllerV3:
         observed = (type(response) is InitialDispatchResultV3
                     and response.status is InitialDispatchStatusV3.OBSERVED
                     and type(response.run_id) is int and response.run_id > 0)
+        if self.acknowledgment_authority is not None:
+            acknowledgment = None
+            try:
+                receipt = None if not observed else self.acknowledgment_authority.observe(
+                    request=request, response=response, transport=self.dispatch_transport,
+                    controller_authority=self.authority, reservation=snapshot,
+                )
+                if receipt is not None:
+                    acknowledgment = self.journal.acknowledge_dispatch(
+                        snapshot, receipt, self.acknowledgment_authority,
+                    )
+            except Exception:
+                pass  # The dispatch already happened; preserve ambiguity, never repeat it.
+            confirmed = (acknowledgment is not None
+                         and acknowledgment.status is OutcomeStatusV3.COMMITTED)
+            return ControllerResultV3(
+                ControllerStatusV3.DISPATCH_ACKNOWLEDGED if confirmed
+                else ControllerStatusV3.DISPATCH_UNRESOLVED,
+                "DISPATCH_ACK_CONFIRMED" if confirmed else "DISPATCH_ACK_UNCONFIRMED_NO_RETRY",
+                claim, reservation, request, response, acknowledgment,
+            )
         return ControllerResultV3(
             ControllerStatusV3.DISPATCH_OBSERVED if observed else ControllerStatusV3.DISPATCH_UNRESOLVED,
             "INJECTED_RESPONSE_NOT_WORKER_AUTHENTICATION", claim, reservation, request,
