@@ -102,7 +102,7 @@ The RWP-02 Worker scenario is reused with an additive RWP-03 state-transition
 measurement transport; historical fixtures and assertions are unchanged.
 
 - N01–N02: exact content/schema/identities, independent authorization, reviewer agreement.
-- N03: byte-for-byte comparison with the exact base's synthetic packet implementation.
+- N03: complete file-inventory byte identities and packet/schema identities from an independent oracle produced by the exact base's synthetic implementation.
 - N04: equal policy content with different independently approved selections changes packet identity.
 - N05: attributed ADMITTED and current-Worker handoff, without false packet completion.
 - N06: complete authorized four-reference packet with full verification.
@@ -191,6 +191,33 @@ FULL_SUITE_QUALIFICATION=AWAITING_EXACT_SOURCE_CI
 INDEPENDENT_REVIEW=NOT_RUN
 RWP03_OFFLINE_AUTHORIZED_PACKET=NOT_QUALIFIED
 ```
+
+### First exact-source CI failure and task-local correction
+
+Draft PR #87 first published candidate
+`791f18c8365ec5ef74b8bdf8fb9e78210632339b`, tree
+`f900ca9e683284e3e1aac6ceb7a72da8e71dfb8c`.
+Actions run `41732810510`, job `126254241168`, completed with FAILURE:
+932 tests in 282.243 seconds, one error, exit code 1. Installation passed;
+subsequent compilation/JSON steps were skipped and are not claimed PASS.
+The observed merge checkout `3409a9dfdd2b39b802c3bceba8b65655ab66a0fe`
+has that exact candidate tree. This is failed evidence, never qualification.
+
+The error was confined to new test N03: its runtime `git show` of the exact
+architecture base required a historical object absent from Actions' shallow
+checkout. The real CI log reproduces the failure end to end. No production
+module, historical assertion, dependency, or workflow required modification.
+
+The corrected N03 retains an independent golden oracle: all nine historical
+packet file SHA-256 values, packet ID, and canonical synthetic-schema digest
+were obtained from the exact base implementation, not generated from candidate
+output. The base `packet_v2.py` SHA-256 is
+`4e7f14fe0ea7e0fa8b1a45bfbb7291401075e1619a4b59162fdce28c8eac48c3`.
+CI now checks the full historical inventory without requiring historical Git
+objects or a network fetch. The normal shallow-checkout CI provides the
+regression environment. The failed run and original local STOP records remain
+preserved. The global known-bugs registry is outside the authorized file scope
+and was not modified.
 
 Final qualification and publication receipts remain pending. The successor PR
 and Issue #70 handoff must identify the exact published SHA/tree, complete CI
