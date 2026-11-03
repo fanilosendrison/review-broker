@@ -217,6 +217,39 @@ class AddedRenderingTests(unittest.TestCase):
             self.assertEqual(rebuilt, original)
             self.assertEqual(verify_packet(output), original)
 
+    def test_noprefix_legacy_recovery_does_not_require_compact_observations(self):
+        from unittest.mock import patch
+        from review_broker.identity import artifact_identity
+        from review_broker.packet_preparation import prepare_packet
+        self.git('config', 'diff.noprefix', 'true')
+        self.diff = self.reader.diff(self.base, self.head)
+        self.assertIn(b'diff --git one.txt one.txt', self.diff)
+        _, original = self.build(None)
+        with self.assertRaises(PacketError):
+            self.build()
+        with patch.object(self.reader, 'added_change_modes', side_effect=PacketError('COMPACT_UNAVAILABLE')) as modes:
+            output = self.root/'recovered-noprefix'
+            rebuilt = prepare_packet(self.records, request_id=original['request_id'],
+                subject_id=original['subject_id'], mission_instruction=original['program']['mission_instruction'],
+                profile=original['program']['profile'], output_directory=output,
+                changes=self.changes, change_diff=self.diff, merge_base=self.base, head=self.head,
+                prepared_evidence_ids=(artifact_identity(canonical_bytes(original)),), source_reader=self.reader)
+        modes.assert_not_called()
+        # A new packet has no journal-bound legacy identity to authorize fallback.
+        with self.assertRaises(PacketError):
+            prepare_packet(self.records, request_id=original['request_id'], subject_id=original['subject_id'],
+                mission_instruction=original['program']['mission_instruction'], profile=original['program']['profile'],
+                output_directory=self.root/'new-fail-closed', changes=self.changes, change_diff=self.diff,
+                merge_base=self.base, head=self.head, source_reader=self.reader)
+        self.assertEqual(rebuilt, original)
+        self.assertEqual(verify_packet(output), original)
+        with self.assertRaisesRegex(PacketError, 'PREPARED_PACKET_EVIDENCE_MISMATCH'):
+            prepare_packet(self.records, request_id=original['request_id'], subject_id=original['subject_id'],
+                mission_instruction=original['program']['mission_instruction'], profile=original['program']['profile'],
+                output_directory=self.root/'no-match', changes=self.changes, change_diff=self.diff,
+                merge_base=self.base, head=self.head, prepared_evidence_ids=('artifact:sha256:'+'0'*64,),
+                source_reader=self.reader)
+
     def test_format_marker_cannot_be_removed_from_a_new_packet(self):
         directory, manifest = self.build()
         del manifest["rendering_format"]

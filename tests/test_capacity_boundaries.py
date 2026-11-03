@@ -16,6 +16,7 @@ from review_broker.reconciliation import reconcile_repository
 from review_broker.request import build_issue_body
 from review_broker.reviewer_profile import install_reviewer_profile
 from tests import test_input_capacity as fixtures
+from tests import arm_authority_fixture as arm_auth
 from tests.test_codex import verified_runtime
 from tests.test_orchestration import SharedJournal, FakeController
 
@@ -111,8 +112,10 @@ class CapacityBoundaryTests(unittest.TestCase):
             (directory / "input.txt").write_bytes(b"late path substitution")
             (directory / "codex-final.json").write_bytes(b"{}")
             return subprocess.CompletedProcess(command, 0)
-        with self.assertRaisesRegex(InvocationError, "INPUT_CHANGED_DURING_EXECUTION"):
-            invoke_once(directory, schema, fixtures.ATTEMPT, runner=runner, **arguments)
+        bundle, trust = arm_auth.authorization(directory, manifest, fixtures.ATTEMPT)
+        with arm_auth.trusted_fixture(trust), self.assertRaisesRegex(InvocationError, "INPUT_CHANGED_DURING_EXECUTION"):
+            invoke_once(directory, schema, fixtures.ATTEMPT, runner=runner,
+                        authorization_bundle=canonical_bytes(bundle) + b"\n", **arguments)
         self.assertEqual(calls, [original])
         self.assertEqual((directory / "input-before.sha256").read_text().strip(), receipt["input_sha256"])
 
@@ -121,12 +124,16 @@ class CapacityBoundaryTests(unittest.TestCase):
             with self.subTest(forged=forged):
                 directory, manifest, journal, schema, arguments = self.invocation_fixture()
                 receipt = self.factory.check(directory, manifest, journal, arm=True)
+                bundle, trust = arm_auth.authorization(directory, manifest, fixtures.ATTEMPT)
                 if forged:
                     receipt["executing_broker_sha"] = "f" * 40
                     (directory / "input-capacity.json").write_bytes(canonical_bytes(receipt) + b"\n")
+                else:
+                    (directory / "input-capacity.json").unlink()
                 runner = Mock(side_effect=AssertionError("model-capable runner forbidden"))
-                with self.assertRaisesRegex(InvocationError, "CAPACITY"):
-                    invoke_once(directory, schema, fixtures.ATTEMPT, runner=runner, **arguments)
+                with arm_auth.trusted_fixture(trust), self.assertRaisesRegex(InvocationError, "CAPACITY"):
+                    invoke_once(directory, schema, fixtures.ATTEMPT, runner=runner,
+                                authorization_bundle=canonical_bytes(bundle) + b"\n", **arguments)
                 runner.assert_not_called()
 
     def test_scheduler_does_not_dispatch_a_durable_capacity_rejection(self):

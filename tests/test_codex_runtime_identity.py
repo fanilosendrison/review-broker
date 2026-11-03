@@ -17,6 +17,8 @@ from review_broker.codex_runtime_identity import (
 )
 from review_broker.packets import SourceRecord, build_packet
 from review_broker.reviewer_profile import install_reviewer_profile
+from review_broker.identity import attempt_identity, canonical_bytes
+from tests import arm_authority_fixture as arm_auth
 
 
 def verified_runtime(root: Path) -> VerifiedCodexRuntime:
@@ -143,11 +145,15 @@ class CodexRuntimeIdentityBaselineTests(unittest.TestCase):
                 kwargs["stderr"].write(b"controlled failure")
                 return subprocess.CompletedProcess(command, 1)
 
-            with self.assertRaises(InvocationError):
+            manifest = json.loads((packet / "input-manifest.json").read_bytes())
+            actual_attempt = attempt_identity(manifest["request_id"], 1)
+            bundle, trust = arm_auth.authorization(packet, manifest, actual_attempt)
+            with arm_auth.trusted_fixture(trust), self.assertRaises(InvocationError):
                 invoke_once(
                     packet,
                     schema,
-                    "attempt:sha256:" + "a" * 64,
+                    actual_attempt,
+                    authorization_bundle=canonical_bytes(bundle) + b"\n",
                     expected_packet_id=packet_id,
                     broker_wheel_sha256="b" * 64,
                     trusted_workspace=workspace,
