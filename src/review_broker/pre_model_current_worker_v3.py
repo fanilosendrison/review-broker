@@ -1,6 +1,8 @@
 """Fresh continuation authority; never a registration or perpetual Worker permit."""
 from __future__ import annotations
 
+import copy
+
 from .github_actions_identity_v3 import (
     GitHubActionsExpectationV3, GitHubActionsIdentityReaderV3,
 )
@@ -101,7 +103,19 @@ class CurrentBoundWorkerAuthorityV3:
                 or runtime.event_name != "workflow_dispatch" or not runtime.worker_dispatch
                 or expected.event_name != "workflow_dispatch" or not expected.worker_dispatch):
             raise ValueError("CURRENT_WORKER_BINDING_OR_ACK_UNTRUSTED")
-        observation = self.reader.observe(runtime, expected, _CurrentRuntimeBoundary(
+        def require_observation_boundary() -> None:
+            self.authenticate_context(context)
+            if self.journal.read(attempt.request_id) != snapshot:
+                raise ValueError("CURRENT_WORKER_JOURNAL_MOVED")
+            self.authenticate_context(context)
+
+        reader = copy.copy(self.reader)
+        executor = self.reader._executor
+        def execute(request):
+            require_observation_boundary()
+            return executor(request)
+        reader._executor = execute
+        observation = reader.observe(runtime, expected, _CurrentRuntimeBoundary(
             context, self.boundary, self.boundary_id))
         if (observation.actor_id != self.principal
                 or observation.triggering_actor_id != self.principal
@@ -109,6 +123,5 @@ class CurrentBoundWorkerAuthorityV3:
                 or observation.run_id != worker.run_id or observation.run_attempt != 1):
             raise ValueError("CURRENT_WORKER_RUN_JOB_UNTRUSTED")
         # The REST observation can take time: reject journal movement during it.
-        if self.journal.read(attempt.request_id) != snapshot:
-            raise ValueError("CURRENT_WORKER_JOURNAL_MOVED")
+        require_observation_boundary()
         return worker
