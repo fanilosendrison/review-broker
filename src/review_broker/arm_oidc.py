@@ -3,6 +3,7 @@ from typing import Any
 
 from . import github_oidc
 from .arm_authority_contract import ArmAuthorityError, envelope_audience
+from .oidc_subject import BROKER_OWNER_ID, immutable_repository_subject
 
 
 def issuer_json(url: str) -> dict[str, Any]:
@@ -22,7 +23,10 @@ def verify_oidc(token: str, envelope: dict[str, Any], trust: dict[str, Any]) -> 
                     'workflow_ref': 'workflow_ref', 'workflow_sha': 'executing_broker_sha',
                     'ref': 'ref', 'run_id': 'run_id', 'run_attempt': 'run_attempt'}
         expected = {claim: envelope[field] for claim, field in bindings.items()}
-        expected['sub'] = 'repo:' + trust['broker_repository'] + ':ref:' + trust['ref']
+        expected['repository_owner_id'] = BROKER_OWNER_ID
+        expected['repository_owner'] = trust['broker_repository'].split('/', 1)[0]
+        expected['sub'] = immutable_repository_subject(
+            trust['broker_repository'], trust['broker_repository_id'], BROKER_OWNER_ID, trust['ref'])
         github_oidc.verify_github_identity(token, audience=envelope_audience(envelope),
             expected_claims=expected, issuer_reader=issuer_json)
         for field in ['broker_repository', 'broker_repository_id', 'executing_broker_sha',

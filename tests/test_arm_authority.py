@@ -1,5 +1,7 @@
 """Offline hostile signature/binding/replay/persistence oracles; no provider invocation."""
+import contextlib
 import copy
+import io
 from dataclasses import replace
 import os
 from pathlib import Path
@@ -70,6 +72,45 @@ class ArmAuthorityTests(unittest.TestCase):
                 bundle['jwt'] = auth.sign(bundle['envelope'], key=key, header=header)
                 with self.assertRaises(ArmAuthorityError):
                     self.authorize(bundle)
+        self.assertEqual(list(Path(self.trust['consumption_directory']).iterdir()), [])
+
+    def test_immutable_subject_substitution_and_missing_owner_cannot_consume(self):
+        variants = [
+            {'sub': 'repo:sample/broker:ref:refs/heads/dev'},
+            {'sub': 'repo:sample@9/broker@1:ref:refs/heads/dev'},
+            {'sub': 'repo:sample@30498238/broker@9:ref:refs/heads/dev'},
+            {'sub': 'repo:other@30498238/broker@1:ref:refs/heads/dev'},
+            {'sub': 'repo:sample@30498238/other@1:ref:refs/heads/dev'},
+            {'sub': 'repo:sample@30498238/broker@1:ref:refs/heads/main'},
+            {'repository_owner_id': '9'}, {'repository_owner': 'other'},
+            {'repository': 'other/broker'}, {'repository': 'sample/other'},
+        ]
+        for changes in variants:
+            with self.subTest(changes=changes):
+                self.assert_invalid_identity(auth.sign(self.bundle['envelope'], changes))
+        for claim in ['repository_owner_id', 'repository_owner']:
+            with self.subTest(missing=claim):
+                self.assert_invalid_identity(auth.sign(self.bundle['envelope'], missing=(claim,)))
+
+    def assert_invalid_identity(self, token):
+        bundle = dict(self.bundle, jwt=token)
+        out, err = io.StringIO(), io.StringIO()
+        with auth.trusted_fixture(self.trust), contextlib.redirect_stdout(out), \
+             contextlib.redirect_stderr(err):
+            with self.assertRaisesRegex(ArmAuthorityError, '^ARM_OIDC_VERIFICATION_FAILED$') as failure:
+                self.authorize(bundle)
+        self.assertEqual((out.getvalue(), err.getvalue()), ('', ''))
+        self.assertNotIn(token, str(failure.exception))
+        self.assertIsNone(failure.exception.__cause__)
+        self.assertEqual(list(Path(self.trust['consumption_directory']).iterdir()), [])
+
+    def test_signed_repository_id_cannot_replace_protected_trust_identity(self):
+        bundle = copy.deepcopy(self.bundle)
+        bundle['envelope']['broker_repository_id'] = '9'
+        bundle['jwt'] = auth.sign(bundle['envelope'])
+        with auth.trusted_fixture(self.trust), self.assertRaisesRegex(
+                ArmAuthorityError, '^ARM_OIDC_VERIFICATION_FAILED$'):
+            self.authorize(bundle)
         self.assertEqual(list(Path(self.trust['consumption_directory']).iterdir()), [])
 
     def test_changed_envelope_wrong_bindings_and_missing_files_refuse(self):

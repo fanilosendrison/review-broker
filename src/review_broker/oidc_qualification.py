@@ -8,10 +8,12 @@ from typing import Mapping
 
 from .github_oidc import ISSUER, GitHubOIDCError, request_identity, verify_github_identity
 from .identity import canonical_bytes
+from .oidc_subject import (
+    BROKER_REPOSITORY as REPOSITORY, BROKER_REF as REF,
+    BROKER_REPOSITORY_ID, BROKER_OWNER_ID, immutable_repository_subject,
+)
 
 NAMESPACE = 'urn:review-broker:qualification:v1'
-REPOSITORY = 'fanilosendrison/review-broker'
-REF = 'refs/heads/dev'
 WORKFLOW = REPOSITORY + '/.github/workflows/review-request.yml@' + REF
 POLICY = dict(namespace=NAMESPACE, repository=REPOSITORY, ref=REF, workflow_ref=WORKFLOW,
               issuer=ISSUER, algorithm='RS256', lifetime_seconds=600,
@@ -27,6 +29,9 @@ def qualify(environment: Mapping[str, str]) -> dict[str, object]:
         or environment.get('QUALIFICATION_DEFAULT_BRANCH') != 'dev'
         or environment.get('QUALIFICATION_SHA') != environment.get('GITHUB_SHA')
         or environment.get('GITHUB_REPOSITORY') != REPOSITORY
+        or environment.get('GITHUB_REPOSITORY_ID') != BROKER_REPOSITORY_ID
+        or environment.get('GITHUB_REPOSITORY_OWNER') != REPOSITORY.split('/', 1)[0]
+        or environment.get('GITHUB_REPOSITORY_OWNER_ID') != BROKER_OWNER_ID
         or environment.get('GITHUB_REF') != REF
         or environment.get('GITHUB_WORKFLOW_REF') != WORKFLOW
         or environment.get('GITHUB_WORKFLOW_SHA') != environment.get('GITHUB_SHA')
@@ -51,7 +56,10 @@ def qualify(environment: Mapping[str, str]) -> dict[str, object]:
     sys.stderr.write('OIDC_QUALIFICATION_TOKEN_RESPONSE_OBTAINED\n')
     expected = {key: source[key] for key in ['repository', 'repository_id', 'workflow_ref',
                                             'workflow_sha', 'ref', 'run_id', 'run_attempt']}
-    expected['sub'] = 'repo:' + REPOSITORY + ':ref:' + REF
+    expected['repository_owner_id'] = BROKER_OWNER_ID
+    expected['repository_owner'] = REPOSITORY.split('/', 1)[0]
+    expected['sub'] = immutable_repository_subject(
+        REPOSITORY, BROKER_REPOSITORY_ID, BROKER_OWNER_ID, REF)
     verify_github_identity(token, audience=audience, expected_claims=expected, allow_thumbprints=True)
     return dict(schema_version=1, status='OIDC_JOB_QUALIFIED', source=source,
         qualification_id=identity, audience_sha256=hashlib.sha256(audience.encode()).hexdigest(),
