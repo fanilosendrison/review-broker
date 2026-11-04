@@ -33,7 +33,7 @@ jobs:
             "420a18d006e421e197d23b8e93681376fbabc2db"
           test "$(git -C "$CANDIDATE" rev-parse --abbrev-ref HEAD)" = "HEAD"
       - name: Install
-        run: python -m pip install .
+        run: python -m pip install '.[test]'
       - name: Unit and adversarial tests
         env:
           REVIEW_BROKER_PR72_TEST_CHECKOUT: ${{ github.workspace }}/artifacts/pr72-test-checkout
