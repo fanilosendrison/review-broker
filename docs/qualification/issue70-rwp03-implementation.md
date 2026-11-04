@@ -283,13 +283,61 @@ A later test exposed an unguarded Git reader inside the injected capture
 provider. Its failed log is retained; the provider now uses the same guarded
 adapter, without changing historical source acquisition.
 
-Final installed-source focused receipts are disjoint: policy/effect 31 PASS,
+First-remediation installed-source focused receipts are disjoint: policy/effect 31 PASS,
 continuation 27 PASS, cold packet first partition 12 PASS and remaining partition
 8 PASS: **78 targeted tests PASS**, including all original N01–N08/F01–F36
 cases. Existing packet/admission/journal and RWP-01/RWP-02 regressions passed
 **165 tests**. These are execution results, not an independent closure of R5.
 The original 868 historical tests remain unchanged; corrected-source complete
 CI and a new exact-source independent review remain mandatory.
+
+### Further R4 counterexamples and correction
+
+Mandatory orchestrator run `01M6HY7FV7MR2DDPPP60ZQMVSS` published first
+remediation SHA `d891dc847ce97a7fc38879975c24d6ecf05d9b6a`, tree
+`0aa9b58df801d94ca29e1efcd7c1543bcb0c3c5c`, to existing draft PR #87.
+Normal CI run `41744744839`, job `126294804221`, passed 946 tests in
+173.269 seconds, installation, compilation and JSON validation. Its logged
+checkout `3a658c5dcf01b93311fdc25a16646abe5d4b5a65` has that exact tree.
+CI log SHA-256:
+`ddc8709f1c6763e43dbde5fdfc120d0ed50b25d3ec36108a4cb0fa15639c974b`.
+
+The fresh independent review on that exact source returned **NO_GO**, closing
+R1/R2/R3 but retaining R4 and R5. Its complete result is preserved in the
+[second review receipt](https://github.com/fanilosendrison/review-broker/pull/87#issuecomment-6619312976).
+Actual metadata verifies `openai-codex-1 / gpt-5.6-sol / xhigh`; all 69 tool
+calls were read-only (45 read, 24 grep). Trace SHA-256:
+`d53dc0c443d70a7d85bc1fa454cc839b7acfb39376f6275cfef2a4ed6cd1cda3`.
+Session SHA-256:
+`853439b67857efab136294fefa3d6594700ade90cf9602b06d106a0c4c5971ed`.
+Review-text SHA-256:
+`15bbdbe9bc6c4afb1e27f615a323df83f1af0a2d7c8bb08668e99ad28dce41df`.
+
+Six further counterexamples against that installed source and its original
+fixtures produced six expected assertion failures, zero errors. They expose
+run/job observation revocation and journal movement, acquisition copy-to-Git
+movement, archive-write-to-child-launch movement, and retained root/file
+metadata movement. That RED log remains separate evidence.
+
+The current authority now guards each injected Actions execution and its final
+return using its existing context authentication and exact journal snapshot,
+without recursion or a second control algorithm. Reader cloning avoids shared
+transport mutation. The injected fixture acquisition guards each copy-tree,
+file-copy/metadata and subsequent Git operation. The cold-stage callback receives
+the same effect guard; archive writes and child launch are distinct guarded
+boundaries. This changes freshness only, not network isolation or inherited
+credential-environment qualification. Retained metadata and inventory observation
+uses guarded directory enumeration and a non-symlink-following walk, not an
+unguarded recursive glob. Packet/source metadata checks are similarly guarded.
+
+A complete current targeted run passed **84 tests in 486.986 seconds**. Its
+preceding 84-test run had one new test expectation error: Actions correctly
+wrapped a revoked executor boundary in its existing typed unavailable error,
+but the assertion expected only ValueError. The corrected test accepts those
+existing fail-closed error types and still requires exactly one transport call.
+The failed log is retained. All original N01–N08/F01–F36 tests remain present.
+The new source requires new exact-tree CI and another fresh independent review;
+no verdict is transferred from either earlier NO_GO.
 
 ### R5 capability discovery and unresolved qualification boundary
 
@@ -316,8 +364,9 @@ CI and a new exact-source independent review remain mandatory.
 - Semantic disposition: `no-normative-impact`.
 - Affected layers: verification-or-qualification-evidence;
   integration-or-conformance; repository-governance-or-documentation.
-- Related consequences: the old cold subprocess launcher and socket monkeypatch
-  remain unchanged. Earlier network-blocked language does not establish
+- Related consequences: the cold launcher's inherited environment and socket
+  monkeypatch remain unchanged; R4 adds only its explicit effect guard. Earlier
+  network-blocked language does not establish
   universal isolation. Cold byte reconstruction passes, but network denial and
   overall RWP-03 remain NOT_QUALIFIED. No effective Codex policy is attested.
 - Required authority: a permitted channel for the exact local capability probes
@@ -337,7 +386,7 @@ R4_INTERNAL_FRESHNESS=TARGETED_PASS
 R5_ISOLATION_CAPABILITY=UNAVAILABLE
 R5_REMEDIATION=BLOCKED
 R5_COLD_NETWORK_DENIAL=NOT_QUALIFIED
-RWP03_TARGETED_TESTS=78_PASS
+RWP03_TARGETED_TESTS=84_PASS
 RWP03_OFFLINE_AUTHORIZED_PACKET=NOT_QUALIFIED
 ```
 
