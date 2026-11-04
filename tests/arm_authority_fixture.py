@@ -15,6 +15,7 @@ from review_broker.arm_authority_contract import ISSUER, JWKS, envelope_audience
 from review_broker.codex_policy import CodexPolicy
 from review_broker.identity import canonical_bytes
 from review_broker.input_capacity import capacity_receipt
+from review_broker.oidc_subject import BROKER_OWNER_ID, immutable_repository_subject
 
 _KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 _JWK = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(_KEY.public_key()))
@@ -51,14 +52,19 @@ def authorization(directory, manifest, attempt, broker='a' * 40):
     return {'envelope': envelope, 'jwt': sign(envelope)}, trust
 
 
-def sign(envelope, overrides=None, key=None, header=None):
+def sign(envelope, overrides=None, key=None, header=None, missing=()):
     now = int(time.time())
     claims = dict(iss=ISSUER, aud=envelope_audience(envelope), iat=now-1, nbf=now-1, exp=now+120,
         repository=envelope['broker_repository'], repository_id=envelope['broker_repository_id'],
         workflow_ref=envelope['workflow_ref'], workflow_sha=envelope['workflow_sha'],
         ref=envelope['ref'], run_id=envelope['run_id'], run_attempt=envelope['run_attempt'],
-        sub='repo:' + envelope['broker_repository'] + ':ref:' + envelope['ref'], jti='fixture-jti')
+        repository_owner=envelope['broker_repository'].split('/', 1)[0],
+        repository_owner_id=BROKER_OWNER_ID,
+        sub=immutable_repository_subject(envelope['broker_repository'],
+            envelope['broker_repository_id'], BROKER_OWNER_ID, envelope['ref']), jti='fixture-jti')
     claims.update(overrides or {})
+    for name in missing:
+        del claims[name]
     return jwt.encode(claims, key or _KEY, algorithm='RS256', headers=header or {'kid': 'offline-fixture'})
 
 
