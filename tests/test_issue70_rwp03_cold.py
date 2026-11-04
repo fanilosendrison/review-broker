@@ -337,6 +337,50 @@ class AuthorizedColdTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify_packet_v2_candidate(self.retained/"packet", self.admission, self.capture, self.profile)
 
+    def test_R1_same_request_independently_valid_other_authorization_rejected(self):
+        from tests.issue70_rwp03_test_support import alternate_admission
+        from review_broker.admission_evidence_v3 import validate_journal_admission_v3
+        self.complete()
+        other = alternate_admission(self.scenario)
+        validate_journal_admission_v3(other.journal_admission(), other.origin_body_bytes)
+        self.assertEqual(other.request_id, self.admission.request_id)
+        self.assertNotEqual(other.requester_authorization_evidence_id,
+                            self.admission.requester_authorization_evidence_id)
+        calls = (
+            lambda: build_packet_v2_candidate(other, self.scenario.inputs.capture,
+                self.profile, self.root/"substitution", self.scenario.inputs.issue_readers,
+                policy_verification=self.verification),
+            lambda: verify_packet_v2_candidate(self.retained/"packet", other,
+                self.capture, self.profile, policy_verification=self.verification),
+            lambda: load_packet_evidence_v3(self.retained, other.journal_admission(),
+                policy_verification=self.verification))
+        for call in calls:
+            with self.subTest(entry=call), self.assertRaisesRegex(ValueError, "ORIGINAL_ADMISSION_REQUIRED"):
+                call()
+        self.assertFalse((self.root/"substitution").exists())
+
+    def test_R2_complete_valid_synthetic_packet_and_retention_cannot_downgrade(self):
+        from tests.packet_v2_test_support import profile
+        from review_broker.packet_retention_v3 import packet_retention_locator_v3
+        self.complete()
+        base = self.root/"synthetic-retention"
+        snapshot = self.verification.snapshot
+        persist_packet_evidence_v3(self.admission, self.scenario.inputs.capture, profile(),
+            base, snapshot, self.verification.journal, self.scenario.inputs.issue_readers)
+        retained = packet_retention_locator_v3(base, snapshot.claim_ref)
+        load_packet_evidence_v3(retained, self.admission.journal_admission())
+        calls = (
+            lambda: build_packet_v2_candidate(self.admission, self.scenario.inputs.capture,
+                profile(), self.root/"downgrade", self.scenario.inputs.issue_readers,
+                policy_verification=self.verification),
+            lambda: verify_packet_v2_candidate(retained/"packet", self.admission,
+                self.capture, self.profile, policy_verification=self.verification),
+            lambda: load_packet_evidence_v3(retained, self.admission.journal_admission(),
+                policy_verification=self.verification))
+        for call in calls:
+            with self.subTest(entry=call), self.assertRaisesRegex(ValueError, "AUTHORIZED_POLICY_MODE_REQUIRED"):
+                call()
+
     def test_existing_destination_never_overwritten(self):
         self.complete()
         with self.assertRaises(ValueError):

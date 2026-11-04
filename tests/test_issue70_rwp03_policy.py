@@ -208,5 +208,100 @@ class Rwp03PolicyTests(unittest.TestCase):
                     type(receipt).from_bytes(malformed)
 
 
+class PolicyEffectBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from tests.issue70_rwp03_test_support import RealContinuationScenario
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.s = RealContinuationScenario(self.root)
+
+    def test_R4_revocation_after_file_creation_prevents_content_write(self):
+        import os
+        from unittest.mock import patch
+        opened, original = [], os.open
+        def create(path, *args, **kwargs):
+            fd = original(path, *args, **kwargs)
+            if Path(path).name == "S001.bin":
+                opened.append(Path(path))
+                self.s.worker.boundary.trusted = False
+            return fd
+        with patch("os.open", create):
+            result = self.s.continuation.run(self.s.worker.context)
+        self.assertIsNone(result.packet_id)
+        self.assertEqual(len(opened), 1)
+        self.assertEqual(opened[0].read_bytes(), b"")
+        self.assertFalse((self.root/"candidate").exists())
+        self.assertFalse((self.root/"retained").exists())
+
+    def test_R4_packet_internal_git_proof_stops_before_second_read(self):
+        from unittest.mock import patch
+        from review_broker.packets import GitSourceReader
+        from review_broker.packet_v2 import build_packet_v2_candidate
+        result = self.s.continuation.run(self.s.worker.context)
+        self.assertEqual(result.status.value, "COMMITTED", result.reason)
+        admission, capture, profile, verification, readers = self.s.stages._inputs
+        calls, original = [], GitSourceReader._git
+        def execute(reader, *args, **kwargs):
+            data = original(reader, *args, **kwargs)
+            calls.append(args)
+            self.s.worker.boundary.trusted = False
+            return data
+        with patch.object(GitSourceReader, "_git", execute), self.assertRaises(ValueError):
+            build_packet_v2_candidate(admission, capture, profile,
+                self.root/"second-candidate", readers, policy_verification=verification)
+        self.assertEqual(len(calls), 1)
+        self.assertFalse((self.root/"second-candidate").exists())
+
+    def test_R4_native_rename_checks_authority_at_operation_edge(self):
+        import ctypes
+        from unittest.mock import patch
+        from review_broker.pre_model_policy_evidence_retention_v3 import rename_exclusive_policy_tree_v3
+        result = self.s.continuation.run(self.s.worker.context)
+        self.assertEqual(result.status.value, "COMMITTED", result.reason)
+        verification = self.s.stages._inputs[3]
+        staging, destination = self.root/"rename-staging", self.root/"rename-destination"
+        staging.mkdir(mode=0o700)
+        calls = []
+        def operation(*args):
+            calls.append(args)
+            raise AssertionError("rename after authority revocation")
+        scenario = self.s
+        class Library:
+            def __getattr__(self, name):
+                if name not in {"renameatx_np", "renameat2"}: raise AttributeError(name)
+                scenario.worker.boundary.trusted = False
+                return operation
+        with patch.object(ctypes, "CDLL", return_value=Library()), self.assertRaises(ValueError):
+            rename_exclusive_policy_tree_v3(staging, destination,
+                                           before_effect=verification.before_effect)
+        self.assertEqual(calls, [])
+        self.assertTrue(staging.is_dir())
+        self.assertFalse(destination.exists())
+
+    def test_R4_cold_retained_reads_stop_on_journal_movement(self):
+        from unittest.mock import patch
+        from review_broker.packet_retention_v3 import load_packet_evidence_v3
+        result = self.s.continuation.run(self.s.worker.context)
+        self.assertEqual(result.status.value, "COMMITTED", result.reason)
+        verification = self.s.verification()
+        reads, original = [], Path.read_bytes
+        def read(path):
+            data = original(path)
+            if path.is_relative_to(result.retained_root):
+                reads.append(path)
+                snapshot = verification.snapshot
+                transport = self.s.worker.transport
+                sha = transport.create_journal_commit(snapshot.commit_sha, snapshot.journal_bytes)
+                transport.attributed.add(sha)
+                transport.refs[snapshot.claim_ref] = sha
+            return data
+        with patch.object(Path, "read_bytes", read), self.assertRaisesRegex(ValueError, "JOURNAL_STALE"):
+            load_packet_evidence_v3(result.retained_root,
+                self.s.worker.admission.journal_admission(), policy_verification=verification)
+        self.assertEqual(len(reads), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

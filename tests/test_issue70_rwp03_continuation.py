@@ -279,6 +279,112 @@ class ForbiddenPacketStages:
         raise AssertionError(f"packet stage reached before capture: {name}")
 
 
-if __name__ == "__main__":
+class AuthorizedInternalBoundaryTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        from tests.issue70_rwp03_test_support import RealContinuationScenario
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.s = RealContinuationScenario(self.root)
 
+    def refused(self):
+        result = self.s.continuation.run(self.s.worker.context)
+        self.assertNotEqual(result.status.value, "COMMITTED")
+        self.assertIsNone(result.packet_id)
+        self.assertFalse((self.root/"candidate").exists())
+        self.assertFalse((self.root/"retained").exists())
+
+    def test_R3_coherent_issue_body_replacement(self):
+        self.s.inputs.issue_readers["requirement"]._executor.body = "coherent changed body"
+        self.refused()
+
+    def test_R3_coherent_issue_comment_replacement(self):
+        self.s.inputs.issue_readers["decision"]._executor.body = "coherent changed comment"
+        self.refused()
+
+    def test_R3_second_materialization_changes_previously_accepted_reference(self):
+        api = self.s.inputs.issue_readers["requirement"]._executor
+        reads = []
+        def execute(request):
+            response = api(request)
+            if request.full_url.endswith("/issues/43"):
+                reads.append(request.full_url)
+                api.body = "coherent replacement after first accepted observation"
+            return response
+        self.s.inputs.issue_readers["requirement"]._executor = execute
+        self.refused()
+        self.assertEqual(len(reads), 2)
+        self.assertTrue(self.s.archive.exists())  # First reference pass reached selection.
+
+    def test_R3_observation_time_alone_is_not_content_drift(self):
+        for reader in self.s.inputs.issue_readers.values():
+            reader._clock = lambda: datetime(2026, 1, 3, tzinfo=timezone.utc)
+        result = self.s.continuation.run(self.s.worker.context)
+        self.assertEqual(result.status.value, "COMMITTED", result.reason)
+
+    def test_R4_git_internal_read_stops_on_journal_movement(self):
+        from unittest.mock import patch
+        from review_broker.packets import GitSourceReader
+        calls = []
+        original = GitSourceReader._git
+        def execute(reader, *args, **kwargs):
+            result = original(reader, *args, **kwargs)
+            calls.append(args)
+            snapshot = self.s.worker.journal.read(self.s.worker.admission.request_id)
+            transport = self.s.worker.transport
+            sha = transport.create_journal_commit(snapshot.commit_sha, snapshot.journal_bytes)
+            transport.attributed.add(sha)
+            transport.refs[snapshot.claim_ref] = sha
+            return result
+        with patch.object(GitSourceReader, "_git", execute):
+            self.refused()
+        self.assertEqual(len(calls), 1)
+
+    def test_R4_reference_internal_http_stops_on_authority_loss(self):
+        api = self.s.inputs.issue_readers["requirement"]._executor
+        calls = []
+        def execute(request):
+            calls.append(request.full_url)
+            response = api(request)
+            self.s.worker.boundary.trusted = False
+            return response
+        self.s.inputs.issue_readers["requirement"]._executor = execute
+        self.refused()
+        self.assertEqual(len(calls), 1)
+
+    def test_R4_policy_source_internal_reads_use_current_guard(self):
+        from tests.issue70_rwp03_test_support import POLICY_BYTES, SOURCE
+        archive = self.root/"independent-source.bin"
+        archive.write_bytes(POLICY_BYTES)
+        reads = []
+        def read_policy(expectation, *, before_effect):
+            before_effect()
+            data = archive.read_bytes()
+            reads.append(data)
+            self.s.worker.boundary.trusted = False
+            before_effect()
+            reads.append(archive.read_bytes())
+            return data, SOURCE
+        self.s.source_authority.read_policy = read_policy
+        self.refused()
+        self.assertEqual(reads, [POLICY_BYTES])
+
+    def test_R4_selection_internal_archive_reads_stop_after_revocation(self):
+        from unittest.mock import patch
+        from pathlib import Path
+        reads, original = [], Path.read_bytes
+        def read(path):
+            data = original(path)
+            if path == self.s.archive:
+                reads.append(data)
+                self.s.worker.boundary.trusted = False
+            return data
+        with patch.object(Path, "read_bytes", read):
+            self.refused()
+        self.assertEqual(len(reads), 1)
+
+
+if __name__ == "__main__":
     unittest.main()

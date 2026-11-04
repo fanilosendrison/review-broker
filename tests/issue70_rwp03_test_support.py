@@ -90,11 +90,13 @@ class ContinuationWorkerScenario(WorkerScenario):
 class FixturePolicySourceAuthority:
     """Pinned external fixture archive; not real GitHub source attestation."""
 
-    def read_policy(self, expectation):
-        self.verify_source(SOURCE, POLICY_BYTES, expectation)
+    def read_policy(self, expectation, *, before_effect):
+        before_effect()
+        self.verify_source(SOURCE, POLICY_BYTES, expectation, before_effect=before_effect)
         return POLICY_BYTES, SOURCE
 
-    def verify_source(self, observation, original_bytes, expectation):
+    def verify_source(self, observation, original_bytes, expectation, *, before_effect=None):
+        if before_effect is not None: before_effect()
         if (observation != SOURCE or original_bytes != POLICY_BYTES
                 or expectation != EXPECTED):
             raise ValueError("fixture source object not independently recognized")
@@ -103,11 +105,13 @@ class FixturePolicySourceAuthority:
 class FixturePolicySelectionAuthority:
     """Fixed owner decision external to receipt parsing and content hashing."""
 
-    def select_policy(self, source, context, expectation):
-        self.verify_selection(SELECTION, source, context, expectation)
+    def select_policy(self, source, context, expectation, *, before_effect):
+        before_effect()
+        self.verify_selection(SELECTION, source, context, expectation, before_effect=before_effect)
         return SELECTION
 
-    def verify_selection(self, receipt, source, context, expectation):
+    def verify_selection(self, receipt, source, context, expectation, *, before_effect=None):
+        if before_effect is not None: before_effect()
         if (receipt != SELECTION or source != SOURCE or context != CONTEXT
                 or expectation != EXPECTED):
             raise ValueError("fixture decision not independently recognized")
@@ -118,12 +122,15 @@ class ArchivedSelectionAuthority:
     def __init__(self, archive):
         self.archive = Path(archive)
 
-    def select_policy(self, source, context, expectation):
+    def select_policy(self, source, context, expectation, *, before_effect):
+        before_effect()
         receipt = PolicySelectionReceiptV3.from_bytes(self.archive.read_bytes())
-        self.verify_selection(receipt, source, context, expectation)
+        self.verify_selection(receipt, source, context, expectation, before_effect=before_effect)
         return receipt
 
-    def verify_selection(self, receipt, source, context, expectation):
+    def verify_selection(self, receipt, source, context, expectation, *, before_effect=None):
+        if before_effect is None: raise ValueError("external archive requires effect guard")
+        before_effect()
         approved = PolicySelectionReceiptV3.from_bytes(self.archive.read_bytes())
         if (receipt != approved or source != SOURCE or expectation != EXPECTED
                 or any(receipt.basis[key] != value for key, value in context.basis.items())):
@@ -247,7 +254,11 @@ class RealContinuationScenario:
             before_effect()
             return popen(*args, **kwargs)
         before_effect()
-        with patch.object(capture_module, "_popen", guarded_popen):
+        from functools import partial
+        from review_broker.packet_v2 import GuardedPacketGitReaderV3
+        with patch.object(capture_module, "_popen", guarded_popen), patch.object(
+                capture_module, "GitSourceReader",
+                partial(GuardedPacketGitReaderV3, before_effect=before_effect)):
             capture = capture_module.capture_authenticated_subject_v3(
                 scope, reader, self.inputs.source.authorize(scope.repository, scope.repository_id),
                 self.inputs.source.scope_observation.evidence_id, TOKEN,
@@ -266,6 +277,25 @@ class RealContinuationScenario:
             env={key: value for key, value in os.environ.items() if key != "PYTHONHOME"},
             timeout=90, check=True)
         return json.loads(process.stdout)
+
+
+def alternate_admission(scenario):
+    """Independently admit the same request under a different origin authorization."""
+    from review_broker.admission_v3 import admit_initial_inline_v3
+    from review_broker.github_requester_authority_v3 import GitHubRequesterAuthorityV3
+    from tests.request_v3_test_support import HistoryAuthority, origin
+    inputs = scenario.inputs
+    reader = origin(inputs.request, login="independently-observed-owner")
+    observed = reader.observe(51)
+    authority = GitHubRequesterAuthorityV3(
+        requester_id=observed.requester_id, broker_issue_id=observed.issue_id,
+        origin_evidence_id=observed.evidence_id, authorized=True)
+    return admit_initial_inline_v3(
+        reader, broker_issue_number=51, expected_broker_issue_id=6106789428,
+        expected_requester_id=30498238, requester_authority=authority,
+        pr_authority=inputs.pr_reader, source_authority=inputs.source,
+        history_authority=HistoryAuthority(), git_file_readers=inputs.git_readers,
+        issue_reference_readers=inputs.issue_readers)
 
 
 def cold_probe():
