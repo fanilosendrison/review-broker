@@ -1,13 +1,11 @@
 """Trusted Actions use case: reserve first, read authoritative state, then mint workload proof."""
 from dataclasses import asdict
 import hashlib
-import json
 import os
 from pathlib import Path
 import secrets
 from typing import Any, Mapping
-import urllib.parse
-import urllib.request
+from .github_oidc import request_identity
 
 from .arm_authority_contract import (
     ArmAuthorityError, TRUSTED_REF, WORKFLOW_PATH, envelope_audience, execution_metadata,
@@ -20,36 +18,12 @@ from .input_capacity import assess_packet_capacity
 from .queue import AttemptState
 
 # Any represents canonical JSON, validated before requesting issuer authority.
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *_args, **_kwargs):
-        raise ArmAuthorityError('ARM_TOKEN_REDIRECT_REFUSED')
-
-
 def actions_token(audience: str, environment: Mapping[str, str]) -> str:
     try:
-        url = environment['ACTIONS_ID_TOKEN_REQUEST_URL']
-        parsed = urllib.parse.urlsplit(url)
-        if (parsed.scheme != 'https' or parsed.hostname != 'pipelines.actions.githubusercontent.com'
-            or parsed.username or parsed.password or parsed.port not in {None, 443} or parsed.fragment):
-            raise ValueError
-        query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
-        if any(k == 'audience' for k, _ in query):
-            raise ValueError
-        query.append(('audience', audience))
-        target = urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(query)))
-        request = urllib.request.Request(target, headers={
-            'Authorization': 'Bearer ' + environment['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
-        with opener.open(request, timeout=15) as response:
-            raw = response.read(65_537)
-            if len(raw) > 65_536:
-                raise ValueError
-        token = json.loads(raw)['value']
-        if not isinstance(token, str) or not token or len(token) > 32_768:
-            raise ValueError
-        return token
-    except Exception as exc:
-        raise ArmAuthorityError('ARM_ACTIONS_OIDC_UNAVAILABLE') from exc
+        return request_identity(audience, environment,
+            allowed_host=lambda host: host == 'pipelines.actions.githubusercontent.com')
+    except Exception:
+        raise ArmAuthorityError('ARM_ACTIONS_OIDC_UNAVAILABLE') from None
 
 
 def arm_and_authorize(

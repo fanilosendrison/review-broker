@@ -9,14 +9,12 @@ from typing import Any
 from jsonschema import Draft202012Validator
 
 from .codex_policy import CodexPolicy
+from .github_oidc import DISCOVERY, ISSUER, JWKS  # Compatibility exports; one issuer policy.
 from .fileobservation import read_regular_file_bounded
 from .identity import attempt_identity, canonical_bytes
 from .input_capacity import validate_capacity_receipt
 
 # Any denotes JSON contract values, not executable objects; schema and bindings are checked.
-ISSUER = 'https://token.actions.githubusercontent.com'
-DISCOVERY = ISSUER + '/.well-known/openid-configuration'
-JWKS = ISSUER + '/.well-known/jwks'
 AUDIENCE_PREFIX = 'urn:review-broker:arm-authority:v1:sha256:'
 WORKFLOW_PATH = '.github/workflows/review-request.yml'
 TRUSTED_REF = 'refs/heads/dev'
