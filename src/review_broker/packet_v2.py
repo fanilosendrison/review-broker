@@ -33,7 +33,6 @@ from .packets import (
 from .physical import PhysicalLineError, decode_physical_lines
 from .request_v3 import request_identity_v3, validate_request_v3
 from .review_intent_v3 import review_intent_identity_v3
-
 class GuardedPacketGitReaderV3(GitSourceReader):
     def __init__(self, repository_root: Path, *, environment: Mapping[str, str], before_effect: Callable[[], None]):
         super().__init__(repository_root, environment=environment); self.before_effect = before_effect
@@ -207,6 +206,8 @@ def _packet_basis(manifest: Mapping[str, object]) -> dict[str, object]:
         "technical_policy", "program", "source_manifest_id", "program_id")}
 def _effect(verification: AuthorizedPolicyVerificationV3 | None) -> None:
     if verification is not None: verification.before_effect()
+def _inspect(verification, operation):
+    _effect(verification); return operation()
 def _exclusive(path: Path, data: bytes, verification: AuthorizedPolicyVerificationV3 | None = None) -> None:
     _effect(verification); path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     _effect(verification); descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -263,8 +264,8 @@ def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCa
     manifest.update(prompt_sha256=hashlib.sha256(prompt).hexdigest(),
                     prompt_byte_length=len(prompt))
     manifest = _validate_schema(manifest)
-    if output_directory.is_symlink() or (output_directory.exists()
-            and (not output_directory.is_dir() or any(output_directory.iterdir()))):
+    if _inspect(policy_verification, output_directory.is_symlink) or (_inspect(policy_verification, output_directory.exists)
+            and (not _inspect(policy_verification, output_directory.is_dir) or _inspect(policy_verification, lambda: tuple(output_directory.iterdir())))):
         _fail("PACKET_V2_OUTPUT_NOT_EMPTY")
     def guard() -> None:
         if policy_verification is not None: policy_verification.before_effect()
@@ -280,7 +281,7 @@ def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCa
         write(staging / "changes.patch", capture.diff)
         write(staging / "input.txt", prompt)
         write(staging / "input-manifest.json", canonical_bytes(manifest) + b"\n")
-        if output_directory.exists(): guard(); output_directory.rmdir()
+        if _inspect(policy_verification, output_directory.exists): guard(); output_directory.rmdir()
         guard(); os.replace(staging, output_directory)
     except BaseException:
         guard(); shutil.rmtree(staging, ignore_errors=True); raise
@@ -290,7 +291,7 @@ def _read_snapshot(directory: Path, entry: Mapping[str, object], *, git: bool, p
     if entry.get("snapshot") != expected or Path(expected).is_absolute() or ".." in Path(expected).parts:
         _fail("PACKET_V2_SNAPSHOT_PATH_INVALID")
     path = directory / expected
-    if path.is_symlink() or not path.is_file(): _fail("PACKET_V2_SNAPSHOT_INVALID")
+    if _inspect(policy_verification, path.is_symlink) or not _inspect(policy_verification, path.is_file): _fail("PACKET_V2_SNAPSHOT_INVALID")
     _effect(policy_verification); data = path.read_bytes()
     if len(data) != entry["original_byte_length"] or hashlib.sha256(data).hexdigest() != entry["sha256"]:
         _fail("PACKET_V2_SOURCE_BYTES_MISMATCH")
@@ -314,20 +315,20 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
         _effect(policy_verification); return path.read_bytes()
     read_snapshot = partial(_read_snapshot, policy_verification=policy_verification)
     manifest_path, prompt_path = output_directory / "input-manifest.json", output_directory / "input.txt"
-    if (output_directory.is_symlink() or (output_directory / "sources").is_symlink()
-            or manifest_path.is_symlink() or prompt_path.is_symlink()):
+    if (_inspect(policy_verification, output_directory.is_symlink) or _inspect(policy_verification, (output_directory / "sources").is_symlink)
+            or _inspect(policy_verification, manifest_path.is_symlink) or _inspect(policy_verification, prompt_path.is_symlink)):
         _fail("PACKET_V2_ARTIFACT_SYMLINK_FORBIDDEN")
     try: raw = read(manifest_path); manifest = json.loads(raw)
     except (OSError, json.JSONDecodeError) as exc: _fail("PACKET_V2_MANIFEST_INVALID", exc)
     if raw != canonical_bytes(manifest) + b"\n": _fail("PACKET_V2_MANIFEST_NONCANONICAL")
     manifest = _validate_schema(manifest)
     if policy_verification is not None and manifest["technical_policy"]["qualification"] != "PREMODEL_POLICY_SOURCE_VERIFIED_ONLY": _fail("AUTHORIZED_POLICY_MODE_REQUIRED")
-    if {item.name for item in output_directory.iterdir()} != {
+    if {item.name for item in _inspect(policy_verification, lambda: tuple(output_directory.iterdir()))} != {
         "input-manifest.json", "input.txt", "changes.patch", "sources"}:
         _fail("PACKET_V2_ARTIFACT_INVENTORY_INVALID")
     expected_snapshots = {entry["snapshot"].split("/")[1] for entry in
                           manifest["subject_sources"] + manifest["reference_sources"]}
-    if {item.name for item in (output_directory / "sources").iterdir()} != expected_snapshots:
+    if {item.name for item in _inspect(policy_verification, lambda: tuple((output_directory / "sources").iterdir()))} != expected_snapshots:
         _fail("PACKET_V2_SOURCE_INVENTORY_INVALID")
     request, _ = _admission(admission); _validate_capture(
         capture, admission, request, prove_local_git=False)
@@ -379,7 +380,7 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
         merge_base=capture.merge_base_sha, head=capture.head_sha)
     except ChangeScopeError as exc: _fail(str(exc), exc)
     diff_path = output_directory / "changes.patch"
-    if diff_path.is_symlink() or not diff_path.is_file() or read(diff_path) != capture.diff:
+    if _inspect(policy_verification, diff_path.is_symlink) or not _inspect(policy_verification, diff_path.is_file) or read(diff_path) != capture.diff:
         _fail("PACKET_V2_DIFF_MISMATCH")
     source_manifest = {key: manifest[key] for key in (
         "subject_sources", "reference_sources", "reference_outcomes")}

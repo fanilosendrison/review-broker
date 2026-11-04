@@ -19,6 +19,7 @@ from .packet_v2_technical_policy import AuthorizedPolicySnapshotV3, AuthorizedPo
 from .pre_model_policy_evidence_retention_v3 import (
  POLICY_EVIDENCE_NAMES, load_policy_evidence_v3, persist_policy_evidence_v3,
  require_private_policy_tree_v3, rename_exclusive_policy_tree_v3,
+ observe_path_v3, policy_tree_paths_v3,
 )
 from .packet_v2_subject_provenance import (SubjectCaptureProvenanceV2Error,
                                          validate_capture_provenance_v2)
@@ -40,10 +41,11 @@ def _exclusive(path:Path,data:bytes,before_effect=None)->None:
   if before_effect is not None: before_effect()
   os.fsync(stream.fileno())
 def _private_tree(root:Path,before_effect=None)->None:
- for path in [root,*root.rglob("*")]:
-  if path.is_symlink(): raise PacketRetentionV3Error("RETAINED_SYMLINK_FORBIDDEN")
+ for path in policy_tree_paths_v3(root,before_effect):
+  if observe_path_v3(path.is_symlink,before_effect): raise PacketRetentionV3Error("RETAINED_SYMLINK_FORBIDDEN")
+  mode=0o700 if observe_path_v3(path.is_dir,before_effect) else 0o600
   if before_effect is not None: before_effect()
-  os.chmod(path,0o700 if path.is_dir() else 0o600)
+  os.chmod(path,mode)
 def persist_packet_evidence_v3(admission:PreclaimAdmissionV3,capture:SubjectCaptureV2,
  profile:PolicySnapshotV2,retention_base:Path,snapshot:VerifiedJournalSnapshotV3,
  journal:GitHubJournalV3,issue_reference_readers:Mapping|None=None,*,
@@ -67,17 +69,18 @@ def persist_packet_evidence_v3(admission:PreclaimAdmissionV3,capture:SubjectCapt
   guard();_exclusive(path,data,guard if authorized else None);guard()
  guard()
  retention_root=packet_retention_locator_v3(retention_base,snapshot.claim_ref)
- if retention_base.is_symlink() or retention_root.is_symlink() or retention_root.exists(): raise PacketRetentionV3Error("RETENTION_TARGET_EXISTS")
+ def inspect(operation): return observe_path_v3(operation,guard if authorized else None)
+ if inspect(retention_base.is_symlink) or inspect(retention_root.is_symlink) or inspect(retention_root.exists): raise PacketRetentionV3Error("RETENTION_TARGET_EXISTS")
  guard();retention_base.mkdir(mode=0o700,parents=True,exist_ok=True)
  guard();os.chmod(retention_base,0o700)
  guard();staging=Path(tempfile.mkdtemp(prefix=".retained-v3-",dir=retention_base))
  try:
   if authorized:
    if candidate_directory is None: raise PacketRetentionV3Error("RETENTION_VERIFIED_CANDIDATE_REQUIRED")
-   require_private_policy_tree_v3(candidate_directory)
+   require_private_policy_tree_v3(candidate_directory,guard)
    manifest=verify_packet_v2_candidate(candidate_directory,admission,capture,profile,policy_verification=policy_verification)
-   for path in sorted(candidate_directory.rglob("*")):
-    if path.is_file():
+   for path in sorted(list(policy_tree_paths_v3(candidate_directory,guard))[1:]):
+    if inspect(path.is_file):
      guard();data=path.read_bytes()
      write(staging/"packet"/path.relative_to(candidate_directory),data)
   else:
@@ -104,7 +107,8 @@ def persist_packet_evidence_v3(admission:PreclaimAdmissionV3,capture:SubjectCapt
   guard();shutil.rmtree(staging,ignore_errors=True);raise
 
 def _read_private(path:Path,verification=None)->bytes:
- if (path.is_symlink() or not path.is_file() or path.stat().st_mode & 0o077):
+ def inspect(operation): return observe_path_v3(operation,None if verification is None else verification.before_effect)
+ if (inspect(path.is_symlink) or not inspect(path.is_file) or inspect(path.stat).st_mode & 0o077):
   raise PacketRetentionV3Error("RETAINED_FILE_INVALID")
  if verification is not None: verification.before_effect()
  return path.read_bytes()
@@ -127,10 +131,13 @@ def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,ob
  """Cold-reconstruct verifier inputs from journal authority and retained bytes only."""
  if policy_verification is not None: policy_verification.require_admission(journal_admission)
  def read(path): return _read_private(path,policy_verification)
+ guard=None if policy_verification is None else policy_verification.before_effect
+ def inspect(operation): return observe_path_v3(operation,guard)
+ def entries(path): return inspect(lambda: tuple(path.iterdir()))
  packet,evidence=retention_root/"packet",retention_root/"evidence"
- if retention_root.is_symlink() or packet.is_symlink() or evidence.is_symlink(): raise PacketRetentionV3Error("RETAINED_SYMLINK_FORBIDDEN")
- if ({item.name for item in retention_root.iterdir()}!={"packet","evidence"}
-  or retention_root.stat().st_mode&0o077 or packet.stat().st_mode&0o077 or evidence.stat().st_mode&0o077):
+ if inspect(retention_root.is_symlink) or inspect(packet.is_symlink) or inspect(evidence.is_symlink): raise PacketRetentionV3Error("RETAINED_SYMLINK_FORBIDDEN")
+ if ({item.name for item in entries(retention_root)}!={"packet","evidence"}
+  or inspect(retention_root.stat).st_mode&0o077 or inspect(packet.stat).st_mode&0o077 or inspect(evidence.stat).st_mode&0o077):
   raise PacketRetentionV3Error("RETAINED_ROOT_INVENTORY_INVALID")
  origin=read(evidence/"origin-body.bin");validated=validate_journal_admission_v3(journal_admission,origin)
  try: manifest=json.loads(read(packet/"input-manifest.json"))
@@ -140,13 +147,13 @@ def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,ob
  if policy_verification is not None and not authorized: raise PacketRetentionV3Error("AUTHORIZED_POLICY_MODE_REQUIRED")
  expected={"origin-body.bin","technical-profile.bin","admitted-references"}
  if authorized:
-  require_private_policy_tree_v3(retention_root)
+  require_private_policy_tree_v3(retention_root,guard)
   expected={"origin-body.bin","admitted-references"}|POLICY_EVIDENCE_NAMES
-  if {item.name for item in evidence.iterdir()}!=expected: raise PacketRetentionV3Error("RETAINED_POLICY_INVENTORY_INVALID")
- elif {item.name for item in evidence.iterdir()}-({"preparation-receipt.json"}|expected): raise PacketRetentionV3Error("RETAINED_EVIDENCE_INVENTORY_INVALID")
+  if {item.name for item in entries(evidence)}!=expected: raise PacketRetentionV3Error("RETAINED_POLICY_INVENTORY_INVALID")
+ elif {item.name for item in entries(evidence)}-({"preparation-receipt.json"}|expected): raise PacketRetentionV3Error("RETAINED_EVIDENCE_INVENTORY_INVALID")
  admitted_dir=evidence/"admitted-references";expected_files={f"{key}.bin" for key in refs}
- if (admitted_dir.is_symlink() or not admitted_dir.is_dir() or admitted_dir.stat().st_mode&0o077
-  or {item.name for item in admitted_dir.iterdir()}!=expected_files):
+ if (inspect(admitted_dir.is_symlink) or not inspect(admitted_dir.is_dir) or inspect(admitted_dir.stat).st_mode&0o077
+  or {item.name for item in entries(admitted_dir)}!=expected_files):
   raise PacketRetentionV3Error("RETAINED_REFERENCE_INVENTORY_INVALID")
  git_meta=iter(validated.get("reference_admissions",[]));issue_meta=iter(validated.get("issue_reference_admissions",[]));git=[];issues=[]
  for identifier,reference in refs.items():

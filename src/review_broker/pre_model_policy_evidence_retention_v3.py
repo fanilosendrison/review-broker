@@ -10,7 +10,6 @@ from typing import Callable
 
 from .admission_v3 import PreclaimAdmissionV3
 from .github_journal_transport_v3 import VerifiedJournalSnapshotV3
-from .packet_v2 import build_packet_v2_candidate, verify_packet_v2_candidate
 from .packet_v2_subject import SubjectCaptureV2
 from .packet_v2_technical_policy import (
     AuthorizedPolicySnapshotV3, AuthorizedPolicyVerificationV3, PacketV2CandidateError,
@@ -81,10 +80,31 @@ def rename_exclusive_policy_tree_v3(staging: Path, destination: Path, *,
         raise OSError(error, os.strerror(error), str(destination))
 
 
-def require_private_policy_tree_v3(root: Path) -> None:
-    for path in (root, *root.rglob("*")):
-        if (path.is_symlink() or not (path.is_file() or path.is_dir())
-                or path.stat().st_mode & 0o077):
+def observe_path_v3(operation, before_effect=None):
+    """One filesystem observation; absent guard is only the legacy synthetic path."""
+    if before_effect is not None: before_effect()
+    return operation()
+
+
+def policy_tree_paths_v3(root: Path, before_effect=None):
+    """Walk without symlink traversal, guarding each directory enumeration."""
+    yield root
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        for path in observe_path_v3(lambda: tuple(directory.iterdir()), before_effect):
+            yield path
+            if (not observe_path_v3(path.is_symlink, before_effect)
+                    and observe_path_v3(path.is_dir, before_effect)):
+                pending.append(path)
+
+
+def require_private_policy_tree_v3(root: Path, before_effect=None) -> None:
+    for path in policy_tree_paths_v3(root, before_effect):
+        if (observe_path_v3(path.is_symlink, before_effect)
+                or not (observe_path_v3(path.is_file, before_effect)
+                        or observe_path_v3(path.is_dir, before_effect))
+                or observe_path_v3(path.stat, before_effect).st_mode & 0o077):
             raise PacketV2CandidateError("RETAINED_AUTHORIZED_TREE_NOT_PRIVATE_REGULAR")
 
 
@@ -97,7 +117,7 @@ class LocalAuthorizedPacketStagesV3:
 
     def __init__(self, *, candidate_directory: Path, retention_base: Path,
                  verification: Callable[[], AuthorizedPolicyVerificationV3],
-                 cold_verifier: Callable[[Path, VerifiedJournalSnapshotV3], dict[str, object]]):
+                 cold_verifier: Callable[[Path, VerifiedJournalSnapshotV3, Callable[[], None]], dict[str, object]]):
         self.candidate_directory, self.retention_base = candidate_directory, retention_base
         self.verification_factory, self.cold_verifier = verification, cold_verifier
         self._inputs = None
@@ -110,6 +130,7 @@ class LocalAuthorizedPacketStagesV3:
         verification = replace(verification, effect_guard=before_effect)
         if verification.selection_context(admission.request) != selection_context:
             raise PacketV2CandidateError("PACKET_STAGE_SELECTION_CONTEXT_MISMATCH")
+        from .packet_v2 import build_packet_v2_candidate
         build_packet_v2_candidate(admission, capture, profile, self.candidate_directory,
                                   readers, policy_verification=verification)
         self._inputs = admission, capture, profile, verification, readers
@@ -118,6 +139,7 @@ class LocalAuthorizedPacketStagesV3:
     def verify(self, candidate, before_effect):
         before_effect()
         admission, capture, profile, verification, _ = self._require_inputs(candidate)
+        from .packet_v2 import verify_packet_v2_candidate
         return verify_packet_v2_candidate(candidate, admission, capture, profile,
                                            policy_verification=verification)
 
@@ -134,7 +156,7 @@ class LocalAuthorizedPacketStagesV3:
 
     def cold_verify(self, retained, snapshot, before_effect):
         before_effect()
-        return self.cold_verifier(retained, snapshot)
+        return self.cold_verifier(retained, snapshot, before_effect)
 
     def _require_inputs(self, candidate):
         if self._inputs is None or candidate != self.candidate_directory:
