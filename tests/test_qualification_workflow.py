@@ -146,7 +146,7 @@ class QualificationWorkflowTests(unittest.TestCase):
         self.assertEqual(self.workflow['on']['issues'],baseline['on']['issues'])
 
     def test_isolated_qualification_import_graph_has_no_mutating_or_model_capable_modules(self):
-        allowed={'oidc_qualification','github_oidc','identity'}
+        allowed={'oidc_qualification','github_oidc','identity','oidc_subject'}
         for module in allowed:
             tree=ast.parse((ROOT/'src/review_broker'/f'{module}.py').read_text())
             for node in ast.walk(tree):
