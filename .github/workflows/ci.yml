@@ -32,11 +32,34 @@ jobs:
           test "$(git -C "$CANDIDATE" rev-parse 'HEAD^{tree}')" = \
             "420a18d006e421e197d23b8e93681376fbabc2db"
           test "$(git -C "$CANDIDATE" rev-parse --abbrev-ref HEAD)" = "HEAD"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: f3f24d942ad13d368975843f4796b1943dc7cdcb
+          path: artifacts/issue83-baseline-workflow
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify exact Issue83 historical workflow fixture
+        run: |
+          set -euo pipefail
+          CANDIDATE="artifacts/issue83-baseline-workflow"
+          WORKFLOW=".github/workflows/review-request.yml"
+          test "$(git -C "$CANDIDATE" rev-parse HEAD)" = \
+            "f3f24d942ad13d368975843f4796b1943dc7cdcb"
+          test "$(git -C "$CANDIDATE" rev-parse 'HEAD^{tree}')" = \
+            "acc12a1ee8ef01166ac44fe184d575585d6a0956"
+          test "$(git -C "$CANDIDATE" rev-parse --abbrev-ref HEAD)" = "HEAD"
+          test -f "$CANDIDATE/$WORKFLOW"
+          test ! -L "$CANDIDATE/$WORKFLOW"
+          test "$(git -C "$CANDIDATE" rev-parse "HEAD:$WORKFLOW")" = \
+            "806f543b04aa53c0aaa1f69d216f36dbe9460150"
+          test "$(git -C "$CANDIDATE" hash-object --no-filters "$WORKFLOW")" = \
+            "806f543b04aa53c0aaa1f69d216f36dbe9460150"
       - name: Install
-        run: python -m pip install .
+        run: python -m pip install '.[test]'
       - name: Unit and adversarial tests
         env:
           REVIEW_BROKER_PR72_TEST_CHECKOUT: ${{ github.workspace }}/artifacts/pr72-test-checkout
+          REVIEW_BROKER_ISSUE83_BASELINE_WORKFLOW_CHECKOUT: ${{ github.workspace }}/artifacts/issue83-baseline-workflow
         run: python -m unittest discover -s tests -v
       - name: Compile package
         run: python -m compileall -q src

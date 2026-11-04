@@ -5,6 +5,8 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
+from .added_rendering import ADDED_IMAGES_V1, AddedRenderingError, added_image_modes, render_added_scope
+
 
 class ChangeScopeError(ValueError):
     """A PR change cannot be matched to its immutable source images."""
@@ -58,11 +60,29 @@ def validate_change_scope(
 
 def build_change_basis(
     changes: list[dict[str, Any]], sources: list[dict[str, Any]],
-    *, merge_base: str, head: str, diff: bytes,
+    *, merge_base: str, head: str, diff: bytes, rendering_format: str | None = None,
+    image_directory: Path | None = None, added_file_modes: dict[str, str] | None = None,
 ) -> tuple[dict[str, Any], str]:
     validate_change_scope(changes, sources, merge_base=merge_base, head=head)
-    text = render_change_scope(changes, diff)
+    extra: dict[str, Any] = {}
+    if rendering_format is None:
+        if added_file_modes is not None:
+            raise ChangeScopeError("CHANGE_RENDERING_FORMAT_INVALID")
+        text = render_change_scope(changes, diff)
+    elif rendering_format == ADDED_IMAGES_V1:
+        try:
+            if image_directory is None or added_file_modes is None:
+                raise AddedRenderingError("ADDED_IMAGE_MODES_REQUIRED")
+            modes = added_image_modes(changes, sources, head=head, diff=diff,
+                                      directory=image_directory, modes=added_file_modes)
+        except AddedRenderingError as exc:
+            raise ChangeScopeError(str(exc)) from exc
+        extra = {"rendering_format": ADDED_IMAGES_V1, "added_file_modes": modes}
+        text = render_added_scope(changes, diff, modes)
+    else:
+        raise ChangeScopeError("CHANGE_RENDERING_FORMAT_UNSUPPORTED")
     return ({
+        **extra,
         "changes": changes,
         "merge_base": merge_base,
         "head": head,
@@ -79,7 +99,12 @@ def verify_change_basis(
         basis, text = build_change_basis(
             manifest["changes"], sources, merge_base=manifest["merge_base"],
             head=manifest["head"], diff=diff,
+            rendering_format=manifest.get("rendering_format"), image_directory=directory,
+            added_file_modes=manifest.get("added_file_modes"),
         )
+        if ("rendering_format" in manifest and manifest["rendering_format"] is None
+            or "rendering_format" not in manifest and "added_file_modes" in manifest):
+            raise ChangeScopeError("CHANGE_RENDERING_FORMAT_INVALID")
         if any(manifest.get(key) != value for key, value in basis.items()):
             raise ChangeScopeError("CHANGE_DIFF_IDENTITY_MISMATCH")
     except (OSError, KeyError, TypeError, ValueError) as exc:

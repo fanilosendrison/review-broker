@@ -4,14 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "review-broker"
-version = "0.5.0"
+version = "0.7.0"
 description = "Evidence-bound independent review broker"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "jsonschema==4.26.0",
   "rfc8785==0.1.4",
+  "PyJWT[crypto]==2.15.1",
 ]
+
+[project.optional-dependencies]
+test = ["PyYAML==6.0.3"]
 
 [project.scripts]
 reviewctl = "review_broker.cli:main"

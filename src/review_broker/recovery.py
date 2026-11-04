@@ -4,10 +4,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from .queue import AttemptRecord, AttemptState
+from .queue import AttemptRecord, AttemptState, has_capacity_rejection
 
 
 class PreparationRecoveryAction(str, Enum):
+    BLOCKED_INPUT_CAPACITY = "BLOCKED_INPUT_CAPACITY"
     ADMIT_AND_BUILD = "ADMIT_AND_BUILD"
     BUILD_FROM_ADMITTED = "BUILD_FROM_ADMITTED"
     REBUILD_PREPARED = "REBUILD_PREPARED"
@@ -15,6 +16,7 @@ class PreparationRecoveryAction(str, Enum):
 
 
 class RecoveryAction(str, Enum):
+    BLOCKED_INPUT_CAPACITY = "BLOCKED_INPUT_CAPACITY"
     NONE = "NONE"
     RESUME_PRE_MODEL = "RESUME_PRE_MODEL"
     MARK_INDETERMINATE_AND_STOP = "MARK_INDETERMINATE_AND_STOP"
@@ -35,6 +37,8 @@ def decide_preparation_recovery(
     record: AttemptRecord,
     admission_evidence_id: str,
 ) -> PreparationRecoveryAction:
+    if has_capacity_rejection(record):
+        return PreparationRecoveryAction.BLOCKED_INPUT_CAPACITY
     if record.state is AttemptState.REQUESTED:
         return PreparationRecoveryAction.ADMIT_AND_BUILD
     if record.state in {AttemptState.ADMITTED, AttemptState.PREPARED}:
@@ -55,6 +59,9 @@ def verify_rebuilt_packet(record: AttemptRecord, packet_evidence_id: str) -> Non
 
 
 def decide_recovery(record: AttemptRecord, *, codespace_state: str) -> RecoveryDecision:
+    if has_capacity_rejection(record):
+        return RecoveryDecision(RecoveryAction.BLOCKED_INPUT_CAPACITY,
+                                "INPUT_CAPACITY_REJECTED: retained pre-model evidence; no automatic dispatch.")
     state = record.state
     if state in {AttemptState.REQUESTED, AttemptState.ADMITTED, AttemptState.PREPARED}:
         return RecoveryDecision(

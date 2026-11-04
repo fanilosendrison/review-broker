@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 from dataclasses import replace
 import json
+import secrets
 import subprocess
 from typing import Any, Callable, Mapping
 
@@ -12,39 +13,20 @@ from .artifact_locator import (
     validate_evidence_artifact_plan,
 )
 from .identity import attempt_identity, canonical_bytes
+from .github_contents import decode_github_contents_base64 as _decode_github_contents_base64
 from .publication import validate_publication_intent, validate_publication_receipt
 from .queue import (
     AttemptRecord,
     AttemptState,
     StateTransitionError,
     record_publication_transition,
+    record_capacity_assessment,
     record_shutdown_transition,
     record_terminal_capture_transition,
     transition_record,
 )
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
-_BASE64_ALPHABET = frozenset(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
-_BASE64_WHITESPACE = frozenset(b" \t\r\n")
-
-
-def _decode_github_contents_base64(encoded: str) -> bytes:
-    """Strictly decode standard Base64 with GitHub's ASCII line formatting."""
-    if not isinstance(encoded, str):
-        raise ValueError("GITHUB_CONTENT_BASE64_INVALID")
-    try:
-        formatted = encoded.encode("ascii")
-    except UnicodeEncodeError as exc:
-        raise ValueError("GITHUB_CONTENT_BASE64_INVALID") from exc
-    compact = bytes(value for value in formatted if value not in _BASE64_WHITESPACE)
-    if any(value not in _BASE64_ALPHABET for value in compact):
-        raise ValueError("GITHUB_CONTENT_BASE64_INVALID")
-    raw = base64.b64decode(compact, validate=True)
-    if base64.b64encode(raw) != compact:
-        raise ValueError("GITHUB_CONTENT_BASE64_NONCANONICAL")
-    return raw
-
-
 class GitHubRefJournal:
     """Git-ref-backed journal using create-ref and fast-forward as atomic operations."""
 
@@ -72,14 +54,13 @@ class GitHubRefJournal:
         )
         base_sha = self._ref_sha(f"heads/{self.base_branch}")
         commit_sha = self._state_commit(base_sha, record)
-        result = self._api(
+        self._api(
             "POST",
             f"repos/{self.repository}/git/refs",
             {"ref": self._claim_ref(request_id), "sha": commit_sha},
             check=False,
         )
-        if result.returncode == 0:
-            return record
+        # Ref creation, like updates, requires an independently observed outcome.
         winner = self._read(request_id)
         if winner is None:
             raise StateTransitionError("ATOMIC_CLAIM_FAILED")
@@ -92,6 +73,12 @@ class GitHubRefJournal:
         if found is None:
             raise KeyError(request_id)
         return found[1]
+
+    def get_snapshot(self, request_id: str) -> tuple[str, AttemptRecord]:
+        found = self._read(request_id)
+        if found is None:
+            raise KeyError(request_id)
+        return found
 
     def transition(
         self,
@@ -106,6 +93,11 @@ class GitHubRefJournal:
         updated = transition_record(current, target, evidence_ids)
         self._compare_and_swap(request_id, current_sha, updated)
         return updated
+
+    def record_capacity(self, request_id: str, receipt: Mapping[str, Any]) -> AttemptRecord:
+        return self._record_verified_transition(
+            request_id, lambda current: record_capacity_assessment(current, receipt),
+        )
 
     def record_terminal_capture(
         self,
@@ -296,6 +288,9 @@ class GitHubRefJournal:
         )
         if result.returncode != 0:
             raise StateTransitionError("STATE_COMPARE_AND_SWAP_FAILED")
+        observed = self._read(request_id)
+        if observed is None or observed[0] != commit_sha or observed[1] != updated:
+            raise StateTransitionError("STATE_COMPARE_AND_SWAP_NOT_OBSERVED")
 
     def _read(self, request_id: str) -> tuple[str, AttemptRecord] | None:
         ref = self._api(
@@ -359,7 +354,8 @@ class GitHubRefJournal:
         commit = json.loads(self._api(
             "POST",
             f"repos/{self.repository}/git/commits",
-            {"message": f"state: {record.state.value} {record.attempt_id}", "tree": tree, "parents": [parent_sha]},
+            {"message": f"state: {record.state.value} {record.attempt_id}\n\ntransaction: {secrets.token_hex(32)}",
+             "tree": tree, "parents": [parent_sha]},
         ).stdout)
         return commit["sha"]
 

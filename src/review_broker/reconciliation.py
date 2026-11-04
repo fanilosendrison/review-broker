@@ -322,6 +322,9 @@ def _execute_recovery_decision(
         entry["shutdown_observation"] = receipt
         entry["final_state"] = stopped.state.value
         entry["outcome"] = "STOPPED"
+    elif decision.action is RecoveryAction.BLOCKED_INPUT_CAPACITY:
+        entry["outcome"] = "BLOCKED"
+        entry["input_capacity"] = record.input_capacity
     elif decision.action is RecoveryAction.BLOCKED_EVIDENCE_LOCATION:
         entry["outcome"] = "BLOCKED"
     elif decision.action is RecoveryAction.INFRASTRUCTURE_INCIDENT:

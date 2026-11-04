@@ -39,7 +39,10 @@ class PrearmWorkflowCleanupTests(unittest.TestCase):
     def test_physical_shutdown_still_runs_after_started_prearm_failure(self):
         step = workflow_step("Stop and independently observe Shutdown")
         self.assertIn("always()", step)
-        self.assertIn("steps.start.outcome != 'skipped'", step)
+        self.assertIn("steps.start.outputs.start_requested == 'true'", step)
+        start = workflow_step("Start and observe dedicated Codespace")
+        self.assertLess(start.index('capture_recipient('), start.index('start_requested=true'))
+        self.assertLess(start.index('start_requested=true'), start.index('gh api --method POST'))
         self.assertIn("internal-stop-codespace", step)
 
     def test_stopped_transition_requires_a_legal_workflow_predecessor(self):

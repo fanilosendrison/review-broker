@@ -5,7 +5,7 @@ asset_type: "readme"
 domain: "independent-review"
 severity: "guideline"
 name: "Review Broker"
-version: "0.1.0"
+version: "0.3.0"
 ---
 
 # Review Broker
@@ -23,6 +23,12 @@ reviewer profile passes a producer-run non-secret isolation probe. Independent
 security and construction reviews, a dedicated Codespaces-control credential,
 and live execution qualification remain incomplete. Automatic workflows fail
 closed until external security evidence is registered.
+
+The 0.7.0 construction adds [OIDC-bound arm authority](docs/contracts/oidc-arm-authority.md).
+Offline signature, reservation and consumption tests do not qualify live Actions
+OIDC or the dedicated Codespace's protected persistent substrate. Operational
+invocation now requires the authenticated grant; old evidence validation does
+not grant new historical execution. No production activation is implied.
 
 ## Install the requester CLI
 
@@ -65,12 +71,32 @@ The broker never merges a pull request, changes reviewed material, retries an
 indeterminate model attempt automatically, substitutes a model, or grants
 normative authority to a review result.
 
+## Added-file rendering and input capacity
+
+The 0.6.0 construction candidate adds an explicitly versioned, non-duplicating
+presentation for complete additions-only PRs. Every source image remains intact
+and line-addressed; the original full diff remains in `changes.patch` with its
+exact identity. Mixed or other canonical change kinds keep legacy presentation.
+Old packet identities and reviewer/request contracts remain unchanged.
+
+A pinned Codex 0.164.0 capacity check records Unicode scalar characters, UTF-16
+units, UTF-8 bytes and the exact input hash before lifecycle and final armament.
+The conservative UTF-8 upper bound rejects oversized input before a reviewer
+invocation is reserved. Such a rejection stays PREPARED, distinct from an
+ARMED execution becoming INDETERMINATE. This does not enable admission or
+qualify a provider/model. See the
+[implementation contract](docs/contracts/added-source-rendering-capacity.md) and
+[offline qualification](docs/qualification/issue83-offline-capacity.md).
+
 ## Development
 
 ```bash
 python -m pip install .
-python -m unittest discover -s tests -v
+REVIEW_BROKER_PR72_TEST_CHECKOUT="<absolute-detached-fixture>" \
+  python -m unittest discover -s tests -v
 python -m compileall -q src
 ```
 
+The complete suite requires the exact detached PR #72 Git fixture declared in
+[CI](.github/workflows/ci.yml); a missing or wrong fixture fails closed.
 Tests use synthetic transports and do not consume ChatGPT quota by default.
