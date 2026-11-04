@@ -77,9 +77,13 @@ class IdentityDeliveryWorkflowTests(unittest.TestCase):
                 finally:os.chdir(previous)
                 self.assertEqual(len(transports),1 if scenario=='valid' else 0,'Unauthorized SSH/model transport forbidden')
 
-    def test_existing_event_guard_is_unchanged(self):
+    def test_existing_event_guard_remains_with_explicit_qualification_separation(self):
         text=(Path(__file__).parents[1]/'.github/workflows/review-request.yml').read_text()
         self.assertIn("github.ref == format('refs/heads/{0}', github.event.repository.default_branch)",text)
         for marker in ['workflow_dispatch','<!-- review-broker-request:v1 -->','<!-- review-broker-request:v2 -->']:
             self.assertIn(marker,text)
-        self.assertNotIn('qualification_only',text)
+        review=text.split('\n  review:\n',1)[1]
+        self.assertIn("github.event_name != 'workflow_dispatch' || inputs.qualification_only != true",review)
+        qualification=text.split('\n  qualification:\n',1)[1].split('\n  review:\n',1)[0]
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.qualification_only == true",qualification)
+        self.assertNotIn('REVIEW_BROKER_CODESPACE_TOKEN',qualification)

@@ -49,7 +49,8 @@ class ArmAuthorityTests(unittest.TestCase):
 
     def test_signature_and_claim_failures_cannot_consume(self):
         other = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        variants = [{'iss': 'https://attacker.invalid'}, {'aud': 'wrong'}, {'exp': 1},
+        variants = [{'iss': 'https://attacker.invalid'}, {'aud': 'wrong'},
+                    {'aud': 'urn:review-broker:qualification:v1:sha256:' + 'a'*64}, {'exp': 1},
                     {'nbf': 9999999999}, {'iat': 9999999999}, {'run_id': '12'},
                     {'run_attempt': '2'}, {'workflow_sha': 'f' * 40}, {'repository_id': '99'},
                     {'workflow_ref': 'sample/broker/.github/workflows/ci.yml@refs/heads/dev'},
@@ -61,6 +62,7 @@ class ArmAuthorityTests(unittest.TestCase):
                 with self.assertRaises(ArmAuthorityError):
                     self.authorize(bundle)
         for header, key in [({'kid': 'unknown'}, None),
+                            ({'kid': 'offline-fixture', 'x5t': 'a'*27}, None),
                             ({'kid': 'offline-fixture', 'jku': 'https://attacker.invalid'}, None),
                             ({'kid': 'offline-fixture'}, other)]:
             with self.subTest(header=header), auth.trusted_fixture(self.trust):
