@@ -33,9 +33,10 @@ def persist_policy_evidence_v3(root: Path, profile: AuthorizedPolicySnapshotV3,
     ):
         verification.before_effect()
         descriptor = os.open(root / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(descriptor, "wb") as stream:
+        with os.fdopen(descriptor, "wb", buffering=0) as stream:
+            verification.before_effect()
             stream.write(data)
-            stream.flush()
+            verification.before_effect()
             os.fsync(stream.fileno())
         verification.before_effect()
 
@@ -45,17 +46,22 @@ def load_policy_evidence_v3(root: Path,
                             admission: PreclaimAdmissionV3) -> AuthorizedPolicySnapshotV3:
     if type(verification) is not AuthorizedPolicyVerificationV3:
         raise PacketV2CandidateError("RETAINED_POLICY_INDEPENDENT_AUTHORITY_REQUIRED")
+    verification.require_admission(admission.journal_admission())
     # The containing retained tree is checked before any file is interpreted.
+    def read(name):
+        verification.before_effect()
+        return (root / name).read_bytes()
     profile = AuthorizedPolicySnapshotV3(
-        (root / "expected-policy.bin").read_bytes(),
-        PolicySourceObservationV3.from_bytes((root / "policy-source-observation.json").read_bytes()),
-        PolicySelectionReceiptV3.from_bytes((root / "policy-selection-receipt.json").read_bytes()),
+        read("expected-policy.bin"),
+        PolicySourceObservationV3.from_bytes(read("policy-source-observation.json")),
+        PolicySelectionReceiptV3.from_bytes(read("policy-selection-receipt.json")),
     )
-    verification.verify(profile, admission.request)
+    verification.verify(profile, admission)
     return profile
 
 
-def rename_exclusive_policy_tree_v3(staging: Path, destination: Path) -> None:
+def rename_exclusive_policy_tree_v3(staging: Path, destination: Path, *,
+                                    before_effect: Callable[[], None]) -> None:
     """Native atomic directory rename with no replacement, on macOS and Linux."""
     library = ctypes.CDLL(None, use_errno=True)
     if sys.platform == "darwin":
@@ -68,6 +74,7 @@ def rename_exclusive_policy_tree_v3(staging: Path, destination: Path) -> None:
     operation.restype = ctypes.c_int
     # Absolute names make AT_FDCWD irrelevant; Darwin and Linux use different values.
     cwd = -2 if sys.platform == "darwin" else -100
+    before_effect()
     if operation(cwd, os.fsencode(staging.absolute()), cwd,
                  os.fsencode(destination.absolute()), flags) != 0:
         error = ctypes.get_errno()

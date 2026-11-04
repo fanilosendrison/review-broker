@@ -19,6 +19,7 @@ from .issue_reference_preparation_v3 import prepare_ordered_remote_observations_
 from .journal_record_v3 import encode_journal_v2
 from .packet_v2_subject import SubjectCaptureV2
 from .packet_v2 import validate_subject_capture_v2
+from .packet_v2_technical_policy import AuthorizedPolicyVerificationV3
 from .packet_v2_reference import build_reference_entries_v2
 from .pre_model_control_v3 import transition_state
 from .pre_model_current_worker_v3 import CurrentBoundWorkerAuthorityV3
@@ -152,16 +153,21 @@ class PreModelPacketContinuationV3:
             before_effect()
             capture = self.capture_provider.capture(admission, before_effect)
             before_effect()
-            validate_subject_capture_v2(admission, capture)
+            validate_subject_capture_v2(admission, capture, before_effect=before_effect)
             before_effect()
             readers = self.reference_readers(before_effect)
             before_effect()
-            remote = prepare_ordered_remote_observations_v3(admission.request, admission, readers)
+            verification = AuthorizedPolicyVerificationV3(
+                self.journal, after, self.authority.expected,
+                self.source_authority, self.selection_authority, before_effect)
+            remote = verification.prepare_references(admission, readers)
             build_reference_entries_v2(admission.request, len(capture.records) + 1, remote)
             before_effect()
-            policy_bytes, source = self.source_authority.read_policy(self.authority.expected)
+            policy_bytes, source = self.source_authority.read_policy(
+                self.authority.expected, before_effect=before_effect)
             policy = verify_policy_source_v3(
-                policy_bytes, source, self.authority.expected, self.source_authority)
+                policy_bytes, source, self.authority.expected, self.source_authority,
+                before_effect=before_effect)
             policy.require_reviewer_agreement(admission.request)
             control = after.record.control
             selection_context = PolicySelectionContextV3(
@@ -169,10 +175,10 @@ class PreModelPacketContinuationV3:
                 after.claim_ref, control.generation, control.reservation_id, worker, after.commit_sha)
             before_effect()
             selection = self.selection_authority.select_policy(
-                source, selection_context, self.authority.expected)
+                source, selection_context, self.authority.expected, before_effect=before_effect)
             verify_policy_selection_v3(
                 policy_bytes, source, selection, selection_context, self.authority.expected,
-                self.source_authority, self.selection_authority)
+                self.source_authority, self.selection_authority, before_effect=before_effect)
             before_effect()
             candidate = self.stages.build(admission, capture, policy_bytes, source, selection,
                                            selection_context, readers, before_effect)

@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import json
 import re
-from typing import Protocol
+from typing import Callable, Protocol
 
 from .github_actions_identity_v3 import GitHubActionsExpectationV3
 from .identity import artifact_identity, canonical_bytes
@@ -107,17 +107,23 @@ class PolicySelectionReceiptV3:
 
 
 class PolicySelectionAuthorityV3(Protocol):
-    """Independent approved-decision archive; never approval by digest alone."""
+    """Independent approval, never by digest alone.
+
+    Invoke before_effect immediately before EACH external observation/read,
+    including archive reads performed internally by verify_selection.
+    """
 
     def select_policy(self, source: PolicySourceObservationV3,
                       context: PolicySelectionContextV3,
-                      expectation: GitHubActionsExpectationV3
+                      expectation: GitHubActionsExpectationV3, *,
+                      before_effect: Callable[[], None]
                       ) -> PolicySelectionReceiptV3: ...
 
     def verify_selection(self, receipt: PolicySelectionReceiptV3,
                          source: PolicySourceObservationV3,
                          context: PolicySelectionContextV3,
-                         expectation: GitHubActionsExpectationV3) -> None: ...
+                         expectation: GitHubActionsExpectationV3, *,
+                         before_effect: Callable[[], None] | None = None) -> None: ...
 
 
 def verify_policy_selection_v3(
@@ -125,10 +131,12 @@ def verify_policy_selection_v3(
     receipt: PolicySelectionReceiptV3, context: PolicySelectionContextV3,
     expectation: GitHubActionsExpectationV3,
     source_authority: PolicySourceAuthorityV3 | None,
-    selection_authority: PolicySelectionAuthorityV3 | None,
+    selection_authority: PolicySelectionAuthorityV3 | None, *,
+    before_effect: Callable[[], None] | None = None,
 ) -> ExpectedPolicyV3:
     """Reverify provenance before checking the exact independently approved decision."""
-    policy = verify_policy_source_v3(original_bytes, source, expectation, source_authority)
+    policy = verify_policy_source_v3(original_bytes, source, expectation, source_authority,
+                                     before_effect=before_effect)
     if selection_authority is None:
         raise ExpectedPolicyErrorV3("POLICY_V3_SELECTION_AUTHORITY_REQUIRED")
     if (type(receipt) is not PolicySelectionReceiptV3
@@ -154,5 +162,6 @@ def verify_policy_selection_v3(
             or re.fullmatch(r"artifact:sha256:[0-9a-f]{64}",
                             receipt.decision_authority_evidence_id) is None):
         raise ExpectedPolicyErrorV3("POLICY_V3_SELECTION_BINDING_MISMATCH")
-    selection_authority.verify_selection(receipt, source, context, expectation)
+    selection_authority.verify_selection(receipt, source, context, expectation,
+                                         before_effect=before_effect)
     return policy

@@ -224,6 +224,127 @@ and Issue #70 handoff must identify the exact published SHA/tree, complete CI
 suite result/count, CI checkout tree, and independent review receipt.
 No intermediate component PASS substitutes for those joint gates.
 
+## Independent NO_GO and bounded remediation
+
+The original reviewed source remains
+`3c68aa0621e82cfe5ae056b06ee8bbf43182aa9e`, tree
+`96832379b259760efca681d9e53564456f041be0`. Its normal CI run
+`41734320780`, job `126259444003`, passed 932 tests in 281.568 seconds,
+installation, compilation and JSON validation. The logged checkout
+`d8a7a45c8ad14604b33e9582584f826a3a513b29` has that exact tree.
+That CI PASS did not resolve the subsequent independent **NO_GO**.
+
+The complete original review is retained in the
+[PR #87 qualification receipt](https://github.com/fanilosendrison/review-broker/pull/87#issuecomment-6617863759).
+Trace SHA-256:
+`9f1c2fddcd9eb45eb53a8a5af751d4a77a0f994c78eda21ce459b199844b973e`.
+Session SHA-256:
+`4547896345e33c6be7b42d674ea7ed76ea82e934ecd4184b85a4ab8ebe34cc6f`.
+Review-text SHA-256:
+`df33e601f6ae7e148fc3c516f29f8522326388e0fc0c6920bfe884812d186f9e`.
+Its five findings are not relabeled PASS.
+
+### R1 through R4 implementation and targeted evidence
+
+The owner explicitly mandated these corrections without changing the frozen
+architecture or adopting normative v3 semantics:
+
+- R1: all authorized entry points compare the complete canonical admission with
+  the authenticated snapshot's original admission before profile acceptance.
+  An independently admitted same-request/different-origin-authorization fixture
+  is individually valid but fails this exact binding at build, verify and load.
+- R2: an independently supplied authorized boundary requires the authorized
+  profile and qualification. A complete valid synthetic packet and retained
+  layout remain supported by historical default calls but cannot downgrade an
+  authorized invocation.
+- R3: authorized materialization and verification compare original Issue/Comment
+  content and provenance, excluding only the new observation timestamp. Body
+  replacement, comment replacement and a coherent change after the first
+  accepted observation fail; observation-time-only advancement succeeds.
+- R4: one guarded Git adapter protects each subprocess in subject proof and the
+  injected capture provider. Authorized reference capture guards every injected
+  HTTP call. Source/selection implementations receive the existing current
+  effect guard and must invoke it before each internal external observation.
+  Packet/evidence creation, unbuffered writes, fsync, native rename and retained
+  content reads use the same authority. Authority loss prevents subsequent
+  operational reads/writes; interrupted private staging is not cleaned by a
+  stale authorization. A freshness check still provides no cross-system lock
+  or atomicity. The reviewer program remains derived from the resolved policy
+  content, not from selection approval, in the technical-policy responsibility.
+
+The installed original source and original fixtures were exercised with the
+new coherent/internal-boundary tests before installing corrections: 10 tests,
+9 expected assertion failures and zero errors; the observation-time positive
+control passed. The original RED log remains private and unchanged.
+
+A first combined targeted run and a cold-file run exceeded their 180-second
+tool deadlines. Both are INCOMPLETE, not PASS; no matching process remained.
+A later test exposed an unguarded Git reader inside the injected capture
+provider. Its failed log is retained; the provider now uses the same guarded
+adapter, without changing historical source acquisition.
+
+Final installed-source focused receipts are disjoint: policy/effect 31 PASS,
+continuation 27 PASS, cold packet first partition 12 PASS and remaining partition
+8 PASS: **78 targeted tests PASS**, including all original N01–N08/F01–F36
+cases. Existing packet/admission/journal and RWP-01/RWP-02 regressions passed
+**165 tests**. These are execution results, not an independent closure of R5.
+The original 868 historical tests remain unchanged; corrected-source complete
+CI and a new exact-source independent review remain mandatory.
+
+### R5 capability discovery and unresolved qualification boundary
+
+- Statement: no sufficient, permitted network-isolation qualification boundary
+  has been established for both the local cold process and CI.
+- Source and evidence: the actual local host reports Darwin 17.7.0, macOS
+  10.13.6, not the generic workspace's Monterey assumption. Its existing
+  sandbox-exec executable accepted a per-process deny-network profile;
+  connect_ex and UDP sendto returned EPERM. This is partial capability evidence,
+  not cold reconstruction or complete alternate-route qualification.
+- Source and evidence: a fuller assessment with a minimal explicitly selected
+  environment, stream, connect_ex, UDP, native and descendant probes was denied
+  before execution by the active enforcer: protected path `/usr/`. No output
+  receipt or probe PASS is claimed for that denied command. No substitute path,
+  supervisor, privilege elevation, dependency installation, global security
+  policy change or enforcer modification was attempted.
+- Source and evidence: authenticated prior CI identifies ubuntu-24.04 and its
+  ephemeral hosted runner. The exact runner-image software-manifest reference
+  in that log returned HTTP 404. Installed tools, unprivileged isolation support
+  and descendant inheritance on that actual runner are not established.
+- Existing authority: the remediation mandate requires read-only capability
+  assessment before changing the cold-process harness, and forbids substituting
+  Python patches or environment cleanup for OS-enforced network denial.
+- Semantic disposition: `no-normative-impact`.
+- Affected layers: verification-or-qualification-evidence;
+  integration-or-conformance; repository-governance-or-documentation.
+- Related consequences: the old cold subprocess launcher and socket monkeypatch
+  remain unchanged. Earlier network-blocked language does not establish
+  universal isolation. Cold byte reconstruction passes, but network denial and
+  overall RWP-03 remain NOT_QUALIFIED. No effective Codex policy is attested.
+- Required authority: a permitted channel for the exact local capability probes
+  under the active enforcer, plus authenticated assessment on the actual hosted
+  CI environment. An owner-provided probe receipt or separately authorized
+  capability-only execution can supply that evidence; no implicit workflow
+  edit, dispatch, elevated privilege or system-policy permission is inferred.
+- Next action: obtain that narrow capability evidence, then modify only the
+  allowed cold harness, prove stream/connect_ex/datagram/native/descendant denial
+  and successful ordinary cold reconstruction inside the verified boundary.
+
+```text
+R1_ADMISSION_BINDING=TARGETED_PASS
+R2_MODE_DOWNGRADE=TARGETED_PASS
+R3_MUTABLE_REFERENCE_DRIFT=TARGETED_PASS
+R4_INTERNAL_FRESHNESS=TARGETED_PASS
+R5_ISOLATION_CAPABILITY=UNAVAILABLE
+R5_REMEDIATION=BLOCKED
+R5_COLD_NETWORK_DENIAL=NOT_QUALIFIED
+RWP03_TARGETED_TESTS=78_PASS
+RWP03_OFFLINE_AUTHORIZED_PACKET=NOT_QUALIFIED
+```
+
+No Issue #70 handoff is permitted until all five findings are independently
+closed, exact-source complete CI passes and fresh review returns GO. Partial
+correction publication on existing draft PR #87 is not that handoff.
+
 ## Qualification limits
 
 ```text

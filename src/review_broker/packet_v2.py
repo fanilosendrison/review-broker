@@ -8,7 +8,8 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
-from typing import Any, Mapping
+from functools import partial
+from typing import Any, Callable, Mapping
 from jsonschema import Draft202012Validator
 from .admission_evidence_v3 import validate_journal_admission_v3
 from .admission_v3 import PreclaimAdmissionV3
@@ -22,7 +23,7 @@ from .packet_v2_renderer import RENDERER_ID, render_packet_v2_prompt
 from .packet_v2_subject import SubjectCaptureV2
 from .packet_v2_technical_policy import (
     AuthorizedPolicyVerificationV3, PacketV2CandidateError, PolicySnapshotV2,
-    TechnicalProfileSnapshotV2, technical_policy_v2,
+    TechnicalProfileSnapshotV2, technical_policy_v2, packet_program_v2, require_policy_boundary_v3,
 )
 from .packet_v2_subject_provenance import evidence_basis_v2,manifest_fields_v2,validate_capture_provenance_v2
 from .packets import (
@@ -32,11 +33,14 @@ from .packets import (
 from .physical import PhysicalLineError, decode_physical_lines
 from .request_v3 import request_identity_v3, validate_request_v3
 from .review_intent_v3 import review_intent_identity_v3
-from .reviewer_output_contract import CANONICAL_REVIEWER_OUTPUT_INSTRUCTIONS
 
-_SOURCE_ID = re.compile(r"S[0-9]{3}\Z")
+class GuardedPacketGitReaderV3(GitSourceReader):
+    def __init__(self, repository_root: Path, *, environment: Mapping[str, str], before_effect: Callable[[], None]):
+        super().__init__(repository_root, environment=environment); self.before_effect = before_effect
+    def _git(self, *arguments: str, input_data: bytes | None = None) -> bytes:
+        self.before_effect()
+        return super()._git(*arguments, input_data=input_data)
 _SHA = re.compile(r"[0-9a-f]{40}\Z")
-_HEX = re.compile(r"[0-9a-f]{64}\Z")
 def _fail(marker: str, cause: BaseException | None = None) -> None:
     if cause is None:
         raise PacketV2CandidateError(marker)
@@ -93,7 +97,7 @@ def subject_capture_evidence_id_v2(capture: SubjectCaptureV2) -> str:
     basis.update(evidence_basis_v2(capture))
     return artifact_identity(canonical_bytes(basis) + b"\n")
 def _validate_capture(capture: SubjectCaptureV2, admission: PreclaimAdmissionV3,
-                      request: Mapping[str, object], *, prove_local_git: bool) -> None:
+                      request: Mapping[str, object], *, prove_local_git: bool, before_effect: Callable[[], None] | None = None) -> None:
     subject = request["subject"]
     if (not isinstance(capture, SubjectCaptureV2)
             or capture.verification not in {"SYNTHETIC_OFFLINE_VERIFIED", "AUTHENTICATED_SOURCE_READ_ONLY"}
@@ -129,7 +133,7 @@ def _validate_capture(capture: SubjectCaptureV2, admission: PreclaimAdmissionV3,
     try:
         git_environment = {"PATH": os.environ.get("PATH", ""), "GIT_NO_REPLACE_OBJECTS": "1",
                            "GIT_NO_LAZY_FETCH": "1", "GIT_CONFIG_NOSYSTEM": "1"}
-        reader = GitSourceReader(capture.repository_root, environment=git_environment)
+        reader = (GitSourceReader(capture.repository_root, environment=git_environment) if before_effect is None else GuardedPacketGitReaderV3(capture.repository_root, environment=git_environment, before_effect=before_effect))
         reread = tuple(reader.read(SourceSpec(item.repository, item.commit, item.path))
                        for item in capture.records)
         exact = reader.diff(capture.merge_base_sha, capture.head_sha)
@@ -149,10 +153,10 @@ def _validate_capture(capture: SubjectCaptureV2, admission: PreclaimAdmissionV3,
     if (reread != capture.records or exact != capture.diff or changed_paths != set(paths)
             or merge_base != capture.merge_base_sha or inventory != list(capture.changes)):
         _fail("PACKET_V2_LOCAL_GIT_PROOF_MISMATCH")
-def validate_subject_capture_v2(admission: PreclaimAdmissionV3, capture: SubjectCaptureV2) -> None:
+def validate_subject_capture_v2(admission: PreclaimAdmissionV3, capture: SubjectCaptureV2, *, before_effect: Callable[[], None] | None = None) -> None:
     """Reuse the full admitted subject and local-Git proof before policy selection."""
     request, _ = _admission(admission)
-    _validate_capture(capture, admission, request, prove_local_git=True)
+    _validate_capture(capture, admission, request, prove_local_git=True, before_effect=before_effect)
 def _subject_entries(capture: SubjectCaptureV2) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     entries, changes, cursor = [], [], 0
     for change in capture.changes:
@@ -195,39 +199,37 @@ def _subject_entries(capture: SubjectCaptureV2) -> tuple[list[dict[str, object]]
     except ChangeScopeError as exc:
         _fail(str(exc), exc)
     return entries, changes
-def _program(request: Mapping[str, object], policy: Mapping[str, object]) -> dict[str, object]:
-    return {"mission": request["mission"], "reviewer": request["reviewer"],
-            "technical_policy_id": policy["technical_policy_id"],
-            "renderer_id": RENDERER_ID,
-            "output_instructions": CANONICAL_REVIEWER_OUTPUT_INSTRUCTIONS}
 def _packet_basis(manifest: Mapping[str, object]) -> dict[str, object]:
     return {key: manifest[key] for key in (
         "schema_version", "request_id", "review_intent_id", "subject_id",
         "admission_evidence_id", "subject", "atomicity", "change_scope",
         "subject_sources", "reference_sources", "reference_outcomes",
         "technical_policy", "program", "source_manifest_id", "program_id")}
-def _exclusive(path: Path, data: bytes) -> None:
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+def _effect(verification: AuthorizedPolicyVerificationV3 | None) -> None:
+    if verification is not None: verification.before_effect()
+def _exclusive(path: Path, data: bytes, verification: AuthorizedPolicyVerificationV3 | None = None) -> None:
+    _effect(verification); path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    _effect(verification); descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(data); stream.flush(); os.fsync(stream.fileno())
+        with os.fdopen(descriptor, "wb", buffering=0) as stream:
+            _effect(verification); stream.write(data); _effect(verification); os.fsync(stream.fileno())
     except BaseException:
-        path.unlink(missing_ok=True); raise
+        _effect(verification); path.unlink(missing_ok=True); raise
 def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCaptureV2,
                               profile: PolicySnapshotV2, output_directory: Path,
                               issue_reference_readers: Mapping[str, GitHubIssueReferenceReaderV3] | None = None,
                               *, policy_verification: AuthorizedPolicyVerificationV3 | None = None) -> dict[str, object]:
     """Build atomically without network, execution, inference, or publication."""
+    require_policy_boundary_v3(profile, admission, policy_verification)
     request, _ = _admission(admission)
-    _validate_capture(capture, admission, request, prove_local_git=True)
+    _validate_capture(capture, admission, request, prove_local_git=True, before_effect=None if policy_verification is None else policy_verification.before_effect)
     subject_sources, changes = _subject_entries(capture)
-    remote=prepare_ordered_remote_observations_v3(request,admission,issue_reference_readers)
+    remote=(prepare_ordered_remote_observations_v3(request,admission,issue_reference_readers) if policy_verification is None else policy_verification.prepare_references(admission,issue_reference_readers))
     reference_sources, outcomes, reference_data = build_reference_entries_v2(
         request, len(subject_sources) + 1, tuple(remote))
     if len(subject_sources) + len(reference_sources) > MAX_SOURCE_COUNT:
         _fail("PACKET_V2_SOURCE_COUNT_EXCEEDED")
-    policy = technical_policy_v2(profile, request, policy_verification); program = _program(request, policy)
+    policy = technical_policy_v2(profile, request, policy_verification, admission); program = packet_program_v2(request, policy)
     change_basis, _ = build_change_basis(changes, subject_sources,
         merge_base=capture.merge_base_sha, head=capture.head_sha, diff=capture.diff)
     change_scope = {**change_basis, "diff_snapshot": "changes.patch",
@@ -267,7 +269,7 @@ def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCa
     def guard() -> None:
         if policy_verification is not None: policy_verification.before_effect()
     def write(path: Path, data: bytes) -> None:
-        guard(); _exclusive(path, data)
+        guard(); _exclusive(path, data, policy_verification)
     guard(); output_directory.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     guard(); staging = Path(tempfile.mkdtemp(prefix=".packet-v2-", dir=output_directory.parent))
     try:
@@ -281,15 +283,15 @@ def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCa
         if output_directory.exists(): guard(); output_directory.rmdir()
         guard(); os.replace(staging, output_directory)
     except BaseException:
-        shutil.rmtree(staging, ignore_errors=True); raise
+        guard(); shutil.rmtree(staging, ignore_errors=True); raise
     return manifest
-def _read_snapshot(directory: Path, entry: Mapping[str, object], *, git: bool) -> tuple[bytes, tuple[str, ...]]:
+def _read_snapshot(directory: Path, entry: Mapping[str, object], *, git: bool, policy_verification=None) -> tuple[bytes, tuple[str, ...]]:
     expected = f"sources/{entry['source_id']}.bin"
     if entry.get("snapshot") != expected or Path(expected).is_absolute() or ".." in Path(expected).parts:
         _fail("PACKET_V2_SNAPSHOT_PATH_INVALID")
     path = directory / expected
     if path.is_symlink() or not path.is_file(): _fail("PACKET_V2_SNAPSHOT_INVALID")
-    data = path.read_bytes()
+    _effect(policy_verification); data = path.read_bytes()
     if len(data) != entry["original_byte_length"] or hashlib.sha256(data).hexdigest() != entry["sha256"]:
         _fail("PACKET_V2_SOURCE_BYTES_MISMATCH")
     try: encoding, lines, mapping = decode_physical_lines(data)
@@ -307,14 +309,19 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
                                issue_reference_observations: tuple[object,...]=(),
                                *, policy_verification: AuthorizedPolicyVerificationV3 | None = None) -> dict[str, object]:
     """Independently reconstruct every candidate packet identity and byte."""
+    require_policy_boundary_v3(profile, admission, policy_verification)
+    def read(path):
+        _effect(policy_verification); return path.read_bytes()
+    read_snapshot = partial(_read_snapshot, policy_verification=policy_verification)
     manifest_path, prompt_path = output_directory / "input-manifest.json", output_directory / "input.txt"
     if (output_directory.is_symlink() or (output_directory / "sources").is_symlink()
             or manifest_path.is_symlink() or prompt_path.is_symlink()):
         _fail("PACKET_V2_ARTIFACT_SYMLINK_FORBIDDEN")
-    try: raw = manifest_path.read_bytes(); manifest = json.loads(raw)
+    try: raw = read(manifest_path); manifest = json.loads(raw)
     except (OSError, json.JSONDecodeError) as exc: _fail("PACKET_V2_MANIFEST_INVALID", exc)
     if raw != canonical_bytes(manifest) + b"\n": _fail("PACKET_V2_MANIFEST_NONCANONICAL")
     manifest = _validate_schema(manifest)
+    if policy_verification is not None and manifest["technical_policy"]["qualification"] != "PREMODEL_POLICY_SOURCE_VERIFIED_ONLY": _fail("AUTHORIZED_POLICY_MODE_REQUIRED")
     if {item.name for item in output_directory.iterdir()} != {
         "input-manifest.json", "input.txt", "changes.patch", "sources"}:
         _fail("PACKET_V2_ARTIFACT_INVENTORY_INVALID")
@@ -326,9 +333,10 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
         capture, admission, request, prove_local_git=False)
     if not issue_reference_observations:
         issue_reference_observations=reconstruct_issue_observations_v3(
-            output_directory,manifest["reference_sources"],_read_snapshot)
+            output_directory,manifest["reference_sources"],read_snapshot)
     expected_subject, expected_changes = _subject_entries(capture)
     remote=retained_ordered_remote_observations_v3(request,admission,issue_reference_observations)
+    if policy_verification is not None: policy_verification.require_references(admission,remote)
     expected_references, expected_outcomes, _ = build_reference_entries_v2(
         request, len(expected_subject) + 1, tuple(remote))
     expected_change, _ = build_change_basis(expected_changes, expected_subject,
@@ -355,9 +363,9 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
         _fail("PACKET_V2_SOURCE_ORDER_INVALID")
     subject_lines, reference_lines = {}, {}
     for entry in manifest["subject_sources"]:
-        _, subject_lines[entry["source_id"]] = _read_snapshot(output_directory, entry, git=True)
+        _, subject_lines[entry["source_id"]] = read_snapshot(output_directory, entry, git=True)
     for entry, reference in zip(manifest["reference_sources"], request["references"]):
-        data, reference_lines[entry["source_id"]] = _read_snapshot(output_directory, entry, git=False)
+        data, reference_lines[entry["source_id"]] = read_snapshot(output_directory, entry, git=False)
         selector = reference["source"]
         if selector["kind"] == "inline" and data != selector["text"].encode("utf-8"):
             _fail("PACKET_V2_INLINE_REQUEST_MISMATCH")
@@ -371,12 +379,12 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
         merge_base=capture.merge_base_sha, head=capture.head_sha)
     except ChangeScopeError as exc: _fail(str(exc), exc)
     diff_path = output_directory / "changes.patch"
-    if diff_path.is_symlink() or not diff_path.is_file() or diff_path.read_bytes() != capture.diff:
+    if diff_path.is_symlink() or not diff_path.is_file() or read(diff_path) != capture.diff:
         _fail("PACKET_V2_DIFF_MISMATCH")
     source_manifest = {key: manifest[key] for key in (
         "subject_sources", "reference_sources", "reference_outcomes")}
-    policy = technical_policy_v2(profile, request, policy_verification)
-    program = _program(request, policy)
+    policy = technical_policy_v2(profile, request, policy_verification, admission)
+    program = packet_program_v2(request, policy)
     if (manifest["source_manifest_id"] != _hash("source-manifest", source_manifest)
             or manifest["technical_policy"] != policy or manifest["program"] != program
             or manifest["program_id"] != _hash("program", program)
@@ -384,7 +392,7 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
         _fail("PACKET_V2_CANONICAL_IDENTITY_MISMATCH")
     prompt = render_packet_v2_prompt(manifest, subject_lines=subject_lines,
         reference_lines=reference_lines, diff=capture.diff)
-    actual = prompt_path.read_bytes()
+    actual = read(prompt_path)
     if (actual != prompt or len(actual) != manifest["prompt_byte_length"]
             or hashlib.sha256(actual).hexdigest() != manifest["prompt_sha256"]):
         _fail("PACKET_V2_PROMPT_MISMATCH")

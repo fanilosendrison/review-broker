@@ -1,6 +1,7 @@
 """Separate historical synthetic policy content from authorized expected policy."""
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 import hashlib
 from typing import Callable, Mapping
@@ -17,6 +18,8 @@ from .pre_model_policy_selection_v3 import (
     verify_policy_selection_v3,
 )
 from .pre_model_policy_source_v3 import PolicySourceAuthorityV3, PolicySourceObservationV3
+from .packet_v2_renderer import RENDERER_ID
+from .reviewer_output_contract import CANONICAL_REVIEWER_OUTPUT_INSTRUCTIONS
 from .queue import AttemptState
 from .request_v3 import request_identity_v3
 from .review_intent_v3 import review_intent_identity_v3
@@ -64,6 +67,46 @@ class AuthorizedPolicyVerificationV3:
         if self.journal.read(self.snapshot.record.attempt.request_id) != self.snapshot:
             raise PacketV2CandidateError("AUTHORIZED_POLICY_JOURNAL_STALE")
 
+    def require_admission(self, admission: Mapping[str, object]) -> None:
+        self.before_effect()
+        if canonical_bytes(admission) != canonical_bytes(self.snapshot.record.attempt.admission):
+            raise PacketV2CandidateError("AUTHORIZED_POLICY_ORIGINAL_ADMISSION_REQUIRED")
+
+    def require_profile(self, profile: PolicySnapshotV2, admission: PreclaimAdmissionV3) -> None:
+        self.require_admission(admission.journal_admission())
+        if type(profile) is not AuthorizedPolicySnapshotV3:
+            raise PacketV2CandidateError("AUTHORIZED_POLICY_MODE_REQUIRED")
+
+    def require_references(self, admission: PreclaimAdmissionV3, observations: tuple) -> None:
+        """Bind mutable content/provenance; observation time may legitimately advance."""
+        self.require_admission(admission.journal_admission())
+        original = iter(admission.issue_reference_observations)
+        for item in observations:
+            if getattr(item, "source_kind", None) not in {"github_issue_body", "github_issue_comment"}:
+                continue
+            admitted = next(original)
+            fresh_basis, admitted_basis = item.provenance_basis(), admitted.provenance_basis()
+            fresh_basis.pop("observed_at", None)
+            admitted_basis.pop("observed_at", None)
+            if (item.original_bytes != admitted.original_bytes
+                    or canonical_bytes(fresh_basis) != canonical_bytes(admitted_basis)):
+                raise PacketV2CandidateError("AUTHORIZED_MUTABLE_REFERENCE_CHANGED")
+
+    def prepare_references(self, admission: PreclaimAdmissionV3, readers: Mapping | None) -> tuple:
+        from .issue_reference_preparation_v3 import prepare_ordered_remote_observations_v3
+        guarded = {}
+        for identifier, reader in (readers or {}).items():
+            clone = copy.copy(reader)
+            executor = reader._executor
+            def execute(request, executor=executor):
+                self.before_effect()
+                return executor(request)
+            clone._executor = execute
+            guarded[identifier] = clone
+        observations = prepare_ordered_remote_observations_v3(admission.request, admission, guarded)
+        self.require_references(admission, observations)
+        return observations
+
     def selection_context(self, request: Mapping[str, object]) -> PolicySelectionContextV3:
         self.before_effect()
         snapshot = self.snapshot
@@ -93,11 +136,14 @@ class AuthorizedPolicyVerificationV3:
             control.worker, snapshot.commit_sha)
 
     def verify(self, profile: AuthorizedPolicySnapshotV3,
-               request: Mapping[str, object]) -> dict[str, object]:
+               admission: PreclaimAdmissionV3) -> dict[str, object]:
+        self.require_profile(profile, admission)
+        request = admission.request
         context = self.selection_context(request)
         policy = verify_policy_selection_v3(
             profile.original_bytes, profile.source, profile.selection, context,
-            self.expected, self.source_authority, self.selection_authority)
+            self.expected, self.source_authority, self.selection_authority,
+            before_effect=self.before_effect)
         policy.require_reviewer_agreement(request)
         return {"technical_policy_id": policy.technical_policy_id, "basis": policy.basis,
                 "profile_evidence_id": artifact_identity(profile.original_bytes),
@@ -106,14 +152,32 @@ class AuthorizedPolicyVerificationV3:
                 "selection_authorization_evidence_id": profile.selection.evidence_id}
 
 
+def packet_program_v2(request: Mapping[str, object], policy: Mapping[str, object]) -> dict[str, object]:
+    """The reviewer program binds the resolved policy content, never its approval."""
+    return {"mission": request["mission"], "reviewer": request["reviewer"],
+            "technical_policy_id": policy["technical_policy_id"], "renderer_id": RENDERER_ID,
+            "output_instructions": CANONICAL_REVIEWER_OUTPUT_INSTRUCTIONS}
+
+
+def require_policy_boundary_v3(profile: PolicySnapshotV2, admission: PreclaimAdmissionV3 | None,
+                               verification: AuthorizedPolicyVerificationV3 | None) -> None:
+    if verification is None:
+        if type(profile) is AuthorizedPolicySnapshotV3:
+            raise PacketV2CandidateError("PACKET_V2_POLICY_AUTHORITY_REQUIRED")
+    else:
+        if type(verification) is not AuthorizedPolicyVerificationV3 or admission is None:
+            raise PacketV2CandidateError("AUTHORIZED_POLICY_BOUNDARY_INVALID")
+        verification.require_profile(profile, admission)
+
+
 def technical_policy_v2(profile: PolicySnapshotV2,
                         request: Mapping[str, object],
-                        verification: AuthorizedPolicyVerificationV3 | None = None
+                        verification: AuthorizedPolicyVerificationV3 | None = None,
+                        admission: PreclaimAdmissionV3 | None = None
                         ) -> dict[str, object]:
+    require_policy_boundary_v3(profile, admission, verification)
     if type(profile) is AuthorizedPolicySnapshotV3:
-        if type(verification) is not AuthorizedPolicyVerificationV3:
-            raise PacketV2CandidateError("PACKET_V2_POLICY_AUTHORITY_REQUIRED")
-        return verification.verify(profile, request)
+        return verification.verify(profile, admission)
     if (not isinstance(profile, TechnicalProfileSnapshotV2)
             or profile.verification != "SYNTHETIC_OFFLINE_VERIFIED"
             or not profile.expected_name or profile.actual_name != profile.expected_name

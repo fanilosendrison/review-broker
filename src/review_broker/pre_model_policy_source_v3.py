@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import json
 import re
-from typing import Protocol
+from typing import Callable, Protocol
 
 from .github_actions_identity_v3 import GitHubActionsExpectationV3
 from .identity import artifact_identity, canonical_bytes
@@ -64,20 +64,25 @@ class PolicySourceAuthorityV3(Protocol):
     Implementations must independently recognize the exact source object and
     original content. A local digest check alone does not implement this contract.
     Verification raises on unrecognized provenance; it never creates approval.
+    Implementations MUST invoke before_effect immediately before each external
+    observation/read, including reads internal to verification. No cached permit.
     """
 
-    def read_policy(self, expectation: GitHubActionsExpectationV3
+    def read_policy(self, expectation: GitHubActionsExpectationV3, *,
+                    before_effect: Callable[[], None]
                     ) -> tuple[bytes, PolicySourceObservationV3]: ...
 
     def verify_source(self, observation: PolicySourceObservationV3,
                       original_bytes: bytes,
-                      expectation: GitHubActionsExpectationV3) -> None: ...
+                      expectation: GitHubActionsExpectationV3, *,
+                      before_effect: Callable[[], None] | None = None) -> None: ...
 
 
 def verify_policy_source_v3(
     original_bytes: bytes, observation: PolicySourceObservationV3,
     expectation: GitHubActionsExpectationV3,
-    authority: PolicySourceAuthorityV3 | None,
+    authority: PolicySourceAuthorityV3 | None, *,
+    before_effect: Callable[[], None] | None = None,
 ) -> ExpectedPolicyV3:
     """Check content and bindings, then require independent provenance evidence."""
     policy = parse_expected_policy_v3(original_bytes)
@@ -103,5 +108,5 @@ def verify_policy_source_v3(
             or re.fullmatch(r"artifact:sha256:[0-9a-f]{64}",
                             observation.source_authority_evidence_id) is None):
         raise ExpectedPolicyErrorV3("POLICY_V3_SOURCE_BINDING_MISMATCH")
-    authority.verify_source(observation, original_bytes, expectation)
+    authority.verify_source(observation, original_bytes, expectation, before_effect=before_effect)
     return policy
