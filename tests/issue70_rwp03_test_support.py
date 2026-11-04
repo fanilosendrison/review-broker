@@ -286,6 +286,7 @@ class RealContinuationScenario:
             observation.evidence_id)
 
     def cold(self, retained, snapshot, before_effect=None):
+        import tempfile
         from tests.issue68_test_support import IntegratedScenario
         if before_effect is None: before_effect = self.verification().before_effect
         archive = self.transport_archive
@@ -295,11 +296,19 @@ class RealContinuationScenario:
                 return archive.write_bytes(data)
         IntegratedScenario.save_transport(self.worker, GuardedArchive())
         before_effect()
-        process = subprocess.run([sys.executable, "-m", "tests.issue70_rwp03_test_support",
-            str(retained), str(self.transport_archive), str(self.archive),
-            str(self.journal_authority_archive), snapshot.record.attempt.request_id], capture_output=True, text=True,
-            env={key: value for key, value in os.environ.items() if key != "PYTHONHOME"},
-            timeout=90, check=True)
+        from tests.issue70_rwp03_linux_cold_isolation import minimal_environment
+        module = "tests.issue70_rwp03_test_support"
+        prefix = [sys.executable, "-m", module]
+        if sys.platform == "linux":
+            prefix = [sys.executable, "-m", "tests.issue70_rwp03_linux_cold_isolation", "cold"]
+        before_effect()
+        with tempfile.TemporaryDirectory(prefix="cold-home-", dir=self.root) as home:
+            before_effect()
+            process = subprocess.run([*prefix, str(retained), str(self.transport_archive),
+                str(self.archive), str(self.journal_authority_archive), snapshot.record.attempt.request_id],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                env=minimal_environment(Path(home)), close_fds=True, pass_fds=(),
+                timeout=90, check=True)
         return json.loads(process.stdout)
 
 
@@ -323,6 +332,9 @@ def alternate_admission(scenario):
 
 
 def cold_probe():
+    if sys.platform == "linux":
+        from tests.issue70_rwp03_linux_cold_isolation import require_installed_filter
+        require_installed_filter()
     from tests.issue68_test_support import restore_transport, ExactAdmissionAuthority, REPOSITORY
     from tests.journal_v3_test_support import BASE_SHA, NODE_ID, TrustedMutationAuthority, TrustedRejectionAuthority
     from review_broker.github_journal_v3 import GitHubJournalV3

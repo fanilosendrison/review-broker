@@ -394,6 +394,69 @@ No Issue #70 handoff is permitted until all five findings are independently
 closed, exact-source complete CI passes and fresh review returns GO. Partial
 correction publication on existing draft PR #87 is not that handoff.
 
+## R5 direct Linux CI qualification mandate
+
+The subsequent explicit owner mandate supersedes the preceding capability-before-
+implementation prerequisite, not the historical NO_GO verdicts or denied probes.
+Starting source is `c429148260d3cbc6b6b8c54bbc98a53d3bf71101`, tree
+`43e64ab4ee4099b8323d312bf22970001ad712f7`. Its independent review closed
+R1–R4 and left R5 OPEN. This tranche changes no R1–R4 implementation or test.
+The authorized target is the existing ubuntu-24.04 CI job on x86-64 only; no
+macOS isolation qualification, local OS probe, new dependency, workflow change,
+manual dispatch, privilege elevation or system-policy change is authorized.
+
+Two additional test modules own the bounded responsibilities: Linux seccomp
+installation and isolated launcher; and independent Linux qualification tests.
+The existing support module supplies a private temporary HOME, explicit minimal
+environment, closed inherited descriptors and the Linux cold invocation. macOS
+retains functional reconstruction only; its isolation remains NOT_QUALIFIED.
+
+The dedicated Linux child loads `libseccomp.so.2` with explicit ctypes signatures,
+resolves every required syscall by name, adds EPERM rules to an allow-default
+filter, sets PR_SET_NO_NEW_PRIVS and loads the filter before reconstruction.
+Every failure is fatal; missing library, unsupported ABI, unresolved syscall or
+kernel refusal is not a skip or fallback. The context is released after loading.
+The long-lived unittest process never installs the filter.
+
+The probe uses precreated TCP/UDP sockets and numeric loopback only. It requires
+kernel NoNewPrivs=1 and Seccomp=2, native/Python socket denial, connect_ex,
+sendto and native connect EPERM, and real child/second-generation exec inheritance.
+The launcher rejects inherited socket descriptors. Cold mode creates no probe
+sockets and executes the original verifier only after installation; the verifier
+rejects direct unsandboxed Linux entry. Positive reconstruction must return the
+same complete canonical manifest using the existing independent trust roots.
+The missing-library negative test injects only the failure path; positive
+isolation evidence must come from actual Linux syscalls in normal CI.
+
+The explicit environment contains HOME, TMPDIR, LANG, LC_ALL,
+PYTHONNOUSERSITE=1 and PYTHONDONTWRITEBYTECODE=1, not inherited credentials,
+Python configuration or loader injection. stdin is DEVNULL, stdout/stderr are
+captured, close_fds is true and pass_fds is empty. No shell is invoked.
+
+Local static and functional checks do not qualify Linux isolation. The twelve
+new Linux tests are explicitly not applicable on macOS, never skipped on Linux.
+The first actual Linux capability evidence must be the normal exact-source CI
+run after publication. All twelve tests, existing regressions, exact checkout-
+tree equality and a fresh independent GO are required before Issue #70 handoff.
+No result is transferred from earlier CI or reviews. Local targeted validation
+completed 96 tests in 467.789 seconds: 84 functional tests PASS and 12 explicitly
+non-applicable Linux tests skipped on macOS. Static compilation, whitespace and
+400-line checks passed. These results do not establish R5 isolation. Expected
+complete CI count is 964, with no Linux isolation skips permitted. The historical
+qualification limits below remain unchanged until new CI and review evidence
+exists.
+
+Publication attempt `01M6K0Q1AWHQ8670ZKV9MNC9R4` failed before committing:
+the mandatory publisher could not authenticate its explicit GitHub SSH endpoint
+(publickey denial). Invocation-scoped official gh HTTPS credential configuration
+in attempt `01M6K0T4CBVGPR9SK9JQF4ZWVG` did not resolve that refusal. No shared
+Git configuration, credentials or security controls were modified. The remote
+head remains the starting SHA. The four-file candidate is retained locally,
+unpublished; no new Linux CI or independent review has run. This is a publisher-
+authentication blocker, not a restored R5 preimplementation capability gate.
+Resume by restoring authentication for the mandatory publisher, then publish
+this candidate and let normal CI establish capability or report actual failure.
+
 ## Qualification limits
 
 ```text
