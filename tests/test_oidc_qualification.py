@@ -28,12 +28,13 @@ class OIDCQualificationTests(unittest.TestCase):
     def environment(self):
         return dict(GITHUB_ACTIONS='true', GITHUB_EVENT_NAME='workflow_dispatch',
             QUALIFICATION_ONLY='true', QUALIFICATION_SHA='a'*40, QUALIFICATION_DEFAULT_BRANCH='dev',
-            GITHUB_REPOSITORY='fanilosendrison/review-broker', GITHUB_REPOSITORY_ID='1',
+            GITHUB_REPOSITORY='fanilosendrison/review-broker', GITHUB_REPOSITORY_ID='1433701208',
+            GITHUB_REPOSITORY_OWNER='fanilosendrison', GITHUB_REPOSITORY_OWNER_ID='30498238',
             GITHUB_SHA='a'*40, GITHUB_WORKFLOW_SHA='a'*40, GITHUB_REF='refs/heads/dev',
             GITHUB_WORKFLOW_REF='fanilosendrison/review-broker/.github/workflows/review-request.yml@refs/heads/dev',
             GITHUB_RUN_ID='42', GITHUB_RUN_ATTEMPT='1')
 
-    def run_entry(self, *, changed=None, header=None, key=None, keys=None,
+    def run_entry(self, *, changed=None, header=None, key=None, keys=None, missing=(),
                   environment=None, discovery=None, provider_error=False):
         env = environment or self.environment()
         captured = []
@@ -50,8 +51,11 @@ class OIDCQualificationTests(unittest.TestCase):
                 repository_id=env['GITHUB_REPOSITORY_ID'], workflow_ref=env['GITHUB_WORKFLOW_REF'],
                 workflow_sha=env['GITHUB_SHA'], ref=env['GITHUB_REF'], run_id=env['GITHUB_RUN_ID'],
                 run_attempt=env['GITHUB_RUN_ATTEMPT'],
-                sub='repo:fanilosendrison/review-broker:ref:refs/heads/dev')
+                repository_owner='fanilosendrison', repository_owner_id='30498238',
+                sub='repo:fanilosendrison@30498238/review-broker@1433701208:ref:refs/heads/dev')
             claims.update(changed or {})
+            for name in missing:
+                del claims[name]
             token = jwt.encode(claims, key or self.key, algorithm='RS256',
                 headers=header or {'kid': 'qualification-fixture'})
             captured.append(token)
@@ -91,7 +95,7 @@ class OIDCQualificationTests(unittest.TestCase):
         self.assertTrue(value['exact_workload_bindings_verified'])
         self.assertEqual(value['source']['sha'], 'a'*40)
         self.assertEqual(value['source']['workflow_sha'], 'a'*40)
-        self.assertEqual(value['source']['repository_id'], '1')
+        self.assertEqual(value['source']['repository_id'], '1433701208')
         self.assertEqual(value['source']['run_id'], '42')
         self.assertEqual(value['source']['run_attempt'], '1')
         self.assertEqual(set(value), {'schema_version', 'status', 'source', 'qualification_id',
@@ -119,6 +123,41 @@ class OIDCQualificationTests(unittest.TestCase):
             header={'kid':'qualification-fixture','alg':'HS256'})
         self.assertEqual((wrong_algorithm[0],wrong_algorithm[4]),(1,1))
         self.assertIn('GITHUB_OIDC_VERIFICATION_FAILED',wrong_algorithm[2])
+
+    def test_immutable_subject_and_owner_claim_substitutions_fail_once_without_receipt(self):
+        variants = [
+            {'sub': 'repo:fanilosendrison/review-broker:ref:refs/heads/dev'},
+            {'sub': 'repo:fanilosendrison@9/review-broker@1433701208:ref:refs/heads/dev'},
+            {'sub': 'repo:fanilosendrison@30498238/review-broker@9:ref:refs/heads/dev'},
+            {'sub': 'repo:attacker@30498238/review-broker@1433701208:ref:refs/heads/dev'},
+            {'sub': 'repo:fanilosendrison@30498238/other@1433701208:ref:refs/heads/dev'},
+            {'sub': 'repo:fanilosendrison@30498238/review-broker@1433701208:ref:refs/heads/main'},
+            {'repository_owner_id': '9'}, {'repository_owner': 'attacker'},
+        ]
+        for changed in variants:
+            with self.subTest(changed=changed):
+                self.assert_signed_failure(self.run_entry(changed=changed))
+        self.assert_signed_failure(self.run_entry(missing=('repository_owner_id',)))
+        self.assert_signed_failure(self.run_entry(missing=('repository_owner',)))
+
+    def assert_signed_failure(self, result):
+        self.assertEqual(result, (1, '', 'OIDC_QUALIFICATION_TOKEN_RESPONSE_OBTAINED\n'
+            'OIDC_QUALIFICATION_FAILED:GITHUB_OIDC_VERIFICATION_FAILED\n', {}, 1))
+
+    def test_pinned_identity_context_refuses_missing_malformed_and_unequal_before_mint(self):
+        for field in ['GITHUB_REPOSITORY_ID', 'GITHUB_REPOSITORY_OWNER',
+                      'GITHUB_REPOSITORY_OWNER_ID', 'GITHUB_REPOSITORY', 'GITHUB_REF']:
+            for value in [None, '', '9', '030498238', 'attacker', 'value with space']:
+                with self.subTest(field=field, value=value):
+                    env = self.environment()
+                    if value is None:
+                        del env[field]
+                    else:
+                        env[field] = value
+                    self.assertEqual(self.run_entry(environment=env),
+                        (1, '', 'OIDC_QUALIFICATION_FAILED\n', {}, 0))
+                    with self.assertRaisesRegex(ValueError, '^QUALIFICATION_CONTEXT_INVALID$'):
+                        qualification.qualify(env)
 
     def test_unknown_ambiguous_invalid_keys_and_injected_key_urls_fail(self):
         for arguments in [dict(header={'kid': 'unknown'}), dict(keys=[self.jwk, self.jwk]),
