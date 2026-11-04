@@ -247,8 +247,25 @@ class RealContinuationScenario:
         scope = reader.observe_scope()
         acquire = local_acquirer(self.inputs.root / "subject")
         def guarded_acquire(destination, environment):
+            import shutil
             before_effect()
-            return acquire(destination, environment)
+            run, tree, copy_file, copy_metadata = subprocess.run, shutil.copytree, shutil.copy2, shutil.copystat
+            def guarded_run(*args, **kwargs):
+                before_effect()
+                return run(*args, **kwargs)
+            def guarded_file(*args, **kwargs):
+                before_effect()
+                return copy_file(*args, **kwargs)
+            def guarded_metadata(*args, **kwargs):
+                before_effect()
+                return copy_metadata(*args, **kwargs)
+            def guarded_tree(*args, **kwargs):
+                before_effect()
+                if len(args) < 5: kwargs.setdefault("copy_function", guarded_file)
+                return tree(*args, **kwargs)
+            with patch.object(subprocess, "run", guarded_run), patch.object(
+                    shutil, "copytree", guarded_tree), patch.object(shutil, "copystat", guarded_metadata):
+                return acquire(destination, environment)
         popen = capture_module._popen
         def guarded_popen(*args, **kwargs):
             before_effect()
@@ -268,9 +285,16 @@ class RealContinuationScenario:
             capture, self.inputs.source.authorize(scope.repository, scope.repository_id).evidence_id,
             observation.evidence_id)
 
-    def cold(self, retained, snapshot):
+    def cold(self, retained, snapshot, before_effect=None):
         from tests.issue68_test_support import IntegratedScenario
-        IntegratedScenario.save_transport(self.worker, self.transport_archive)
+        if before_effect is None: before_effect = self.verification().before_effect
+        archive = self.transport_archive
+        class GuardedArchive:
+            def write_bytes(self, data):
+                before_effect()
+                return archive.write_bytes(data)
+        IntegratedScenario.save_transport(self.worker, GuardedArchive())
+        before_effect()
         process = subprocess.run([sys.executable, "-m", "tests.issue70_rwp03_test_support",
             str(retained), str(self.transport_archive), str(self.archive),
             str(self.journal_authority_archive), snapshot.record.attempt.request_id], capture_output=True, text=True,

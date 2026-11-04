@@ -303,5 +303,81 @@ class PolicyEffectBoundaryTests(unittest.TestCase):
         self.assertEqual(len(reads), 1)
 
 
+    def move_journal(self):
+        snapshot = self.s.worker.journal.read(self.s.worker.admission.request_id)
+        transport = self.s.worker.transport
+        sha = transport.create_journal_commit(snapshot.commit_sha, snapshot.journal_bytes)
+        transport.attributed.add(sha); transport.refs[snapshot.claim_ref] = sha
+
+    def test_R4_actions_internal_journal_movement_prevents_jobs(self):
+        calls, original = [], self.s.authority.reader._executor
+        def execute(request):
+            result = original(request); calls.append(request)
+            self.move_journal()
+            return result
+        self.s.authority.reader._executor = execute
+        result = self.s.continuation.run(self.s.worker.context)
+        self.assertIsNone(result.packet_id)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(self.s.capture_calls, 0)
+
+    def test_R4_acquisition_copy_then_git_has_separate_guard(self):
+        import shutil, subprocess
+        from unittest.mock import patch
+        tree, run, launches = shutil.copytree, subprocess.run, []
+        def copy(*args, **kwargs):
+            result = tree(*args, **kwargs)
+            if Path(args[1]).name == "source.git": self.s.worker.boundary.trusted = False
+            return result
+        def execute(*args, **kwargs):
+            if "remote" in args[0] and "add" in args[0]: launches.append(args[0])
+            return run(*args, **kwargs)
+        with patch.object(shutil, "copytree", copy), patch.object(subprocess, "run", execute):
+            result = self.s.continuation.run(self.s.worker.context)
+        self.assertIsNone(result.packet_id)
+        self.assertEqual(launches, [])
+
+    def test_R4_cold_archive_write_then_child_launch_has_separate_guard(self):
+        import subprocess, sys
+        from unittest.mock import patch
+        write, run, launches = Path.write_bytes, subprocess.run, []
+        def save(path, data):
+            result = write(path, data)
+            if path == self.s.transport_archive: self.move_journal()
+            return result
+        def execute(*args, **kwargs):
+            if args[0][0] == sys.executable:
+                launches.append(args[0]); raise AssertionError("stale cold launch")
+            return run(*args, **kwargs)
+        with patch.object(Path, "write_bytes", save), patch.object(subprocess, "run", execute):
+            result = self.s.continuation.run(self.s.worker.context)
+        self.assertIsNone(result.packet_id)
+        self.assertTrue(self.s.transport_archive.exists())
+        self.assertEqual(launches, [])
+
+    def metadata_revocation(self, threshold):
+        from unittest.mock import patch
+        from review_broker.packet_retention_v3 import load_packet_evidence_v3
+        result = self.s.continuation.run(self.s.worker.context)
+        self.assertEqual(result.status.value, "COMMITTED", result.reason)
+        verification, calls, original = self.s.verification(), [], Path.stat
+        def stat(path, *args, **kwargs):
+            value = original(path, *args, **kwargs)
+            if path.is_relative_to(result.retained_root):
+                calls.append(path)
+                if len(calls) == threshold: self.move_journal()
+            return value
+        with patch.object(Path, "stat", stat), self.assertRaises(ValueError):
+            load_packet_evidence_v3(result.retained_root,
+                self.s.worker.admission.journal_admission(), policy_verification=verification)
+        self.assertEqual(len(calls), threshold)
+
+    def test_R4_retained_root_metadata_is_an_effect_boundary(self):
+        self.metadata_revocation(1)
+
+    def test_R4_retained_file_metadata_is_an_effect_boundary(self):
+        self.metadata_revocation(8)
+
+
 if __name__ == "__main__":
     unittest.main()

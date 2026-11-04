@@ -95,6 +95,16 @@ class CurrentWorkerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.check(snapshot=after, state=AttemptState.ADMITTED)
 
+    def test_R4_run_observation_revocation_prevents_jobs(self):
+        original, calls = self.authority.reader._executor, []
+        def execute(request):
+            calls.append(request); result = original(request)
+            self.scenario.boundary.trusted = False
+            return result
+        self.authority.reader._executor = execute
+        with self.assertRaises((ValueError, GitHubActionsIdentityV3Error)): self.check()
+        self.assertEqual(len(calls), 1)
+
     def test_F24_unrecognized_dispatch_ack(self):
         self.scenario.dispatch_authority.recognized = False
         with self.assertRaises(ValueError):
