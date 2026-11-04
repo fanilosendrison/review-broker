@@ -14,6 +14,9 @@ dependencies = [
   "PyJWT[crypto]==2.15.1",
 ]
 
+[project.optional-dependencies]
+test = ["PyYAML==6.0.3"]
+
 [project.scripts]
 reviewctl = "review_broker.cli:main"
 
