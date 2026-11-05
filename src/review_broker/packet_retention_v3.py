@@ -15,6 +15,7 @@ from .queue import AttemptState
 from .packet_v2 import (SubjectCaptureV2,TechnicalProfileSnapshotV2,build_packet_v2_candidate,
                         subject_capture_evidence_id_v2,verify_packet_v2_candidate)
 from .packets import SourceRecord
+from .packet_v2_manifest import load_packet_manifest_v2,packet_snapshot_relative_path_v2
 from .packet_v2_technical_policy import AuthorizedPolicySnapshotV3, AuthorizedPolicyVerificationV3, PolicySnapshotV2, PolicyVerificationV3
 from .pre_model_policy_evidence_retention_v3 import (
  POLICY_EVIDENCE_NAMES, load_policy_evidence_v3, persist_policy_evidence_v3,
@@ -145,7 +146,7 @@ def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,ob
   or inspect(retention_root.stat).st_mode&0o077 or inspect(packet.stat).st_mode&0o077 or inspect(evidence.stat).st_mode&0o077):
   raise PacketRetentionV3Error("RETAINED_ROOT_INVENTORY_INVALID")
  origin=read(evidence/"origin-body.bin");validated=validate_journal_admission_v3(journal_admission,origin)
- try: manifest=json.loads(read(packet/"input-manifest.json"))
+ try: manifest=load_packet_manifest_v2(read(packet/"input-manifest.json"))
  except (UnicodeError,json.JSONDecodeError) as exc: raise PacketRetentionV3Error("RETAINED_MANIFEST_INVALID") from exc
  request=validated["canonical_request"];refs={item["id"]:item for item in request["references"] if item["source"]["kind"]!="inline"}
  authorized=manifest["technical_policy"]["qualification"]=="PREMODEL_POLICY_SOURCE_VERIFIED_ONLY"
@@ -169,7 +170,7 @@ def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,ob
  admission=PreclaimAdmissionV3(canonical_bytes(request),validated["request_id"],validated["review_intent_id"],validated["broker_issue_id"],validated["requester_id"],origin_meta["requester_login_observed"],source["repository"],source["repository_id"],source["pull_request"],source["pull_request_id"],source["head_sha"],validated["source_admission_id"],tuple(validated["reference_ids"]),origin,canonical_bytes(origin_meta),canonical_bytes(source),canonical_bytes(validated["requester_authorization"]),canonical_bytes(validated["history_observation"]),validated["origin_evidence_id"],validated["requester_authorization_evidence_id"],validated["history_evidence_id"],validated["history_scan_boundary"],validated["admission_evidence_id"],tuple(git),tuple(issues),source_scope_evidence_id=validated.get("source_app_scope_evidence_id"))
  records=[]
  for entry in manifest["subject_sources"]:
-  data=read(packet/entry["snapshot"]);record=SourceRecord.from_bytes(entry["repository"],entry["commit"],entry["path"],entry["git_blob_oid"],data)
+  data=read(packet/packet_snapshot_relative_path_v2(entry));record=SourceRecord.from_bytes(entry["repository"],entry["commit"],entry["path"],entry["git_blob_oid"],data)
   if hashlib.sha256(data).hexdigest()!=entry["sha256"]: raise PacketRetentionV3Error("RETAINED_SUBJECT_BYTES_MISMATCH")
   records.append(record)
  subject=manifest["subject"];qualification=subject["capture_qualification"]

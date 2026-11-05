@@ -1,7 +1,6 @@
 """Offline construction and full verification of candidate Reviewer Packet v2."""
 from __future__ import annotations
 import hashlib
-from importlib import resources
 import json
 import os
 from pathlib import Path
@@ -9,7 +8,8 @@ import re
 import shutil, tempfile
 from functools import partial
 from typing import Callable, Mapping
-from jsonschema import Draft202012Validator
+from .packet_v2_manifest import (load_packet_manifest_v2, packet_snapshot_relative_path_v2,
+                                 validate_packet_manifest_v2 as _validate_schema)
 from .admission_evidence_v3 import validate_journal_admission_v3
 from .admission_v3 import PreclaimAdmissionV3
 from .changes import ChangeScopeError, build_change_basis, validate_change_scope
@@ -45,18 +45,6 @@ def _fail(marker: str, cause: BaseException | None = None) -> None:
     raise PacketV2CandidateError(marker) from cause
 def _hash(prefix: str, value: object) -> str:
     return f"{prefix}:sha256:{hashlib.sha256(canonical_bytes(value)).hexdigest()}"
-def _schema() -> dict[str, object]:
-    path = resources.files("review_broker.schemas").joinpath("packet-v2.candidate.schema.json")
-    value = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(value, dict):
-        _fail("PACKET_V2_SCHEMA_INVALID")
-    return value
-def _validate_schema(manifest: object) -> dict[str, object]:
-    errors = sorted(Draft202012Validator(_schema()).iter_errors(manifest),
-                    key=lambda error: [str(part) for part in error.path])
-    if errors:
-        _fail("PACKET_V2_SCHEMA_MISMATCH")
-    return json.loads(canonical_bytes(manifest))
 def _admission(admission: PreclaimAdmissionV3) -> tuple[dict[str, object], dict[str, object]]:
     if not isinstance(admission, PreclaimAdmissionV3):
         _fail("PACKET_V2_ADMISSION_REQUIRED")
@@ -287,10 +275,7 @@ def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCa
         guard(); shutil.rmtree(staging, ignore_errors=True); raise
     return manifest
 def _read_snapshot(directory: Path, entry: Mapping[str, object], *, git: bool, policy_verification=None) -> tuple[bytes, tuple[str, ...]]:
-    expected = f"sources/{entry['source_id']}.bin"
-    if entry.get("snapshot") != expected or Path(expected).is_absolute() or ".." in Path(expected).parts:
-        _fail("PACKET_V2_SNAPSHOT_PATH_INVALID")
-    path = directory / expected
+    path = directory / packet_snapshot_relative_path_v2(entry)
     if _inspect(policy_verification, path.is_symlink) or not _inspect(policy_verification, path.is_file): _fail("PACKET_V2_SNAPSHOT_INVALID")
     _effect(policy_verification); data = path.read_bytes()
     if len(data) != entry["original_byte_length"] or hashlib.sha256(data).hexdigest() != entry["sha256"]:
@@ -318,10 +303,8 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
     if (_inspect(policy_verification, output_directory.is_symlink) or _inspect(policy_verification, (output_directory / "sources").is_symlink)
             or _inspect(policy_verification, manifest_path.is_symlink) or _inspect(policy_verification, prompt_path.is_symlink)):
         _fail("PACKET_V2_ARTIFACT_SYMLINK_FORBIDDEN")
-    try: raw = read(manifest_path); manifest = json.loads(raw)
-    except (OSError, json.JSONDecodeError) as exc: _fail("PACKET_V2_MANIFEST_INVALID", exc)
-    if raw != canonical_bytes(manifest) + b"\n": _fail("PACKET_V2_MANIFEST_NONCANONICAL")
-    manifest = _validate_schema(manifest)
+    try: manifest = load_packet_manifest_v2(read(manifest_path))
+    except OSError as exc: _fail("PACKET_V2_MANIFEST_INVALID", exc)
     if policy_verification is not None and manifest["technical_policy"]["qualification"] != "PREMODEL_POLICY_SOURCE_VERIFIED_ONLY": _fail("AUTHORIZED_POLICY_MODE_REQUIRED")
     if {item.name for item in _inspect(policy_verification, lambda: tuple(output_directory.iterdir()))} != {
         "input-manifest.json", "input.txt", "changes.patch", "sources"}:
