@@ -15,7 +15,7 @@ from .queue import AttemptState
 from .packet_v2 import (SubjectCaptureV2,TechnicalProfileSnapshotV2,build_packet_v2_candidate,
                         subject_capture_evidence_id_v2,verify_packet_v2_candidate)
 from .packets import SourceRecord
-from .packet_v2_manifest import load_packet_manifest_v2,packet_snapshot_relative_path_v2
+from .packet_v2_manifest import parse_canonical_packet_manifest_v2,validate_packet_manifest_v2,packet_snapshot_relative_path_v2
 from .packet_v2_technical_policy import AuthorizedPolicySnapshotV3, AuthorizedPolicyVerificationV3, PolicySnapshotV2, PolicyVerificationV3
 from .pre_model_policy_evidence_retention_v3 import (
  POLICY_EVIDENCE_NAMES, load_policy_evidence_v3, persist_policy_evidence_v3,
@@ -129,6 +129,19 @@ def _issue_observation(meta:dict[str,object],data:bytes)->GitHubIssueReferenceOb
  if artifact_identity(canonical_bytes(value.provenance_basis())+b"\n")!=value.evidence_id: raise PacketRetentionV3Error("RETAINED_ISSUE_EVIDENCE_MISMATCH")
  return value
 
+def _require_retained_capture_mode(manifest:object)->None:
+ """Pure legacy diagnostics, before full schema validation and all directed reads."""
+ if not isinstance(manifest,dict) or not isinstance(manifest.get("subject"),dict): return
+ subject=manifest["subject"];qualification=subject.get("capture_qualification")
+ authority_fields=("source_authorization_evidence_id","pr_observation_evidence_id")
+ if qualification=="AUTHENTICATED_SOURCE_READ_ONLY":
+  if any(type(subject.get(key)) is not str or re.fullmatch(r"artifact:sha256:[0-9a-f]{64}",subject[key]) is None for key in authority_fields):
+   raise PacketRetentionV3Error("RETAINED_SUBJECT_AUTHORITY_INVALID")
+ elif qualification=="SYNTHETIC_OFFLINE_VERIFIED":
+  if any(key in subject for key in authority_fields):
+   raise PacketRetentionV3Error("RETAINED_SYNTHETIC_AUTHORITY_FORBIDDEN")
+ else: raise PacketRetentionV3Error("RETAINED_SUBJECT_QUALIFICATION_INVALID")
+
 def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,object],*,
  policy_verification:PolicyVerificationV3|None=None)->tuple[PreclaimAdmissionV3,SubjectCaptureV2,PolicySnapshotV2,dict[str,object]]:
  """Cold-reconstruct verifier inputs from journal authority and retained bytes only."""
@@ -146,8 +159,10 @@ def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,ob
   or inspect(retention_root.stat).st_mode&0o077 or inspect(packet.stat).st_mode&0o077 or inspect(evidence.stat).st_mode&0o077):
   raise PacketRetentionV3Error("RETAINED_ROOT_INVENTORY_INVALID")
  origin=read(evidence/"origin-body.bin");validated=validate_journal_admission_v3(journal_admission,origin)
- try: manifest=load_packet_manifest_v2(read(packet/"input-manifest.json"))
+ try: manifest=parse_canonical_packet_manifest_v2(read(packet/"input-manifest.json"))
  except (UnicodeError,json.JSONDecodeError) as exc: raise PacketRetentionV3Error("RETAINED_MANIFEST_INVALID") from exc
+ _require_retained_capture_mode(manifest)
+ manifest=validate_packet_manifest_v2(manifest)
  request=validated["canonical_request"];refs={item["id"]:item for item in request["references"] if item["source"]["kind"]!="inline"}
  authorized=manifest["technical_policy"]["qualification"]=="PREMODEL_POLICY_SOURCE_VERIFIED_ONLY"
  if policy_verification is not None and not authorized: raise PacketRetentionV3Error("AUTHORIZED_POLICY_MODE_REQUIRED")
@@ -174,14 +189,6 @@ def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,ob
   if hashlib.sha256(data).hexdigest()!=entry["sha256"]: raise PacketRetentionV3Error("RETAINED_SUBJECT_BYTES_MISMATCH")
   records.append(record)
  subject=manifest["subject"];qualification=subject["capture_qualification"]
- authority_fields=("source_authorization_evidence_id","pr_observation_evidence_id")
- if qualification=="AUTHENTICATED_SOURCE_READ_ONLY":
-  if any(type(subject.get(key)) is not str or re.fullmatch(r"artifact:sha256:[0-9a-f]{64}",subject[key]) is None for key in authority_fields):
-   raise PacketRetentionV3Error("RETAINED_SUBJECT_AUTHORITY_INVALID")
- elif qualification=="SYNTHETIC_OFFLINE_VERIFIED":
-  if any(key in subject for key in authority_fields):
-   raise PacketRetentionV3Error("RETAINED_SYNTHETIC_AUTHORITY_FORBIDDEN")
- else: raise PacketRetentionV3Error("RETAINED_SUBJECT_QUALIFICATION_INVALID")
  capture=SubjectCaptureV2(subject["repository"],subject["repository_id"],subject["pull_request"],subject["pull_request_id"],subject["head_sha"],subject["base_sha"],subject["merge_base_sha"],tuple({"status":x["status"],"path":x["path"],"previous_path":x["previous_path"]} for x in manifest["change_scope"]["changes"]),tuple(records),read(packet/"changes.patch"),subject["subject_capture_evidence_id"],Path("."),verification=qualification,source_authorization_evidence_id=subject.get("source_authorization_evidence_id"),pr_observation_evidence_id=subject.get("pr_observation_evidence_id"))
  try: validate_capture_provenance_v2(capture,source,admission.source_scope_evidence_id)
  except SubjectCaptureProvenanceV2Error as exc: raise PacketRetentionV3Error(str(exc)) from exc

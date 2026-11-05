@@ -24,14 +24,18 @@ def validate_packet_manifest_v2(manifest: object) -> dict[str, object]:
     return json.loads(canonical_bytes(manifest))
 
 
-def load_packet_manifest_v2(raw: bytes) -> dict[str, object]:
+def parse_canonical_packet_manifest_v2(raw: bytes) -> object:
     try:
         manifest = json.loads(raw)
     except (UnicodeError, ValueError) as exc:
         raise PacketV2CandidateError("PACKET_V2_MANIFEST_INVALID") from exc
     if raw != canonical_bytes(manifest) + b"\n":
         raise PacketV2CandidateError("PACKET_V2_MANIFEST_NONCANONICAL")
-    return validate_packet_manifest_v2(manifest)
+    return manifest
+
+
+def load_packet_manifest_v2(raw: bytes) -> dict[str, object]:
+    return validate_packet_manifest_v2(parse_canonical_packet_manifest_v2(raw))
 
 
 def packet_snapshot_relative_path_v2(entry: Mapping[str, object]) -> str:
