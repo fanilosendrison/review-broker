@@ -4,7 +4,10 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass
 import hashlib
-from typing import Callable, Mapping
+from typing import Callable, Mapping, TYPE_CHECKING, TypeAlias, Union
+
+if TYPE_CHECKING:
+    from .historical_policy_verification_v3 import HistoricalAuthorizedPolicyVerificationV3
 
 from .admission_v3 import PreclaimAdmissionV3
 from .github_actions_identity_v3 import GitHubActionsExpectationV3
@@ -152,6 +155,9 @@ class AuthorizedPolicyVerificationV3:
                 "selection_authorization_evidence_id": profile.selection.evidence_id}
 
 
+PolicyVerificationV3: TypeAlias = Union[AuthorizedPolicyVerificationV3, "HistoricalAuthorizedPolicyVerificationV3"]
+
+
 def packet_program_v2(request: Mapping[str, object], policy: Mapping[str, object]) -> dict[str, object]:
     """The reviewer program binds the resolved policy content, never its approval."""
     return {"mission": request["mission"], "reviewer": request["reviewer"],
@@ -160,19 +166,20 @@ def packet_program_v2(request: Mapping[str, object], policy: Mapping[str, object
 
 
 def require_policy_boundary_v3(profile: PolicySnapshotV2, admission: PreclaimAdmissionV3 | None,
-                               verification: AuthorizedPolicyVerificationV3 | None) -> None:
+                               verification: PolicyVerificationV3 | None) -> None:
     if verification is None:
         if type(profile) is AuthorizedPolicySnapshotV3:
             raise PacketV2CandidateError("PACKET_V2_POLICY_AUTHORITY_REQUIRED")
     else:
-        if type(verification) is not AuthorizedPolicyVerificationV3 or admission is None:
+        from .historical_policy_verification_v3 import HistoricalAuthorizedPolicyVerificationV3
+        if type(verification) not in {AuthorizedPolicyVerificationV3, HistoricalAuthorizedPolicyVerificationV3} or admission is None:
             raise PacketV2CandidateError("AUTHORIZED_POLICY_BOUNDARY_INVALID")
         verification.require_profile(profile, admission)
 
 
 def technical_policy_v2(profile: PolicySnapshotV2,
                         request: Mapping[str, object],
-                        verification: AuthorizedPolicyVerificationV3 | None = None,
+                        verification: PolicyVerificationV3 | None = None,
                         admission: PreclaimAdmissionV3 | None = None
                         ) -> dict[str, object]:
     require_policy_boundary_v3(profile, admission, verification)

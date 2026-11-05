@@ -6,10 +6,9 @@ import json
 import os
 from pathlib import Path
 import re
-import shutil
-import tempfile
+import shutil, tempfile
 from functools import partial
-from typing import Any, Callable, Mapping
+from typing import Callable, Mapping
 from jsonschema import Draft202012Validator
 from .admission_evidence_v3 import validate_journal_admission_v3
 from .admission_v3 import PreclaimAdmissionV3
@@ -23,7 +22,7 @@ from .packet_v2_renderer import RENDERER_ID, render_packet_v2_prompt
 from .packet_v2_subject import SubjectCaptureV2
 from .packet_v2_technical_policy import (
     AuthorizedPolicyVerificationV3, PacketV2CandidateError, PolicySnapshotV2,
-    TechnicalProfileSnapshotV2, technical_policy_v2, packet_program_v2, require_policy_boundary_v3,
+    TechnicalProfileSnapshotV2, technical_policy_v2, packet_program_v2, require_policy_boundary_v3, PolicyVerificationV3,
 )
 from .packet_v2_subject_provenance import evidence_basis_v2,manifest_fields_v2,validate_capture_provenance_v2
 from .packets import (
@@ -204,7 +203,7 @@ def _packet_basis(manifest: Mapping[str, object]) -> dict[str, object]:
         "admission_evidence_id", "subject", "atomicity", "change_scope",
         "subject_sources", "reference_sources", "reference_outcomes",
         "technical_policy", "program", "source_manifest_id", "program_id")}
-def _effect(verification: AuthorizedPolicyVerificationV3 | None) -> None:
+def _effect(verification: PolicyVerificationV3 | None) -> None:
     if verification is not None: verification.before_effect()
 def _inspect(verification, operation):
     _effect(verification); return operation()
@@ -221,6 +220,7 @@ def build_packet_v2_candidate(admission: PreclaimAdmissionV3, capture: SubjectCa
                               issue_reference_readers: Mapping[str, GitHubIssueReferenceReaderV3] | None = None,
                               *, policy_verification: AuthorizedPolicyVerificationV3 | None = None) -> dict[str, object]:
     """Build atomically without network, execution, inference, or publication."""
+    if policy_verification is not None and type(policy_verification) is not AuthorizedPolicyVerificationV3: _fail("ACTIVE_PACKET_BUILDER_AUTHORITY_REQUIRED")
     require_policy_boundary_v3(profile, admission, policy_verification)
     request, _ = _admission(admission)
     _validate_capture(capture, admission, request, prove_local_git=True, before_effect=None if policy_verification is None else policy_verification.before_effect)
@@ -308,7 +308,7 @@ def _read_snapshot(directory: Path, entry: Mapping[str, object], *, git: bool, p
 def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmissionV3,
                                capture: SubjectCaptureV2, profile: PolicySnapshotV2,
                                issue_reference_observations: tuple[object,...]=(),
-                               *, policy_verification: AuthorizedPolicyVerificationV3 | None = None) -> dict[str, object]:
+                               *, policy_verification: PolicyVerificationV3 | None = None) -> dict[str, object]:
     """Independently reconstruct every candidate packet identity and byte."""
     require_policy_boundary_v3(profile, admission, policy_verification)
     def read(path):

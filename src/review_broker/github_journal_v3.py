@@ -76,6 +76,10 @@ class GitHubJournalV3:
             raise GitHubJournalV3Error(f"JOURNAL_READ_{result.status.value}")
         return self._verified(claim_ref, result.snapshot)
 
+    def read_at(self, request_id: str, commit_sha: str) -> VerifiedJournalSnapshotV3:
+        from .prepared_journal_history_v3 import read_authenticated_journal_at_v3
+        return read_authenticated_journal_at_v3(self, request_id, commit_sha)
+
     @staticmethod
     def _matches_claim(snapshot: VerifiedJournalSnapshotV3, request_id: str,
                        admission: Mapping[str, object]) -> bool:
@@ -260,7 +264,7 @@ class GitHubJournalV3:
         )
 
     def _transition(self, current: VerifiedJournalSnapshotV3,
-                    mutation: RecordMutationV3) -> JournalOutcomeV3:
+                    mutation: RecordMutationV3, before_effect=None) -> JournalOutcomeV3:
         if current.repository != self.repository or current.repository_node_id != self.repository_node_id:
             raise GitHubJournalV3Error("SNAPSHOT_REPOSITORY_MISMATCH")
         reread = decode_journal_v2(current.journal_bytes)
@@ -285,6 +289,7 @@ class GitHubJournalV3:
             encoded = encode_journal_v2(successor)
         except JournalRecordV3Error as exc:
             raise GitHubJournalV3Error(str(exc)) from exc
+        if before_effect is not None: before_effect()
         successor_sha = self.transport.create_journal_commit(current.commit_sha, encoded)
         pending = PendingWriteV3(
             self.repository, current.claim_ref, current.commit_sha, successor_sha,
@@ -298,6 +303,7 @@ class GitHubJournalV3:
             after_oid=successor_sha,
             force=False,
         )
+        if before_effect is not None: before_effect()
         result = self.transport.update_ref(update)
         evidence = result.writer_evidence_id
         if not (result.http_status == 200 and not result.errors
@@ -365,7 +371,7 @@ class GitHubJournalV3:
     def prepare(self, current: VerifiedJournalSnapshotV3, packet_evidence_id: str,
                 reservation_id: str, generation: int,
                 worker: WorkerIdentityV3,
-                authority: PacketAuthorityV3) -> JournalOutcomeV3:
+                authority: PacketAuthorityV3, *, before_effect=None) -> JournalOutcomeV3:
         if not authority.permits(
             snapshot=current, packet_evidence_id=packet_evidence_id,
             reservation_id=reservation_id, generation=generation, worker=worker,
@@ -374,7 +380,7 @@ class GitHubJournalV3:
         return self._transition(current, lambda record: transition_state(
             record, AttemptState.PREPARED, packet_evidence_id,
             reservation_id, generation, worker
-        ))
+        ), before_effect)
 
     def refuse_permanently(self, current: VerifiedJournalSnapshotV3,
                            failure_receipt_id: str, receipt: Mapping[str, object],

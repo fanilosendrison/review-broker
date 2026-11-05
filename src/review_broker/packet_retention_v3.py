@@ -15,7 +15,7 @@ from .queue import AttemptState
 from .packet_v2 import (SubjectCaptureV2,TechnicalProfileSnapshotV2,build_packet_v2_candidate,
                         subject_capture_evidence_id_v2,verify_packet_v2_candidate)
 from .packets import SourceRecord
-from .packet_v2_technical_policy import AuthorizedPolicySnapshotV3, AuthorizedPolicyVerificationV3, PolicySnapshotV2
+from .packet_v2_technical_policy import AuthorizedPolicySnapshotV3, AuthorizedPolicyVerificationV3, PolicySnapshotV2, PolicyVerificationV3
 from .pre_model_policy_evidence_retention_v3 import (
  POLICY_EVIDENCE_NAMES, load_policy_evidence_v3, persist_policy_evidence_v3,
  require_private_policy_tree_v3, rename_exclusive_policy_tree_v3,
@@ -52,7 +52,9 @@ def persist_packet_evidence_v3(admission:PreclaimAdmissionV3,capture:SubjectCapt
  policy_verification:AuthorizedPolicyVerificationV3|None=None,
  candidate_directory:Path|None=None)->dict[str,object]:
  """Build and verify the unique ADMITTED claim locator, then expose it atomically."""
- if policy_verification is not None: policy_verification.require_profile(profile,admission)
+ if policy_verification is not None:
+  if type(policy_verification) is not AuthorizedPolicyVerificationV3: raise PacketRetentionV3Error("ACTIVE_RETENTION_AUTHORITY_REQUIRED")
+  policy_verification.require_profile(profile,admission)
  if (snapshot.record.attempt.state is not AttemptState.ADMITTED
   or snapshot.record.attempt.admission!=admission.journal_admission()):
   raise PacketRetentionV3Error("RETENTION_ADMITTED_SNAPSHOT_REQUIRED")
@@ -127,9 +129,12 @@ def _issue_observation(meta:dict[str,object],data:bytes)->GitHubIssueReferenceOb
  return value
 
 def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,object],*,
- policy_verification:AuthorizedPolicyVerificationV3|None=None)->tuple[PreclaimAdmissionV3,SubjectCaptureV2,PolicySnapshotV2,dict[str,object]]:
+ policy_verification:PolicyVerificationV3|None=None)->tuple[PreclaimAdmissionV3,SubjectCaptureV2,PolicySnapshotV2,dict[str,object]]:
  """Cold-reconstruct verifier inputs from journal authority and retained bytes only."""
- if policy_verification is not None: policy_verification.require_admission(journal_admission)
+ if policy_verification is not None:
+  from .historical_policy_verification_v3 import HistoricalAuthorizedPolicyVerificationV3
+  if type(policy_verification) not in {AuthorizedPolicyVerificationV3,HistoricalAuthorizedPolicyVerificationV3}: raise PacketRetentionV3Error("CLOSED_POLICY_READER_REQUIRED")
+  policy_verification.require_admission(journal_admission)
  def read(path): return _read_private(path,policy_verification)
  guard=None if policy_verification is None else policy_verification.before_effect
  def inspect(operation): return observe_path_v3(operation,guard)

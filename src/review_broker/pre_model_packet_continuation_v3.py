@@ -101,6 +101,15 @@ class PreModelPacketContinuationV3:
             policy_source_authority, policy_selection_authority)
         self.stages = packet_stages
         self._lock, self._attempted = Lock(), False
+        self._remote_handoff = None
+
+    def claim_remote_continuation(self, context, handoff) -> None:
+        """Consume this original process's completed handoff, never an ADMITTED read."""
+        with self._lock:
+            if (self._remote_handoff is None or self._remote_handoff[0] != context
+                    or self._remote_handoff[1] is not handoff):
+                raise ValueError("ORIGINAL_WORKER_REMOTE_CONTINUATION_REQUIRED")
+            self._remote_handoff = None
 
     def run(self, context: WorkerExecutionContextV3) -> PreModelPacketContinuationResultV3:
         with self._lock:
@@ -191,9 +200,12 @@ class PreModelPacketContinuationV3:
             if canonical_bytes(cold) != canonical_bytes(manifest):
                 raise ValueError("CONTINUATION_COLD_RECONSTRUCTION_MISMATCH")
             before_effect()
-            return PreModelPacketContinuationResultV3(
+            result = PreModelPacketContinuationResultV3(
                 OutcomeStatusV3.COMMITTED, "RWP03_OFFLINE_LOCAL_PACKET_COMPLETE",
                 outcome, retained, str(manifest["packet_id"]))
+            with self._lock:
+                self._remote_handoff = (context, result)
+            return result
         except Exception as exc:
             return PreModelPacketContinuationResultV3(
                 OutcomeStatusV3.UNRESOLVED if mutation_started else OutcomeStatusV3.REJECTED,

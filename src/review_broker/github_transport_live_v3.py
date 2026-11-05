@@ -27,8 +27,7 @@ _QUALIFICATION = re.compile(
 )
 _JOURNAL_PATH = ".review-broker/attempt.json"
 
-class GitHubTransportLiveV3Error(RuntimeError):
-    """Fail-closed transport or authenticated observation failure."""
+from .github_git_database_error_v3 import GitHubTransportLiveV3Error
 
 
 class GitHubTransportLiveV3:
@@ -97,6 +96,7 @@ class GitHubTransportLiveV3:
             self._mutation_attempt_count += 1
         failed = False
         try:
+            if getattr(self, "before_effect", None) is not None: self.before_effect()
             response = self._executor(request)
         except Exception:
             failed = True
@@ -255,6 +255,8 @@ class GitHubTransportLiveV3:
             )
         except GitHubTransportLiveV3Error:
             return ReadResultV3(ReadStatusV3.UNAVAILABLE)
+
+    from .github_journal_history_transport_v3 import read_journal_commit_v3 as read_journal_commit
 
     @staticmethod
     def _git_blob_sha(content: bytes) -> str:

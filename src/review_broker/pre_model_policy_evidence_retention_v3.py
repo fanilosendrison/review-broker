@@ -12,7 +12,7 @@ from .admission_v3 import PreclaimAdmissionV3
 from .github_journal_transport_v3 import VerifiedJournalSnapshotV3
 from .packet_v2_subject import SubjectCaptureV2
 from .packet_v2_technical_policy import (
-    AuthorizedPolicySnapshotV3, AuthorizedPolicyVerificationV3, PacketV2CandidateError,
+    AuthorizedPolicySnapshotV3, AuthorizedPolicyVerificationV3, PacketV2CandidateError, PolicyVerificationV3,
 )
 from .pre_model_policy_selection_v3 import PolicySelectionReceiptV3
 from .pre_model_policy_source_v3 import PolicySourceObservationV3
@@ -25,6 +25,8 @@ POLICY_EVIDENCE_NAMES = frozenset({
 def persist_policy_evidence_v3(root: Path, profile: AuthorizedPolicySnapshotV3,
                                verification: AuthorizedPolicyVerificationV3) -> None:
     """Only exclusive private staged writes; caller owns atomic final publication."""
+    if type(verification) is not AuthorizedPolicyVerificationV3:
+        raise PacketV2CandidateError("ACTIVE_POLICY_PERSISTENCE_AUTHORITY_REQUIRED")
     for name, data in (
         ("expected-policy.bin", profile.original_bytes),
         ("policy-source-observation.json", profile.source.canonical_receipt_bytes),
@@ -41,9 +43,10 @@ def persist_policy_evidence_v3(root: Path, profile: AuthorizedPolicySnapshotV3,
 
 
 def load_policy_evidence_v3(root: Path,
-                            verification: AuthorizedPolicyVerificationV3 | None,
+                            verification: PolicyVerificationV3 | None,
                             admission: PreclaimAdmissionV3) -> AuthorizedPolicySnapshotV3:
-    if type(verification) is not AuthorizedPolicyVerificationV3:
+    from .historical_policy_verification_v3 import HistoricalAuthorizedPolicyVerificationV3
+    if type(verification) not in {AuthorizedPolicyVerificationV3, HistoricalAuthorizedPolicyVerificationV3}:
         raise PacketV2CandidateError("RETAINED_POLICY_INDEPENDENT_AUTHORITY_REQUIRED")
     verification.require_admission(admission.journal_admission())
     # The containing retained tree is checked before any file is interpreted.

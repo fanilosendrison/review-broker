@@ -18,19 +18,26 @@ _INTENT_ID=re.compile(r"review-intent:sha256:[0-9a-f]{64}\Z")
 _ATTEMPT_ID=re.compile(r"attempt:sha256:[0-9a-f]{64}\Z")
 _RESERVATION_ID=re.compile(r"preparation-dispatch:sha256:[0-9a-f]{64}\Z")
 _SHA=re.compile(r"[0-9a-f]{40}\Z")
-def _files(root:Path):
- for path in sorted(root.rglob("*"),key=lambda item:item.relative_to(root).as_posix()):
-  if path.is_symlink(): raise PacketPreparationAuthorityV3Error("RETAINED_SYMLINK_FORBIDDEN")
-  if path.stat().st_mode&0o077: raise PacketPreparationAuthorityV3Error("RETAINED_MODE_NOT_PRIVATE")
-  if path.is_file() and path.relative_to(root).as_posix()!="evidence/preparation-receipt.json": yield path
-def retained_inventory_id_v3(root:Path)->str:
+def _files(root:Path,before_effect=None):
+ from .pre_model_policy_evidence_retention_v3 import policy_tree_paths_v3,observe_path_v3
+ paths=list(policy_tree_paths_v3(root,before_effect))[1:]
+ for path in sorted(paths,key=lambda item:item.relative_to(root).as_posix()):
+  def inspect(operation): return observe_path_v3(operation,before_effect)
+  if inspect(path.is_symlink): raise PacketPreparationAuthorityV3Error("RETAINED_SYMLINK_FORBIDDEN")
+  if inspect(path.stat).st_mode&0o077: raise PacketPreparationAuthorityV3Error("RETAINED_MODE_NOT_PRIVATE")
+  if inspect(path.is_file) and path.relative_to(root).as_posix()!="evidence/preparation-receipt.json": yield path
+def retained_inventory_v3(root:Path,*,before_effect=None)->dict[str,object]:
+ """The historical ordered inventory, with a guard at every internal I/O."""
  entries=[];seen=set()
- for path in _files(root):
+ for path in _files(root,before_effect):
   relative=path.relative_to(root).as_posix()
   if relative in seen: raise PacketPreparationAuthorityV3Error("RETAINED_INVENTORY_DUPLICATE")
+  if before_effect is not None: before_effect()
   seen.add(relative);data=path.read_bytes();entries.append({"path":relative,"byte_length":len(data),"sha256":hashlib.sha256(data).hexdigest()})
  if not entries: raise PacketPreparationAuthorityV3Error("RETAINED_INVENTORY_EMPTY")
- return artifact_identity(canonical_bytes({"schema_version":1,"files":entries})+b"\n")
+ return {"schema_version":1,"files":entries}
+def retained_inventory_id_v3(root:Path,*,before_effect=None)->str:
+ return artifact_identity(canonical_bytes(retained_inventory_v3(root,before_effect=before_effect))+b"\n")
 def _receipt(snapshot:VerifiedJournalSnapshotV3,manifest:Mapping[str,object],inventory_id:str)->dict[str,object]:
  attempt=snapshot.record.attempt;control=snapshot.record.control
  return {"schema_version":1,"evidence_type":"offline-v3-prepared-packet-binding",
@@ -43,6 +50,13 @@ def _receipt(snapshot:VerifiedJournalSnapshotV3,manifest:Mapping[str,object],inv
   "subject_capture_evidence_id":manifest["subject"]["subject_capture_evidence_id"],
   "technical_policy_id":manifest["technical_policy"]["technical_policy_id"],
   "retained_inventory_id":inventory_id}
+def offline_packet_receipt_v3(snapshot:VerifiedJournalSnapshotV3,manifest:Mapping[str,object],inventory_id:str)->dict[str,object]:
+ """Pure historical receipt construction; no file is added to authorized packets."""
+ return _receipt(snapshot,manifest,inventory_id)
+def offline_packet_receipt_identity_v3(receipt:Mapping[str,object])->str:
+ if set(receipt)!=_RECEIPT_FIELDS or receipt["evidence_type"]!="offline-v3-prepared-packet-binding":
+  raise PacketPreparationAuthorityV3Error("OFFLINE_RECEIPT_FIELDS_INVALID")
+ return artifact_identity(canonical_bytes(dict(receipt))+b"\n")
 def prepare_packet_receipt_v3(retention_base:Path,snapshot:VerifiedJournalSnapshotV3,
  expected_technical_policy_id:str,expected_subject_capture_evidence_id:str,
  expected_packet_id:str)->str:
