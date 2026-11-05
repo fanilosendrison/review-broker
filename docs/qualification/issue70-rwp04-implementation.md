@@ -319,6 +319,35 @@ historical mutations, plus genuine disappeared-Worker cold reconstruction.
 Complete CI on the new tree and its independent review remain required. This
 failed run is retained separately and does not qualify either correction.
 
+### Complete test success but failed CI job deadline
+
+Candidate `daa888c66a14e2a12aa7c14c92d5112b2960971c`, tree
+`a622408dc25e7b4fd8793d4dbc20eb6eff6ff0dc`, ran all **1018 tests in
+914.068 seconds, OK**, with no skips in run `42104877423`, job `127516941817`.
+Installation, compilation and JSON steps completed successfully. Nevertheless,
+the job exceeded its fifteen-minute budget and its overall conclusion is failed.
+This is **not** an exact-candidate CI PASS. Log SHA-256:
+`fad4164166bdd8acce285fc71395783a4c502faf946fcc36f1b1db5b35a62eb6`.
+
+- Statement: the extended mandatory corpus exceeded the existing job deadline
+  even though every test and validation command completed successfully.
+- Source and evidence: the run's actual 914.068-second test summary and GitHub's
+  maximum-execution-time annotation; earlier runs remain distinct observations.
+- Existing authority: the owner requires all tests, normal Ubuntu CI, effective
+  Linux cold controls and no masking of failures; no fifteen-minute product or
+  operational deadline is specified by this tranche.
+- Semantic disposition: `no-normative-impact`.
+- Affected layers: `integration-or-conformance`,
+  `verification-or-qualification-evidence`, and
+  `repository-governance-or-documentation`.
+- Related consequence: overall CI qualification remains unavailable on this run.
+- Required authority: existing in-scope validation correction mandate; no new
+  operational or normative authority is created.
+- Next action: increase only the normal CI job budget from fifteen to thirty
+  minutes, keeping every command, test, assertion, runner, action pin and
+  permission unchanged, then qualify the exact new tree. No retry of an
+  operational attempt, test removal or weaker oracle is involved.
+
 ## Governance observations and remaining gates
 
 Live preflight confirmed #87 at the exact mandated SHA/tree, OPEN/DRAFT, and no
