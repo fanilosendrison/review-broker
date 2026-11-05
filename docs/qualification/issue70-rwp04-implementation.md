@@ -206,6 +206,92 @@ The exact-source CI must execute all final tests, including the cold processes.
 - Q24: existing v1/v2, offline receipt and RWP-01/02/03 tests are retained intact;
   final exact-tree CI is the complete regression gate.
 
+## First publication, exact CI and independent NO_GO
+
+Draft PR #89 first published SHA
+`d8de11da1e3b1b0e71f7c16729a609822edab7e1`, tree
+`eb94e93354eedc082d671f2602a07538e8802e80`, through governed publisher run
+`01M6PJT5YX1AHKZS28MHVV4PVX`. Its one authorized branch bootstrap was at the
+exact base; neither dev nor the persistent checkout was synchronized.
+
+Normal Ubuntu 24.04 CI run `42094129066`, job `127479610308`, passed
+**1009 tests in 481.820 seconds without skips**, installation, compilation and
+JSON checks. Its authenticated checkout
+`efe7e4e3e76c8e9233d3242f3448691942eb032f` has the exact candidate tree. All twelve
+RWP-03 Linux tests and both new cold processes executed. Log SHA-256:
+`8ebac22a4c4696f59b1437c6479c5afb0d551fce358bc272584e165c0b1e52ce`.
+This PASS applies to that tree, not automatically to its correction.
+
+The fresh independent Pi review returned **NO_GO** on that exact candidate.
+Its [complete non-sensitive review and verified configuration receipt](https://github.com/fanilosendrison/review-broker/pull/89#issuecomment-6668180928)
+remain historical evidence. Pi 0.84.2 used
+`openai-codex-1 / gpt-6.1-sol / high`; both registered and active tools were
+exactly builtin read, grep, find and ls. Actual calls were 56 read, 13 grep,
+2 ls and 1 find. Prompt completion and waitForIdle were awaited; settled and
+idle were true and the final stop reason was stop. No shell or mutation tool
+was exposed. Review-text SHA-256:
+`fdfb701c44caf56c5552bda03b71fb78a70f9a4cf65a98df29f56808f87abbe3`.
+Private trace SHA-256:
+`de8dd6004bd783349a5515d27fdb60f04d4a696fe11cfca0044f7ae5c306a675`.
+
+### Material discovery classification and bounded corrections
+
+Each record below is independent. Existing authority is the owner RWP-04 mandate
+and its experimental candidate, under the repository's technical-authority
+order. All five dispositions are `no-normative-impact`; the affected layers are
+architecture-or-implementation and verification-or-qualification-evidence.
+Their durable record also affects repository-governance-or-documentation.
+No normative obligation or new product decision is promoted. Existing in-scope
+correction authority suffices; the required next gate is new exact-tree CI and
+independent review, not acceptance transferred from the prior tree.
+
+- **RWP04-R1 — Manifest confinement:** the initial loader read an absolute or
+  traversing subject snapshot before schema/path validation. Five new witness
+  methods produced six expected assertion failures: four observed outside reads
+  across active/historical and absolute/traversal cases, plus the two pagination
+  failures below. Correction extracts the existing canonical schema and snapshot
+  path rules into `packet_v2_manifest.py`, shared by builder, verifier and loader.
+  The complete canonical manifest and exact expected path are checked before any
+  manifest-directed snapshot read. Outside-canary tests require zero reads, not
+  eventual rejection. Historical packet bytes and golden identities stay intact.
+- **RWP04-R2 — Pagination completeness:** a future last page without next, or a
+  changing terminal page, contradicted completeness while the count matched.
+  The listing now retains and confronts the advertised terminal page, rejecting
+  unfetched future pages and terminal drift. Valid consistent last and complete
+  final prev/first controls remain green.
+- **RWP04-Q16 — Concrete internal HTTP evidence:** earlier races did not establish
+  the concrete Git Database callback. New tests use the actual guarded writer
+  and concrete live-transport code with an injected HTTP server only. They move
+  the authenticated journal after blob, tree and commit effects and after the
+  final identity query before GraphQL CAS. Independent HTTP request counters
+  require no subsequent forbidden mutation. Temporarily removing the callback
+  made both guard methods RED with three failures and actual forbidden requests;
+  the source was restored byte-identically, then all three concrete transport
+  tests passed in 17.213 seconds. The historical SHA read is also checked through
+  real Git-object decoding while a different head is visible.
+- **RWP04-Q17 — Historical authority evidence:** new tests produce canonical A/P
+  pairs using existing register/transition functions, changing original admission
+  or Worker coherently. They separately withdraw independent admission and
+  dispatch recognition. Each fails historical authorization; the valid original
+  context remains accepted. Matching hashes or nonempty writer fields are not
+  substituted for those external authorities.
+- **RWP04-Q18/Q21 — Restart evidence:** a new isolated process starts from valid
+  ADMITTED, authenticated external journal/dispatch/execution/selection fixtures
+  and original packet bytes after complete deletion of the Worker root. A
+  positive control first recognizes the genuine current Worker. A newly
+  constructed producer and copied COMMITTED result still cannot acquire the
+  original process-local handoff. Capture, selection, upload, metadata/storage,
+  builder, stage, journal-mutation and dispatch counters remain zero; both
+  continuations refuse and ADMITTED is unchanged. Linux uses the same effective
+  seccomp boundary before these checks.
+
+Correction validation passed **45 tests in 717.206 seconds**: all new review
+witnesses, concrete Git boundaries, restarted-ADMITTED process, existing Packet
+v2 construction/integrity tests and the independent historical synthetic golden
+oracle. The original NO_GO and all RED logs are preserved. The correction is not
+qualified by the preceding 1009-test CI; new complete exact-tree CI and a fresh
+prescribed review remain mandatory.
+
 ## Governance observations and remaining gates
 
 Live preflight confirmed #87 at the exact mandated SHA/tree, OPEN/DRAFT, and no

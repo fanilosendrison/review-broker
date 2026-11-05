@@ -90,7 +90,9 @@ Each adapter requires explicit positive budgets for archive bytes, uncompressed
 bytes, members, metadata pages and metadata response bytes. Packet prompt limits
 are unchanged and are not reused for transport objects. Complete listings reject
 scope drift, invalid links, count disagreement, duplicate IDs or multiple names.
-A complete final page may contain only first/previous links.
+A complete final page may contain only first/previous links. An advertised
+terminal page must remain consistent and cannot remain unfetched when the
+listing declares completion.
 
 The authenticated GitHub download-resolution request and the HTTPS storage
 request are separate. Only a validated redirect from that response can select a
@@ -102,7 +104,11 @@ Extraction creates a fresh private root, directories at 0700 and files at 0600
 before data writes. It rejects ambiguous names, traversal, backslashes,
 symlinks, special members, duplicates and file/directory collisions. Advertised
 and actual byte budgets both apply. Only packet/ and evidence/ are allowed;
-complete packet/inventory verification closes their members. Structural empty
+complete packet/inventory verification closes their members. The shared
+`packet_v2_manifest.py` responsibility validates canonical manifest bytes and
+the complete candidate schema, then constrains each snapshot to its exact
+expected relative path before any manifest-directed read. ZIP member confinement
+alone does not authorize a manifest to select outside files. Structural empty
 `evidence/admitted-references/` is restored when required; no absent file is
 fabricated. Retained content is never executed.
 
