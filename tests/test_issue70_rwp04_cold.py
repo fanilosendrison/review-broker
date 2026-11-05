@@ -81,6 +81,46 @@ class RemoteColdTests(unittest.TestCase):
             self.assertEqual(observed["manifest"]["packet_id"], original_id)
             self.assertEqual([observed[key] for key in ("capture_calls", "selections", "uploads", "journal_mutations")], [0]*4)
 
+    def test_RQ18_Q21_fresh_admitted_process_has_no_continuation_effect_permission(self):
+        from review_broker.prepared_packet_archive_v3 import archive_packet_v3
+        from review_broker.packet_preparation_authority_v3 import retained_inventory_v3
+        from tests.issue70_rwp04_test_support import BUDGET
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            worker_root, cold = root/"worker", root/"admitted-observer"
+            worker_root.mkdir(mode=0o700); cold.mkdir(mode=0o700)
+            r = RemoteScenario(worker_root)
+            s, a = r.s.worker, r.verification.snapshot
+            inventory = retained_inventory_v3(r.handoff.retained_root, before_effect=r.verification.before_effect)
+            packet = archive_packet_v3(r.handoff.retained_root, inventory, BUDGET, r.verification.before_effect)
+            IntegratedScenario.save_transport(s, cold/"journal.json")
+            observed = dict(repository=a.repository, claim_ref=a.claim_ref, commit_sha=a.commit_sha,
+                            parent_sha=a.parent_sha, journal_bytes_id=artifact_identity(a.journal_bytes))
+            for name, data in {
+                "server-origin.json": canonical_bytes([observed])+b"\n",
+                "server-mutation.json": canonical_bytes([asdict(u) for u in s.transport.updates])+b"\n",
+                "dispatch.json": canonical_bytes(s.dispatch_authority.archive)+b"\n",
+                "authenticated-execution.json": canonical_bytes(asdict(s.context))+b"\n",
+                "admission.json": canonical_bytes(s.admission.journal_admission())+b"\n",
+                "independent-selection.json": r.s.archive.read_bytes(),
+                "original-packet.zip": packet, "request-id.txt": s.admission.request_id.encode(),
+            }.items():
+                path = cold/name; path.write_bytes(data); path.chmod(0o600)
+            self.assertEqual(len(r.service.uploads), 0)
+            del s, a, r, packet
+            gc.collect(); shutil.rmtree(worker_root)
+            home = root/"home"; home.mkdir(mode=0o700)
+            process = subprocess.run([sys.executable, "-m", "tests.issue70_rwp04_admitted_observer", str(cold)],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True, env=minimal_environment(home),
+                close_fds=True, pass_fds=(), timeout=90)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            observed = json.loads(process.stdout)
+            self.assertEqual((observed["state"], observed["restarted"], observed["remote"]),
+                             ("ADMITTED", "REJECTED", "REJECTED"))
+            self.assertTrue(observed["forbidden_counts"])
+            self.assertTrue(all(count == 0 for count in observed["forbidden_counts"].values()))
+            self.assertEqual((observed["journal_mutations"], observed["dispatches"]), (0, 0))
+
     def test_Q14_Q18_historical_verification_cannot_build_persist_or_authorize_new_selection(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
