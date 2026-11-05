@@ -85,7 +85,7 @@ class PreparedMetadataReaderV3:
     def listing(self, path: str, query: dict[str, str], field: str,
                 before_effect: BeforeEffectV3) -> list[dict[str, object]]:
         """Every link is scope checked, including prev/first on a complete last page."""
-        page, total, items, identifiers = 1, None, [], set()
+        page, total, items, identifiers, terminal_page = 1, None, [], set(), None
         for _ in range(self.budget.max_metadata_pages):
             params = {**query, "per_page": "100", "page": str(page)}
             response = self.get(path + "?" + urlencode(params), before_effect)
@@ -103,9 +103,17 @@ class PreparedMetadataReaderV3:
                 identifiers.add(identifier)
             items.extend(values)
             links = self._links(response.headers, path, query, page)
-            next_page = links.get("next")
+            next_page, advertised_last = links.get("next"), links.get("last")
+            if advertised_last is not None:
+                if terminal_page is not None and advertised_last != terminal_page:
+                    raise ValueError("PREPARED_LIST_TERMINAL_PAGE_DRIFT")
+                terminal_page = advertised_last
             if len(items) == total and next_page is None:
+                if terminal_page is not None and terminal_page != page:
+                    raise ValueError("PREPARED_LIST_FUTURE_PAGE_UNFETCHED")
                 return items
+            if terminal_page is not None and page >= terminal_page:
+                raise ValueError("PREPARED_LIST_TERMINAL_PAGE_INCOMPLETE")
             if len(items) >= total or not values or next_page != page + 1:
                 raise ValueError("PREPARED_LIST_INCOMPLETE")
             page = next_page
