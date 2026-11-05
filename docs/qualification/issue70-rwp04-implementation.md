@@ -292,6 +292,33 @@ oracle. The original NO_GO and all RED logs are preserved. The correction is not
 qualified by the preceding 1009-test CI; new complete exact-tree CI and a fresh
 prescribed review remain mandatory.
 
+### Corrected-candidate CI failure and legacy diagnostic preservation
+
+The first correction published SHA
+`ff27309075f68f9cc6b9946e569a8c884d5c9378`, tree
+`34bf32b1cecad79a0c0091c13429952b6959d48b`. Normal CI run `42101788467`,
+job `127506158294`, failed: **1018 tests in 802.585 seconds, seven errors**.
+Compilation and JSON steps were skipped, not passed. Checkout
+`71b95290ef44c1772f37375c31bb74d87b5db066` tested that correction.
+Log SHA-256:
+`5064ae97d1c5d66bd22e64128e73be56278dc58907940ab10e132ba8098c4054`.
+
+All seven errors were task-attributable exception-order compatibility regressions
+in two unchanged historical test methods. Early full schema validation correctly
+refused invalid authority fields and unknown capture qualification, but emitted
+the generic Packet error before the established Retention error and diagnostic.
+The fix preserves those existing pure capture-mode checks ahead of full schema
+validation, without any manifest-directed read between them. Canonical parsing,
+capture-mode diagnostics, full schema validation and exact snapshot-path checking
+remain separate ordered operations with one implementation of each rule. No test
+oracle was weakened, skipped or rewritten.
+
+The final compatibility/confinement check passed **19 tests in 157.140 seconds**:
+all thirteen original #70 composition methods, both review findings and coherent
+historical mutations, plus genuine disappeared-Worker cold reconstruction.
+Complete CI on the new tree and its independent review remain required. This
+failed run is retained separately and does not qualify either correction.
+
 ## Governance observations and remaining gates
 
 Live preflight confirmed #87 at the exact mandated SHA/tree, OPEN/DRAFT, and no
