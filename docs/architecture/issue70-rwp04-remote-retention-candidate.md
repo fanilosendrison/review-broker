@@ -44,7 +44,10 @@ v2 verifier, never the packet builder or archive-owned assertions as trust roots
 
 `pre_model_remote_retention_v3.py` owns one active continuation from an attributed
 RWP-03 handoff. It derives the retained path from the claim, reverifies all bytes,
-authorities and inventory, computes the offline receipt, uploads once, observes
+authorities and inventory, and compares the fully verified packet ID with the
+authenticated original handoff's packet ID before upload. That original ID is
+an integrity anchor only after handoff authentication, never an effect permit.
+The continuation computes the offline receipt, uploads once, observes
 and downloads the archive, reconstructs the packet, computes the remote receipt,
 and supplies a narrowly bound remote authority to the existing PREPARED CAS.
 Actual internal reads, writes, archive steps, transport calls and the CAS request

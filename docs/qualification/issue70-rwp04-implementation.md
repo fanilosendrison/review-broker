@@ -348,6 +348,30 @@ This is **not** an exact-candidate CI PASS. Log SHA-256:
   permission unchanged, then qualify the exact new tree. No retry of an
   operational attempt, test removal or weaker oracle is involved.
 
+### Second independent NO_GO and original-packet integrity anchor
+
+Candidate `7d9222d81ee63282e8162c6194dbfd5e1fe208a8`, tree
+`2f058b1e479ca006b31891895a5e6ed69072b5a7`, passed normal CI run
+`42107771113`, job `127527031374`: 1018 tests in 915.270 seconds, no skips,
+installation, compilation and JSON checks SUCCESS. Its exact-tree checkout is
+`542884a2e489983de34b4b18a8ce057cacc380fc`. The thirty-minute budget allowed
+normal completion without reducing coverage. Log SHA-256:
+`011e91bb89cbc6d60cae556e966ac0a2c9283525f17e2c03c32283a97569ce1e`.
+The [second independent review](https://github.com/fanilosendrison/review-broker/pull/89#issuecomment-6670044704)
+closed R1/R2 and all three qualification gaps but returned NO_GO for RWP04-R3.
+A coherent changed diff, capture/packet identities, manifest and rendered prompt
+could replace the genuine handoff's original packet before remote retention.
+The real loader and external authorities accepted the coherent attack; the RED
+observed an upload and attributable PREPARED. The correction compares the fully
+verified loaded packet ID with the authenticated original handoff ID before
+upload. The ID remains an integrity anchor, never an effect permit. Independent
+counters now require zero uploads and zero PREPARED requests. Four focused
+correction, nominal, lost-upload-response and empty-reference cold tests passed
+in 218.113 seconds. New exact-tree CI and independent review remain required.
+R3 is `no-normative-impact` under the existing mandate, affecting implementation
+and qualification evidence; the new witness and correction are its next action.
+The prior CI PASS and both NO_GO verdicts remain bound to their original trees.
+
 ## Governance observations and remaining gates
 
 Live preflight confirmed #87 at the exact mandated SHA/tree, OPEN/DRAFT, and no
