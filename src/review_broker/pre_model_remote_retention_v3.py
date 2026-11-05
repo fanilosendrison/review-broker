@@ -125,6 +125,10 @@ class PreModelRemoteRetentionV3:
             # Neither caller-supplied retained_root nor packet_id grants an effect.
             _, _, _, manifest = load_packet_evidence_v3(
                 root, a.record.attempt.admission, policy_verification=v)
+            # After authenticating this original process's handoff, its ID is an
+            # integrity anchor, never permission to upload or bypass verification.
+            if manifest["packet_id"] != handoff.packet_id:
+                raise ValueError("RWP03_ORIGINAL_PACKET_ID_MISMATCH")
             inventory = retained_inventory_v3(root, before_effect=v.before_effect)
             offline = offline_packet_receipt_v3(a, manifest, inventory_identity_v3(inventory))
             archive = archive_packet_v3(root, inventory, self.adapter.budget, v.before_effect)
