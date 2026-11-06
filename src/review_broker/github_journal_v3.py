@@ -162,106 +162,7 @@ class GitHubJournalV3:
             reason="CLAIM_CREATION_ACKNOWLEDGMENT_UNRESOLVED",
         )
 
-    def reconcile(self, pending: PendingWriteV3) -> JournalOutcomeV3:
-        """Perform one read-only reconciliation; never repeat a mutation."""
-        if pending.repository != self.repository:
-            raise GitHubJournalV3Error("PENDING_REPOSITORY_MISMATCH")
-        if pending.claim_ref != self.claim_ref(pending.request_id):
-            raise GitHubJournalV3Error("PENDING_CLAIM_REF_MISMATCH")
-        if not self._is_sha(pending.intended_sha):
-            raise GitHubJournalV3Error("PENDING_INTENDED_SHA_INVALID")
-        if pending.mutation_kind not in {"CREATE_REF", "UPDATE_REFS"}:
-            raise GitHubJournalV3Error("PENDING_MUTATION_KIND_INVALID")
-        if pending.mutation_kind == "CREATE_REF":
-            if (pending.creation_evidence_id is None
-                    or not self.admission_authority.permits_evidence(
-                        repository=self.repository, request_id=pending.request_id,
-                        admission=pending.admission,
-                        evidence_id=pending.creation_evidence_id,
-                    )):
-                raise GitHubJournalV3Error("PENDING_CREATION_EVIDENCE_UNTRUSTED")
-        if pending.mutation_kind == "UPDATE_REFS":
-            if pending.predecessor_sha is None or not self._is_sha(pending.predecessor_sha):
-                raise GitHubJournalV3Error("PENDING_PREDECESSOR_SHA_INVALID")
-            update = GraphQLRefUpdateV3(
-                self.repository_node_id, pending.claim_ref,
-                pending.predecessor_sha, pending.intended_sha, False,
-            )
-            if (pending.writer_evidence_id is not None
-                    and not self.mutation_authority.permits(
-                        update, pending.writer_evidence_id
-                    )):
-                raise GitHubJournalV3Error("PENDING_WRITER_EVIDENCE_UNTRUSTED")
-            if (pending.expected_old_rejected
-                    and (pending.rejection_evidence_id is None
-                         or not self.rejection_authority.permits(
-                             update, pending.rejection_evidence_id
-                         ))):
-                raise GitHubJournalV3Error("PENDING_REJECTION_EVIDENCE_UNTRUSTED")
-        read = self.transport.read_claim(pending.claim_ref)
-        if read.status is not ReadStatusV3.FOUND or read.snapshot is None:
-            return JournalOutcomeV3(
-                OutcomeStatusV3.UNRESOLVED, pending=pending,
-                reason="READBACK_UNAVAILABLE",
-            )
-        snapshot = self._verified(pending.claim_ref, read.snapshot)
-        if not self._matches_claim(snapshot, pending.request_id, pending.admission):
-            return JournalOutcomeV3(
-                OutcomeStatusV3.REJECTED, snapshot=snapshot, reason="CLAIM_IDENTITY_CONFLICT"
-            )
-        if pending.mutation_kind == "CREATE_REF":
-            if (not pending.creation_may_reuse_existing
-                    and snapshot.commit_sha != pending.intended_sha):
-                return JournalOutcomeV3(
-                    OutcomeStatusV3.UNRESOLVED, snapshot=snapshot, pending=pending,
-                    reason="CREATED_REF_EXACT_TARGET_UNRESOLVED",
-                )
-            evidence = (pending.writer_evidence_id
-                        if snapshot.commit_sha == pending.intended_sha
-                        else snapshot.writer_evidence_id)
-            transport_snapshot = TransportSnapshotV3(
-                snapshot.commit_sha, snapshot.parent_sha, snapshot.journal_bytes
-            )
-            if (evidence is None
-                    or not self.predecessor_authority.permits_evidence(
-                        repository=self.repository, claim_ref=pending.claim_ref,
-                        snapshot=transport_snapshot, evidence_id=evidence,
-                    )):
-                return JournalOutcomeV3(
-                    OutcomeStatusV3.UNRESOLVED, snapshot=snapshot, pending=pending,
-                    reason="CREATED_REF_WRITER_UNATTRIBUTED",
-                )
-            attributed = replace(snapshot, writer_evidence_id=evidence)
-            return JournalOutcomeV3(OutcomeStatusV3.COMMITTED, snapshot=attributed)
-        if snapshot.commit_sha == pending.intended_sha:
-            if pending.writer_evidence_id is None:
-                return JournalOutcomeV3(
-                    OutcomeStatusV3.UNRESOLVED, snapshot=snapshot, pending=pending,
-                    reason="MUTATION_WRITER_UNATTRIBUTED",
-                )
-            if snapshot.parent_sha != pending.predecessor_sha:
-                return JournalOutcomeV3(
-                    OutcomeStatusV3.REJECTED, snapshot=snapshot,
-                    reason="SUCCESSOR_PARENT_MISMATCH",
-                )
-            attributed = replace(snapshot, writer_evidence_id=pending.writer_evidence_id)
-            return JournalOutcomeV3(OutcomeStatusV3.COMMITTED, snapshot=attributed)
-        if pending.application_errors and pending.expected_old_rejected:
-            return JournalOutcomeV3(
-                OutcomeStatusV3.REJECTED, snapshot=snapshot,
-                reason="GRAPHQL_EXPECTED_OLD_REJECTED",
-            )
-        if pending.application_errors:
-            return JournalOutcomeV3(
-                OutcomeStatusV3.UNRESOLVED, snapshot=snapshot, pending=pending,
-                reason="GRAPHQL_ERROR_APPLICATION_UNRESOLVED",
-            )
-        reason = ("READ_AFTER_WRITE_MAY_BE_STALE"
-                  if pending.predecessor_sha == snapshot.commit_sha
-                  else "COMPETING_OR_LAGGING_READBACK")
-        return JournalOutcomeV3(
-            OutcomeStatusV3.UNRESOLVED, snapshot=snapshot, pending=pending, reason=reason
-        )
+    from .github_journal_reconciliation_v3 import reconcile_pending_write_v3 as reconcile
 
     def _transition(self, current: VerifiedJournalSnapshotV3,
                     mutation: RecordMutationV3, before_effect=None) -> JournalOutcomeV3:
@@ -303,27 +204,34 @@ class GitHubJournalV3:
             after_oid=successor_sha,
             force=False,
         )
-        if before_effect is not None: before_effect()
-        result = self.transport.update_ref(update)
-        evidence = result.writer_evidence_id
-        if not (result.http_status == 200 and not result.errors
-                and isinstance(evidence, str)
-                and evidence.startswith("artifact:sha256:") and len(evidence) == 80
-                and all(character in "0123456789abcdef" for character in evidence[16:])
-                and self.mutation_authority.permits(update, evidence)):
-            evidence = None
-        rejection_evidence = result.rejection_evidence_id
-        definite_rejection = (
-            result.http_status == 200 and bool(result.errors)
-            and result.expected_old_rejected
-            and isinstance(rejection_evidence, str)
-            and self.rejection_authority.permits(update, rejection_evidence)
-        )
-        return self.reconcile(replace(
-            pending, writer_evidence_id=evidence, application_errors=result.errors,
-            expected_old_rejected=definite_rejection,
-            rejection_evidence_id=rejection_evidence if definite_rejection else None,
-        ))
+        try:
+            if before_effect is not None: before_effect()
+            result = self.transport.update_ref(update)
+            evidence = result.writer_evidence_id
+            if not (result.http_status == 200 and not result.errors
+                    and isinstance(evidence, str)
+                    and evidence.startswith("artifact:sha256:") and len(evidence) == 80
+                    and all(character in "0123456789abcdef" for character in evidence[16:])
+                    and self.mutation_authority.permits(update, evidence)):
+                evidence = None
+            # Retain each independently recognized result before any further
+            # authority/readback call can fail. Unknown evidence stays absent.
+            pending = replace(pending, writer_evidence_id=evidence, application_errors=result.errors)
+            rejection_evidence = result.rejection_evidence_id
+            definite_rejection = (
+                result.http_status == 200 and bool(result.errors)
+                and result.expected_old_rejected
+                and isinstance(rejection_evidence, str)
+                and self.rejection_authority.permits(update, rejection_evidence)
+            )
+            pending = replace(pending, expected_old_rejected=definite_rejection,
+                              rejection_evidence_id=rejection_evidence if definite_rejection else None)
+            return self.reconcile(pending)
+        except Exception:
+            # The intended successor is already known; never discard its pending
+            # record or turn an observation failure into another write permit.
+            return JournalOutcomeV3(OutcomeStatusV3.UNRESOLVED, pending=pending,
+                                    reason="TRANSITION_RESULT_UNRESOLVED")
 
     def reserve_initial(self, current: VerifiedJournalSnapshotV3) -> JournalOutcomeV3:
         return self._transition(current, reserve_initial)
