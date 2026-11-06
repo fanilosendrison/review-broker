@@ -6,7 +6,7 @@ from tests.github_transport_live_v3_support import FakeGitHubApi, PARENT_TREE, g
 
 class ConcreteFailureGitTransport(GitHubTransportLiveV3):
     def __init__(self, original, snapshot, api):
-        self.original=original
+        self.original,self.api=original,api
         api.rest_node=api.graphql_node=snapshot.repository_node_id
         api.commits[snapshot.commit_sha]=(PARENT_TREE,[snapshot.parent_sha])
         blob=git_blob_sha(snapshot.journal_bytes);api.blobs[blob]=snapshot.journal_bytes
@@ -21,6 +21,8 @@ class ConcreteFailureGitTransport(GitHubTransportLiveV3):
     def read_claim(self, claim_ref):
         # Same external authoritative ref service used by the live-HTTP adapter's
         # qualified fake backend; no alternate head or predecessor is invented.
+        if getattr(self.api,'concrete_readback',False):
+            return super().read_claim(claim_ref)
         return self.original.read_claim(claim_ref)
 
     def create_journal_commit(self, parent_sha, raw):
@@ -33,7 +35,8 @@ class ConcreteFailureGitTransport(GitHubTransportLiveV3):
         if result.http_status==200 and not result.errors:
             # The independent service owns the expected-old application and writer
             # receipt. HTTP success alone never supplies synthetic attribution.
-            return self.original.update_ref(update)
+            result=self.original.update_ref(update)
+            if getattr(self.api,'after_cas',None):self.api.after_cas(update,result)
         return result
 
 
