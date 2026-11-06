@@ -5,7 +5,7 @@ asset_type: "qualification-matrix"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 Pre-model PM Matrix"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Issue 70 — Pre-model PM01–PM35 matrix
@@ -24,7 +24,14 @@ tree `4fd57168bbb656a97c97340795094920f2097b19`.
 The local source candidate ran 1086 tests in 4261.819 seconds: 1074 executed,
 12 Linux-only Darwin skips, no failures. The explicit-authority phase-cut
 measurement follow-up ran three tests in 341.966 seconds, PASS.
-No final candidate SHA/tree or Ubuntu CI is predicted here. Exact published
+Initial exact-tree Ubuntu CI passed on candidate
+`5f4ee4f307db7d91339c8b4c338a9f44755ef48e`, tree
+`caace23b837721c3366ff47f851141df5f901417`, run
+[42229015539](https://github.com/fanilosendrison/review-broker/actions/runs/42229015539),
+job `127929779929`, checkout `b53cfc7a0aeb8642fc0ac4500d92968567b3b813`
+with that same tree: 1086 tests, 1199.081 seconds, zero skips. All twelve Linux
+witnesses and required cold cases passed. These are observed prior-commit facts,
+not transferred acceptance for a later tree. Final published
 SHA/tree, full base diff digest, tested checkout/tree, run/job and independent
 review are bound by the final successor-PR receipt. Until that receipt proves
 exact-tree CI and GO, the global qualification remains NOT_QUALIFIED.
@@ -66,7 +73,7 @@ commands, assumptions, construction failures and operational prerequisites.
 | PM15.X | Excluded: Positive v3 ARMED/invocation. | No positive qualification claimed | OUT_OF_SCOPE | Separate mandate/operational qualification required. |
 | PM16.A | Replayed/stale owner recovery nonce, wrong actor or previous reservation — **Selected:** Recovery/generation-2 entry refused without effects. | E02 E13 E16 | PASS | Negative witness only. |
 | PM16.X | Excluded: Positive nonce/owner/recovery protocol. | No positive qualification claimed | OUT_OF_SCOPE | Separate mandate/operational qualification required. |
-| PM17.A | v1/v2 claim/read/reconciler and historical results — **Selected:** Historical bytes/identities and v1/v2/RWP01-04 regression suite; twelve Linux witnesses required on final tree. | E03 E04 E05 E06 E20 | BLOCKED | Local full run has twelve Darwin skips; final CI remains mandatory. |
+| PM17.A | v1/v2 claim/read/reconciler and historical results — **Selected:** Historical bytes/identities and v1/v2/RWP01-04 regression suite; twelve Linux witnesses required on final tree. | E03 E04 E05 E06 E20 | PASS | Initial exact-tree Ubuntu CI passed all 1086 tests without skips; final-tree CI remains mandatory. |
 | PM18.A | Receipt contains raw secret, unsupported code or malformed canonical bytes — **Selected:** Closed observation/receipt canonical grammar, arbitrary fields/codes/secrets and unrecognized provenance rejected before mutation. | E06 E07 E08 | PASS | No free-text evidence authority. |
 | PM18.X | Excluded: New terminal receipt. | No positive qualification claimed | OUT_OF_SCOPE | Separate mandate/operational qualification required. |
 | PM19.A | Permanent refusal already `STOPPED` when duplicate event arrives — **Selected:** Distinct BLOCKED and REFUSED_PERMANENT rediscovery/new-worker cases preserve history and have zero new effects. | E16 | PASS | No inference from successful failure status to packet success. |
@@ -115,9 +122,9 @@ post-A PASS asserts that all UNKNOWN states are journalized.
 
 ## Evidence register
 
-All E groups below ran locally unless explicitly noted. E20 comprises the twelve
-Linux-only tests skipped on Darwin; its final exact-tree Ubuntu execution is a
-mandatory gate. Full-suite regression additionally includes the unchanged v1/v2,
+All E groups below ran in the initial exact-tree Ubuntu CI. E20 comprises the
+twelve Linux-only tests skipped locally on Darwin and passed without skips in
+that CI. Final-tree Ubuntu regression remains mandatory. Full-suite regression additionally includes the unchanged v1/v2,
 journal reconciliation and legacy identity tests, not just this selected register.
 
 ### E01
@@ -341,8 +348,8 @@ tests/test_issue70_rwp03_network_isolation.py:
 
 ## Gate accounting
 
-The initial matrix has 34 PASS required subcases, one BLOCKED required subcase
-(PM17.A: final Linux regression not yet run), and 30 OUT_OF_SCOPE subcases.
+This matrix has 35 PASS required subcases, zero FAIL/BLOCKED required subcases,
+and 30 OUT_OF_SCOPE subcases, supported by the initial exact-tree Ubuntu CI.
 No required gap is labeled OUT_OF_SCOPE. The global exact-tree CI and independent
 GO gates apply to every required row. The versioned implementation report states
 only evidence known before its commit; the final PR receipt supplies the later

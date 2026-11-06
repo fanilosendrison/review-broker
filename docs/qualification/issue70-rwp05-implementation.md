@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 RWP-05 Implementation and Stage 1 Evidence"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Issue 70 RWP-05 — Implementation and Stage 1 evidence
@@ -24,7 +24,7 @@ independent GO qualify that base only. Historical RWP-04 failed local runs and
 NO_GO reviews are neither erased nor applied to a different candidate.
 
 The successor targets #89's head branch, not dev. This report describes evidence
-known before publication. Final published SHA/tree, complete base-to-candidate
+known before its commit. Final published SHA/tree, complete base-to-candidate
 diff digest, exact tested checkout/tree, CI logs and independent review are
 bound by the final successor-PR comment. A future identity is not predicted in
 this document and its own commit does not qualify itself.
@@ -97,9 +97,21 @@ Compilation, parsing every JSON file under schemas/profiles/programs, and
 most 399 physical lines. Public schemas, adopted contracts and operational
 workflows were not changed. Final size/diff checks remain publication gates.
 
-At this report revision: exact-tree Ubuntu CI NOT_RUN; independent Pi review
-NOT_RUN. Global RWP-05 and Stage 1 qualification remain NOT_QUALIFIED until both
-are established. Local PASS subcases in the matrix do not waive these gates.
+Initial normal Ubuntu 24.04/Python 3.11 CI passed on source candidate
+`5f4ee4f307db7d91339c8b4c338a9f44755ef48e`, tree
+`caace23b837721c3366ff47f851141df5f901417`:
+[run 42229015539](https://github.com/fanilosendrison/review-broker/actions/runs/42229015539),
+job `127929779929`, attempt 1. The logged checkout was
+`b53cfc7a0aeb8642fc0ac4500d92968567b3b813`; its authenticated Git tree exactly
+matches the candidate. All **1086 tests passed in 1199.081 seconds, zero skips**,
+including all twelve Linux isolation witnesses and required cold RWP-04/RWP-05
+cases. Install, compileall and JSON validation also passed. Log SHA-256:
+`314acf3810f729a2e17d10e11cee083f54dcba8b19aaa4bc85feab41ea4285b6`.
+
+This is a prior-commit result. Independent Pi review is NOT_RUN, and this evidence
+update changes the tree. Fresh final-tree CI and GO are still required; global
+RWP-05 and Stage 1 qualification remain NOT_QUALIFIED until the final PR receipt
+establishes both. No prior-tree acceptance is silently transferred.
 
 ## F01–F23 evidence map
 
@@ -250,7 +262,8 @@ Recognized catalog failures after A, all outside-catalog cuts, pre-A ambiguity,
 post-choice irreversibility, local and Git races, original packet integrity,
 independent original-proof retention and restart-only observation are demonstrated
 within the simulated-service configuration. No actual reviewed repository code
-is executed. The cold Linux isolation itself remains a final-CI obligation.
+is executed. Cold Linux isolation passed on the initial CI tree and remains a
+required final-tree regression.
 
 At this revision:
 
@@ -262,11 +275,12 @@ LIVE_PREMODEL_PREPARED=NOT_QUALIFIED
 EFFECTIVE_CODEX_POLICY=NOT_ATTESTED
 ```
 
-The remaining construction gates are normal exact-tree Ubuntu CI with no required
-skips, fresh substantive Pi GO on that same tree/diff, final evidence publication
-and verified handoff. Matrix PM17.A remains BLOCKED until Linux regression passes.
-The initial PM inventory has 34 PASS, zero FAIL, one BLOCKED and 30 OUT_OF_SCOPE
-subcases. Excluded positives remain excluded after construction acceptance.
+The remaining construction gates are fresh final-tree Ubuntu CI with no required
+skips, substantive Pi GO on that same tree/diff, final evidence publication and
+verified handoff. Initial exact-tree Linux regression closes PM17.A. The matrix
+now has 35 PASS, zero FAIL/BLOCKED and 30 OUT_OF_SCOPE subcases, with their exact
+prior-commit CI identity recorded. Excluded positives remain excluded after
+construction acceptance; final-tree gates remain common to every required row.
 
 Even after bounded Stage 1 qualification, a live plan needs separate owner
 mandate and explicit treatment of:
