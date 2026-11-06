@@ -40,6 +40,18 @@ def read_authenticated_journal_at_v3(journal, request_id: str,
     return snapshot
 
 
+def require_journal_admission_origin_v3(journal, snapshot):
+    """Recognized original admission shared by the two historical readers."""
+    attempt = snapshot.record.attempt
+    recognized = journal.admission_authority.evidence_id(
+        repository=snapshot.repository, request=attempt.admission["canonical_request"],
+        admission=attempt.admission)
+    if recognized is None or journal.admission_authority.permits_evidence(
+            repository=snapshot.repository, request_id=attempt.request_id,
+            admission=attempt.admission, evidence_id=recognized) is not True:
+        raise ValueError("HISTORICAL_ADMISSION_UNRECOGNIZED")
+
+
 @dataclass(frozen=True)
 class PreparedJournalHistoryV3:
     journal: object  # Concrete journal checked below; avoids a circular import.
@@ -103,14 +115,7 @@ class PreparedJournalHistoryV3:
                 or ack.executable_sha != self.expected.executing_source_sha
                 or ack.executable_sha != self.expected.workflow_definition_sha):
             raise ValueError("HISTORICAL_WORKER_LINKS_INVALID")
-        # This is independent request admission, not a receipt hash as approval.
-        recognized = journal.admission_authority.evidence_id(
-            repository=a.repository, request=attempt.admission["canonical_request"],
-            admission=attempt.admission)
-        if recognized is None or journal.admission_authority.permits_evidence(
-                repository=a.repository, request_id=attempt.request_id,
-                admission=attempt.admission, evidence_id=recognized) is not True:
-            raise ValueError("HISTORICAL_ADMISSION_UNRECOGNIZED")
+        require_journal_admission_origin_v3(journal, a)
 
     @classmethod
     def read(cls, journal, request_id: str, expected, dispatch_authority,

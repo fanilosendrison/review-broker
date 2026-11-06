@@ -293,7 +293,8 @@ def _read_snapshot(directory: Path, entry: Mapping[str, object], *, git: bool, p
 def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmissionV3,
                                capture: SubjectCaptureV2, profile: PolicySnapshotV2,
                                issue_reference_observations: tuple[object,...]=(),
-                               *, policy_verification: PolicyVerificationV3 | None = None) -> dict[str, object]:
+                               *, policy_verification: PolicyVerificationV3 | None = None,
+                               failure_observer=None) -> dict[str, object]:
     """Independently reconstruct every candidate packet identity and byte."""
     require_policy_boundary_v3(profile, admission, policy_verification)
     def read(path):
@@ -371,8 +372,12 @@ def verify_packet_v2_candidate(output_directory: Path, admission: PreclaimAdmiss
     program = packet_program_v2(request, policy)
     if (manifest["source_manifest_id"] != _hash("source-manifest", source_manifest)
             or manifest["technical_policy"] != policy or manifest["program"] != program
-            or manifest["program_id"] != _hash("program", program)
-            or manifest["packet_id"] != packet_identity(_packet_basis(manifest))):
+            or manifest["program_id"] != _hash("program", program)):
+        _fail("PACKET_V2_CANONICAL_IDENTITY_MISMATCH")
+    calculated_packet_id = packet_identity(_packet_basis(manifest))
+    if manifest["packet_id"] != calculated_packet_id:
+        if failure_observer is not None:
+            failure_observer.packet_identity_failed(verify_packet_v2_candidate, output_directory, calculated_packet_id)
         _fail("PACKET_V2_CANONICAL_IDENTITY_MISMATCH")
     prompt = render_packet_v2_prompt(manifest, subject_lines=subject_lines,
         reference_lines=reference_lines, diff=capture.diff)

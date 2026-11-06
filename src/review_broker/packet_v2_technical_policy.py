@@ -16,6 +16,7 @@ from .github_journal_v3 import GitHubJournalV3
 from .identity import artifact_identity, canonical_bytes
 from .journal_record_v3 import decode_journal_v2, encode_journal_v2
 from .pre_model_dispatch_ack_v3 import acknowledgment_from_record
+from .pre_model_failure_domain_v3 import require_failure_predecessor_v3
 from .pre_model_policy_selection_v3 import (
     PolicySelectionAuthorityV3, PolicySelectionContextV3, PolicySelectionReceiptV3,
     verify_policy_selection_v3,
@@ -65,6 +66,7 @@ class AuthorizedPolicyVerificationV3:
     effect_guard: Callable[[], None] | None = None
 
     def before_effect(self) -> None:
+        require_failure_predecessor_v3(self.snapshot.record)
         if self.effect_guard is not None:
             self.effect_guard()
         if self.journal.read(self.snapshot.record.attempt.request_id) != self.snapshot:

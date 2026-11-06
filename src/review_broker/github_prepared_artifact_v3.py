@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 from urllib.request import Request
 
 from .artifact_locator import _timestamp
-from .identity import canonical_bytes
+from .identity import artifact_identity, canonical_bytes
 from .github_prepared_worker_history_v3 import GitHubPreparedWorkerHistoryV3
 from .prepared_artifact_transport_v3 import (
     BeforeEffectV3, PreparedArtifactBudgetV3, PreparedMetadataReaderV3, PreparedStorageExecutorV3,
@@ -55,7 +55,7 @@ class PreparedArtifactUploaderV3:
         self.boundary, self._lock, self._attempted = boundary, Lock(), False
 
     def upload_once(self, plan: PreparedUploadPlanV3, archive: bytes, *,
-                    before_effect: BeforeEffectV3) -> PreparedUploadResultV3:
+                    before_effect: BeforeEffectV3, failure_observer=None) -> PreparedUploadResultV3:
         with self._lock:
             if self._attempted:
                 raise ValueError("PREPARED_UPLOAD_ALREADY_ATTEMPTED")
@@ -64,9 +64,10 @@ class PreparedArtifactUploaderV3:
         try:
             result = self.boundary.upload_once(plan, archive, before_effect=before_effect)
         except Exception:
-            return PreparedUploadResultV3(UploadStatusV3.UNKNOWN)
+            result = PreparedUploadResultV3(UploadStatusV3.UNKNOWN)
         if type(result) is not PreparedUploadResultV3 or type(result.status) is not UploadStatusV3:
-            return PreparedUploadResultV3(UploadStatusV3.UNKNOWN)
+            result = PreparedUploadResultV3(UploadStatusV3.UNKNOWN)
+        if failure_observer is not None: failure_observer.upload(self, plan, result)
         return result
 
 
@@ -82,6 +83,7 @@ class GitHubPreparedArtifactV3:
             raise ValueError("PREPARED_ARTIFACT_CONFIGURATION_INVALID")
         self.metadata, self.worker_history = metadata, worker_history
         self.storage_executor, self.budget, self.clock = storage_executor, budget, clock
+        self.failure_observer = None
 
     def observe(self, admitted, before_effect: BeforeEffectV3, *, active_context=None):
         expected = self.worker_history.expected
@@ -165,10 +167,16 @@ class GitHubPreparedArtifactV3:
                     raise ValueError("PREPARED_ARCHIVE_SIZE_MISMATCH")
                 digest.update(chunk)
                 chunks.append(chunk)
+        except TimeoutError:
+            if self.failure_observer is not None: self.failure_observer.read_timeout(self, request, storage)
+            raise ValueError("PREPARED_ARCHIVE_READ_UNAVAILABLE_OR_INVALID") from None
         except Exception:
             # Storage exceptions can contain signed URLs. Never surface their text.
             raise ValueError("PREPARED_ARCHIVE_READ_UNAVAILABLE_OR_INVALID") from None
         if count != storage["artifact_size_in_bytes"] or "sha256:" + digest.hexdigest() != storage["artifact_digest"]:
+            if self.failure_observer is not None:
+                self.failure_observer.verification_failed("ARCHIVE_BYTES", "artifact:" + storage["artifact_digest"],
+                    artifact_identity(b"".join(chunks)), self, storage, storage["artifact_size_in_bytes"], count)
             raise ValueError("PREPARED_ARCHIVE_DIGEST_OR_SIZE_MISMATCH")
         before_effect()
         return b"".join(chunks)

@@ -39,7 +39,7 @@ class PreparedStorageExecutorV3(Protocol):
 
 class PreparedMetadataReaderV3:
     def __init__(self, *, token: str, repository: str, executor: PreparedMetadataExecutorV3,
-                 budget: PreparedArtifactBudgetV3):
+                 budget: PreparedArtifactBudgetV3, failure_observer=None):
         if (not isinstance(token, str) or not token or token.strip() != token
                 or any(c in token for c in "\r\n")
                 or re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository) is None
@@ -48,6 +48,7 @@ class PreparedMetadataReaderV3:
             raise ValueError("PREPARED_METADATA_CONFIGURATION_INVALID")
         self._token, self.repository, self.executor, self.budget = token, repository, executor, budget
         self.root = f"https://api.github.com/repos/{repository}"
+        self.failure_observer = failure_observer
 
     def get(self, suffix: str, before_effect: BeforeEffectV3) -> HttpResponseV3:
         if (suffix and not suffix.startswith("/")) or ".." in suffix or "#" in suffix or "//" in suffix:
@@ -59,11 +60,15 @@ class PreparedMetadataReaderV3:
         before_effect()
         try:
             response = self.executor(request, max_bytes=self.budget.max_metadata_response_bytes)
+        except TimeoutError:
+            if self.failure_observer is not None: self.failure_observer.read_timeout(self, request)
+            raise ValueError("PREPARED_METADATA_UNAVAILABLE") from None
         except Exception:
             raise ValueError("PREPARED_METADATA_UNAVAILABLE") from None
         if (type(response) is not HttpResponseV3 or type(response.body) is not bytes
                 or len(response.body) > self.budget.max_metadata_response_bytes):
             raise ValueError("PREPARED_METADATA_RESPONSE_BUDGET")
+        if self.failure_observer is not None: self.failure_observer.http(self, request, response)
         before_effect()
         return response
 

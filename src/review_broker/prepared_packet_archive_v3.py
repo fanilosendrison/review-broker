@@ -69,7 +69,7 @@ def archive_packet_v3(root: Path, inventory: dict[str, object],
 
 
 def extract_prepared_packet_v3(raw: bytes, destination: Path, budget: PreparedArtifactBudgetV3,
-                               before_effect: BeforeEffectV3, *, expected_inventory=None):
+                               before_effect: BeforeEffectV3, *, expected_inventory=None, failure_observer=None):
     if type(raw) is not bytes or not raw or len(raw) > budget.max_archive_bytes:
         raise ValueError("PREPARED_ZIP_ARCHIVE_BUDGET")
     before_effect()
@@ -144,6 +144,10 @@ def extract_prepared_packet_v3(raw: bytes, destination: Path, budget: PreparedAr
     before_effect()
     actual_inventory = retained_inventory_v3(destination, before_effect=before_effect)
     if expected_inventory is not None and actual_inventory != expected_inventory:
+        if failure_observer is not None:
+            failure_observer.verification_failed("INVENTORY", inventory_identity_v3(expected_inventory),
+                inventory_identity_v3(actual_inventory), extract_prepared_packet_v3,
+                (destination, expected_inventory, actual_inventory))
         raise ValueError("PREPARED_ZIP_CONTENT_IDENTITY_MISMATCH")
     return actual_inventory
 

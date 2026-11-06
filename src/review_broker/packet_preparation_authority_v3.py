@@ -9,6 +9,7 @@ from .journal_record_v3 import WorkerIdentityV3
 from .packet_retention_v3 import load_packet_evidence_v3,packet_retention_locator_v3
 from .packet_v2 import verify_packet_v2_candidate
 from .queue import AttemptState
+from .pre_model_failure_domain_v3 import require_preparation_open_control_v3
 
 class PacketPreparationAuthorityV3Error(ValueError): pass
 _RECEIPT_FIELDS={"schema_version","evidence_type","repository","repository_node_id","claim_ref","predecessor_commit_sha","request_id","review_intent_id","attempt_id","admission_evidence_id","reservation_id","generation","worker","packet_id","subject_capture_evidence_id","technical_policy_id","retained_inventory_id"}
@@ -61,6 +62,7 @@ def prepare_packet_receipt_v3(retention_base:Path,snapshot:VerifiedJournalSnapsh
  expected_technical_policy_id:str,expected_subject_capture_evidence_id:str,
  expected_packet_id:str)->str:
  """Verify retained evidence and exclusively persist its ADMITTED transition receipt."""
+ require_preparation_open_control_v3(snapshot.record)
  if snapshot.record.attempt.state is not AttemptState.ADMITTED: raise PacketPreparationAuthorityV3Error("ADMITTED_SNAPSHOT_REQUIRED")
  retention_root=packet_retention_locator_v3(retention_base,snapshot.claim_ref)
  admission,capture,profile,manifest=load_packet_evidence_v3(retention_root,snapshot.record.attempt.admission)
@@ -103,6 +105,7 @@ class RetainedPacketAuthorityV3:
  def __init__(self,retention_base:Path,expected_technical_policy_id:str,expected_subject_capture_evidence_id:str,expected_packet_id:str): self.retention_base=retention_base;self.expected_technical_policy_id=expected_technical_policy_id;self.expected_subject_capture_evidence_id=expected_subject_capture_evidence_id;self.expected_packet_id=expected_packet_id
  def permits(self,*,snapshot:VerifiedJournalSnapshotV3,packet_evidence_id:str,reservation_id:str,generation:int,worker:WorkerIdentityV3)->bool:
   try:
+   require_preparation_open_control_v3(snapshot.record)
    if snapshot.record.attempt.state is not AttemptState.ADMITTED: return False
    retention_root=packet_retention_locator_v3(self.retention_base,snapshot.claim_ref)
    admission,capture,profile,manifest=load_packet_evidence_v3(retention_root,snapshot.record.attempt.admission)

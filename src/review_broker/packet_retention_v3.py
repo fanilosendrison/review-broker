@@ -12,6 +12,7 @@ from .github_journal_transport_v3 import VerifiedJournalSnapshotV3
 from .github_journal_v3 import GitHubJournalV3
 from .identity import artifact_identity,canonical_bytes
 from .queue import AttemptState
+from .pre_model_failure_domain_v3 import require_preparation_open_control_v3
 from .packet_v2 import (SubjectCaptureV2,TechnicalProfileSnapshotV2,build_packet_v2_candidate,
                         subject_capture_evidence_id_v2,verify_packet_v2_candidate)
 from .packets import SourceRecord
@@ -53,6 +54,7 @@ def persist_packet_evidence_v3(admission:PreclaimAdmissionV3,capture:SubjectCapt
  policy_verification:AuthorizedPolicyVerificationV3|None=None,
  candidate_directory:Path|None=None)->dict[str,object]:
  """Build and verify the unique ADMITTED claim locator, then expose it atomically."""
+ require_preparation_open_control_v3(snapshot.record)
  if policy_verification is not None:
   if type(policy_verification) is not AuthorizedPolicyVerificationV3: raise PacketRetentionV3Error("ACTIVE_RETENTION_AUTHORITY_REQUIRED")
   policy_verification.require_profile(profile,admission)
@@ -143,7 +145,7 @@ def _require_retained_capture_mode(manifest:object)->None:
  else: raise PacketRetentionV3Error("RETAINED_SUBJECT_QUALIFICATION_INVALID")
 
 def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,object],*,
- policy_verification:PolicyVerificationV3|None=None)->tuple[PreclaimAdmissionV3,SubjectCaptureV2,PolicySnapshotV2,dict[str,object]]:
+ policy_verification:PolicyVerificationV3|None=None,failure_observer=None)->tuple[PreclaimAdmissionV3,SubjectCaptureV2,PolicySnapshotV2,dict[str,object]]:
  """Cold-reconstruct verifier inputs from journal authority and retained bytes only."""
  if policy_verification is not None:
   from .historical_policy_verification_v3 import HistoricalAuthorizedPolicyVerificationV3
@@ -198,5 +200,6 @@ def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,ob
  else:
   profile_bytes=read(evidence/"technical-profile.bin");name=manifest["technical_policy"]["basis"]["permission_profile_name"]
   profile=TechnicalProfileSnapshotV2(name,name,profile_bytes,artifact_identity(profile_bytes),"SYNTHETIC_OFFLINE_VERIFIED")
- verify_packet_v2_candidate(packet,admission,capture,profile,policy_verification=policy_verification)
+ if failure_observer is None: verify_packet_v2_candidate(packet,admission,capture,profile,policy_verification=policy_verification)
+ else: verify_packet_v2_candidate(packet,admission,capture,profile,policy_verification=policy_verification,failure_observer=failure_observer)
  return admission,capture,profile,manifest

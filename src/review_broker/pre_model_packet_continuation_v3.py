@@ -31,6 +31,11 @@ from .pre_model_policy_source_v3 import (
     PolicySourceAuthorityV3, PolicySourceObservationV3, verify_policy_source_v3,
 )
 from .queue import AttemptState
+from .pre_model_active_decision_v3 import _issue_active_decision_v3
+from .pre_model_failure_boundaries_v3 import PreModelFailureCollectorV3
+from .pre_model_failure_evidence_v3 import PreModelFailureEvidenceV3
+from .pre_model_failure_continuation_v3 import PreModelFailureContinuationV3, PreModelFailureResultV3
+from .prepared_journal_history_v3 import require_snapshot_origin_v3
 
 BeforeEffectV3 = Callable[[], None]
 ReferenceReadersV3 = Mapping[str, GitHubIssueReferenceReaderV3]
@@ -44,7 +49,8 @@ class SubjectCaptureProviderV3(Protocol):
     """
 
     def capture(self, admission: PreclaimAdmissionV3,
-                before_effect: BeforeEffectV3) -> SubjectCaptureV2: ...
+                before_effect: BeforeEffectV3, *,
+                failure_observer: PreModelFailureCollectorV3 | None = None) -> SubjectCaptureV2: ...
 
 
 class PacketContinuationStagesV3(Protocol):
@@ -91,7 +97,8 @@ class PreModelPacketContinuationV3:
                  reference_readers: Callable[[BeforeEffectV3], ReferenceReadersV3],
                  policy_source_authority: PolicySourceAuthorityV3,
                  policy_selection_authority: PolicySelectionAuthorityV3,
-                 packet_stages: PacketContinuationStagesV3):
+                 packet_stages: PacketContinuationStagesV3,
+                 failure_evidence: PreModelFailureEvidenceV3 | None = None):
         if current_worker_authority.journal is not journal:
             raise ValueError("CONTINUATION_AUTHORITY_JOURNAL_MISMATCH")
         self.journal, self.authority = journal, current_worker_authority
@@ -102,22 +109,29 @@ class PreModelPacketContinuationV3:
         self.stages = packet_stages
         self._lock, self._attempted = Lock(), False
         self._remote_handoff = None
+        if failure_evidence is not None and type(failure_evidence) is not PreModelFailureEvidenceV3:
+            raise ValueError("CLOSED_FAILURE_EVIDENCE_BOUNDARY_REQUIRED")
+        self.failure_evidence = failure_evidence
+        self._decision, self._decision_issue_gate, self._decision_admitted_outcome = None, None, None
 
-    def claim_remote_continuation(self, context, handoff) -> None:
+    def claim_remote_continuation(self, context, handoff, *, remote_owner=None):
         """Consume this original process's completed handoff, never an ADMITTED read."""
         with self._lock:
-            if (self._remote_handoff is None or self._remote_handoff[0] != context
-                    or self._remote_handoff[1] is not handoff):
+            if (self._remote_handoff is None or self._remote_handoff[0] is not context
+                    or self._remote_handoff[1] is not handoff or self._decision is None):
                 raise ValueError("ORIGINAL_WORKER_REMOTE_CONTINUATION_REQUIRED")
+            self._decision._transfer_after_handoff(self, remote_owner, context, handoff)
             self._remote_handoff = None
+            return self._decision
 
-    def run(self, context: WorkerExecutionContextV3) -> PreModelPacketContinuationResultV3:
+    def run(self, context: WorkerExecutionContextV3) -> PreModelPacketContinuationResultV3 | PreModelFailureResultV3:
         with self._lock:
             if self._attempted:
                 return PreModelPacketContinuationResultV3(
                     OutcomeStatusV3.UNRESOLVED, "OBSERVER_ONLY_NO_RETRY")
             self._attempted = True
         outcome = None
+        decision, collector = None, None
         mutation_started = False
         try:
             self.authority.authenticate_context(context)
@@ -156,15 +170,26 @@ class PreModelPacketContinuationV3:
                 return PreModelPacketContinuationResultV3(
                     OutcomeStatusV3.UNRESOLVED, "ADMITTED_CAS_NOT_ATTRIBUTED_NO_RETRY", outcome)
 
+            require_snapshot_origin_v3(self.journal, after)
+            issuer = object()
+            self._decision_admitted_outcome, self._decision_issue_gate = outcome, issuer
+            decision = _issue_active_decision_v3(self, context, outcome, issuer)
+
             def before_effect() -> None:
+                decision.require_active(self)
                 self.authority.require_current(context, after, AttemptState.ADMITTED)
 
+            if self.failure_evidence is not None:
+                collector = PreModelFailureCollectorV3(decision=decision, owner=self,
+                    evidence=self.failure_evidence, before_effect=before_effect)
             before_effect()
-            capture = self.capture_provider.capture(admission, before_effect)
+            capture = (self.capture_provider.capture(admission, before_effect) if collector is None
+                       else self.capture_provider.capture(admission, before_effect, failure_observer=collector))
             before_effect()
             validate_subject_capture_v2(admission, capture, before_effect=before_effect)
             before_effect()
             readers = self.reference_readers(before_effect)
+            if collector is not None: readers = collector.bind_reference_readers(readers)
             before_effect()
             verification = AuthorizedPolicyVerificationV3(
                 self.journal, after, self.authority.expected,
@@ -203,10 +228,16 @@ class PreModelPacketContinuationV3:
             result = PreModelPacketContinuationResultV3(
                 OutcomeStatusV3.COMMITTED, "RWP03_OFFLINE_LOCAL_PACKET_COMPLETE",
                 outcome, retained, str(manifest["packet_id"]))
-            with self._lock:
-                self._remote_handoff = (context, result)
+            decision._publish_handoff(self, context, result)
             return result
         except Exception as exc:
+            if collector is not None:
+                failure = PreModelFailureContinuationV3(collector).run()
+                if failure is not None: return failure
             return PreModelPacketContinuationResultV3(
                 OutcomeStatusV3.UNRESOLVED if mutation_started else OutcomeStatusV3.REJECTED,
                 f"CONTINUATION_UNCONFIRMED_NO_RETRY:{type(exc).__name__}", outcome)
+        finally:
+            self._decision_issue_gate = None
+            if decision is not None and self._remote_handoff is None:
+                decision.close(self)
