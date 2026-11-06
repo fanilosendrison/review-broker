@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 Partial Live Preparation Implementation"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Issue 70 — Partial live preparation implementation
@@ -102,11 +102,65 @@ not require the control/source tokens. Provider retries stay inside that one
 pinned child. This construction observation is not a live provider run and does
 not establish runner-to-Python wiring; LP-02 records that remaining boundary.
 
-The full local suite is running under private supervision. Exact final local
-results, normal Ubuntu CI and independent review must be supplied by a later
-exact-SHA PR receipt. They are not predicted by this document's own commit.
-Compilation and initial whitespace checks passed. Final full-suite, JSON/YAML,
-size, secret, diff and source-pin checks remain publication requirements.
+The first full local suite remains under private supervision on its initial
+source and contains the known isolation failure below; it cannot qualify the
+corrected source. Exact final local results, corrected normal Ubuntu CI and
+independent review must be supplied by a later exact-SHA PR receipt. They are
+not predicted by this document's own commit. Compilation and initial whitespace
+checks passed. Full-suite, JSON/YAML, size, secret, diff and source-pin checks
+remain qualification requirements.
+
+## First exact-tree CI failure and bounded correction
+
+The first draft #93 source was `8784a461601b57a23c3dde965d91c304b190714d`,
+tree `3bcb9038c94a2d70136f8cf97d4b17901c3ce922`.
+[CI run 42271271901](https://github.com/fanilosendrison/review-broker/actions/runs/42271271901),
+job `128076155621`, completed **FAILURE**: 1110 tests in 1723.539 seconds,
+one assertion failure. Compilation/JSON steps were skipped, not passed.
+The failure and complete logs are retained, never relabeled PASS.
+
+- **Statement:** The added authority imported the concrete transport outside its
+  repository-reserved import boundary, violating the unchanged isolation oracle.
+- **Source and evidence:** The actual CI failure and focused local RED both name
+  `test_v1_v2_modules_do_not_import_live_v3_transport`. This is task-attributable,
+  not an unrelated failure or a defect in the test.
+- **Existing authority:** The existing import-isolation regression and mandatory
+  v1/v2 preservation apply; test relaxation or hidden/dynamic import is forbidden.
+- **Semantic disposition:** `no-normative-impact`.
+- **Affected layers:** architecture-or-implementation,
+  verification-or-qualification-evidence, repository-governance-or-documentation.
+- **Related consequences:** Prior source is not qualified; no independent GO
+  exists for it. The new component regression assertions remain unchanged.
+- **Required authority:** Existing in-scope correction authority; no product or
+  repository-governance rule change.
+- **Impacts and correction:** Colocate the guarded concrete specialization at the
+  existing concrete transport boundary. Keep target authority protocol-injected,
+  with no concrete transport import. Extract immutable Git commit assembly into
+  one coherent responsibility using the existing method-delegation pattern;
+  source path ownership remains single-source. The original transport remains
+  evidence-free. No journal/CAS/reconciliation algorithm is replaced. No import
+  spelling is hidden or concatenated, and no historical oracle is changed.
+- **Verification:** The unchanged three-test isolation module and complete
+  44-test legacy concrete transport corpus pass after correction. Full new
+  component tests, existing guarded HTTP/RWP-05 tests and corrected exact-tree
+  CI remain required. The existing isolation test is the regression witness;
+  a duplicate would add no new coverage. The global bug registry is outside
+  this task's worktrees and is not modified.
+- **Next action:** Publish the correction through the governed publisher, run
+  new complete exact-tree CI and obtain the prescribed independent review.
+
+Separately, the observed 1723.539-second full corpus leaves little margin inside
+its previous thirty-minute CI job budget. The corrected candidate raises only
+that finite budget to forty-five minutes. This is a no-normative-impact
+qualification-capacity adjustment, not a claim that the first failure was a
+timeout: it was the isolation assertion above. Runner, action pins, permissions,
+commands, test count and every assertion remain unchanged. No test is skipped
+or weakened. No operational workflow receives an enlarged effect budget.
+
+The failure-archive component is also tightened to require an independently
+supplied original packet ID for remote observations. A coherently rehashed
+observation cannot supply that expected ID to itself. The integrated witness
+checks mismatch refusal before spawn, followed by exact positive raw readback.
 
 ## Independent registration publication
 

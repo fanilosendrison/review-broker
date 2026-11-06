@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 Live Preparation Operational Adapter Candidate"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Issue 70 — Live preparation operational adapter candidate
@@ -38,9 +38,11 @@ is installed. The existing disarmed Worker workflow remains byte-identical.
   delegates shared reads. PREPARED still validates its distinct remote receipt.
 - `github_actions_failure_archive_v3.py` implements the separate RWP-05 archive
   protocol. Retention does not recognize observation origin or grant BLOCKED.
-- `github_journal_transition_authority_v3.py` adds a guarded live-transport
-  specialization and deterministic target-continuity authority. The existing
-  journal, expected-old CAS and reconciliation algorithms are unchanged.
+- `github_journal_transition_authority_v3.py` owns deterministic target-continuity
+  authority over an injected authenticated-reader protocol. The guarded concrete
+  specialization is colocated at the existing transport import boundary.
+  `github_journal_commit_writer_v3.py` owns the mechanically extracted immutable
+  Git commit assembly. The journal/CAS/reconciliation algorithms are unchanged.
 
 These components are not an assembled live Controller or Worker. Injected guards
 remain explicit obligations of the future original-process composition. Existing
@@ -197,6 +199,8 @@ Failure artifacts use `rb-v3-failure-observation-<64-hex>` and contain exactly
 SHA, one matching name, positive Artifact ID, raw digest/size and dates. Within
 an instance it pins the full first observed storage identity and rejects drift.
 It then downloads raw bytes and compares the observation identity and links.
+Remote observations additionally require the original packet ID supplied by the
+independent original handoff, never copied from the observation being checked.
 
 The backend is not original-observation provenance. Active RWP-05 still requires
 recognized real-boundary origin, the original decision ticket, current Worker,
