@@ -155,4 +155,27 @@ def refuse_permanently(record: JournalRecordV3, failure_receipt_id: str,
     return _event(updated, "PRE_MODEL_FAILURE", failure_receipt_id, receipt_value)
 
 
+def block_pre_model(record: JournalRecordV3, failure_receipt_id: str,
+                    receipt: Mapping[str, object], reservation_id: str,
+                    generation: int, worker: WorkerIdentityV3) -> JournalRecordV3:
+    """Only the original ADMITTED domain; no AttemptState or recovery is added."""
+    from .pre_model_failure_domain_v3 import require_failure_predecessor_v3
+    from .pre_model_failure_v3 import validate_blocked_failure_receipt
+    control, admission = record.control, record.attempt.admission
+    try:
+        require_failure_predecessor_v3(record)
+        value = validate_blocked_failure_receipt(receipt, failure_receipt_id=failure_receipt_id,
+            request_id=record.attempt.request_id, attempt_id=record.attempt.attempt_id,
+            admission_evidence_id=admission.get("admission_evidence_id"), generation=generation,
+            reservation_id=reservation_id, worker=worker, accepted_reference_ids=admission.get("reference_ids"))
+    except ValueError as exc:
+        raise JournalRecordV3Error(str(exc)) from exc
+    _require(type(generation) is int and generation == control.generation
+             and reservation_id == control.reservation_id and worker == control.worker,
+             "BLOCKED_WORKER_GENERATION_FENCED")
+    updated = JournalRecordV3(record.attempt, replace(control,
+        disposition="BLOCKED", failure_receipt_id=failure_receipt_id))
+    return _event(updated, "PRE_MODEL_FAILURE", failure_receipt_id, value)
+
+
 RecordMutationV3 = Callable[[JournalRecordV3], JournalRecordV3]

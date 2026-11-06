@@ -393,5 +393,7 @@ class GitHubJournalV3:
             record, failure_receipt_id, receipt, reservation_id, generation, worker
         ))
 
+    from .github_journal_failure_v3 import block_pre_model
+
     def unsupported(self, operation: str) -> None:
         raise GitHubJournalV3Error(f"V3_OPERATION_UNSUPPORTED:{operation}")

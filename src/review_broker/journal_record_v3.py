@@ -109,7 +109,6 @@ def _validate_control(value: object, state: AttemptState) -> PreModelControlV3:
     _require(_is_nonnegative_int(generation), "JOURNAL_V2_GENERATION_INVALID")
     _require(generation <= 1, "JOURNAL_V2_GENERATION_UNSUPPORTED")
     _require(disposition in _DISPOSITIONS, "JOURNAL_V2_DISPOSITION_INVALID")
-    _require(disposition != "BLOCKED", "JOURNAL_V2_BLOCKED_UNSUPPORTED")
     reservation = value["reservation_id"]
     authorization = value["authorization_id"]
     worker_value = value["worker"]
@@ -144,6 +143,10 @@ def _validate_control(value: object, state: AttemptState) -> PreModelControlV3:
                  "JOURNAL_V2_RESERVED_INVALID")
     else:
         _require(failure is not None, "JOURNAL_V2_FAILURE_RECEIPT_REQUIRED")
+    if disposition == "BLOCKED":
+        _require(state is AttemptState.ADMITTED and generation == 1
+                 and worker is not None and worker.run_attempt == 1,
+                 "JOURNAL_V2_BLOCKED_DOMAIN_INVALID")
     if state in {AttemptState.PREPARED, AttemptState.ARMED}:
         _require(disposition == "RESERVED" and worker is not None,
                  "JOURNAL_V2_MODEL_CAPABLE_CONTROL_INVALID")

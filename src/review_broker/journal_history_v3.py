@@ -7,7 +7,8 @@ from .journal_record_v3 import (
     _validate_evidence_ids, _is_positive_int, _is_nonnegative_int,
     _PRE_MODEL_EVENTS, _WORKER_FIELDS,
 )
-from .pre_model_failure_v3 import PreModelFailureV3Error, validate_permanent_failure_receipt
+from .pre_model_failure_v3 import (PreModelFailureV3Error, validate_permanent_failure_receipt,
+                                   validate_blocked_failure_receipt)
 from .queue import AttemptState
 
 def _validate_history(history: object) -> None:
@@ -132,7 +133,7 @@ def _validate_pre_model_semantics(value: dict[str, object],
              "JOURNAL_V2_PACKET_EVIDENCE_INVALID")
     all_failures = [entry for entry in history
                     if entry.get("event") == "PRE_MODEL_FAILURE"]
-    _require(not all_failures or control.disposition == "REFUSED_PERMANENT",
+    _require(not all_failures or control.disposition in {"REFUSED_PERMANENT", "BLOCKED"},
              "JOURNAL_V2_FAILURE_HISTORY_IRREVERSIBLE")
     if all_failures:
         failure_index = history.index(all_failures[0])
@@ -142,15 +143,19 @@ def _validate_pre_model_semantics(value: dict[str, object],
         _require(failure_index == len(history) - 1
                  and value["invocation_count"] == 0,
                  "JOURNAL_V2_FAILURE_HISTORY_NOT_FINAL")
-    if control.disposition == "REFUSED_PERMANENT":
+    if control.disposition in {"REFUSED_PERMANENT", "BLOCKED"}:
         failures = [entry for entry in all_failures
                     if entry["evidence_ids"] == [control.failure_receipt_id]
                     and entry["pre_model"]["generation"] == control.generation
                     and entry["pre_model"]["reservation_id"] == control.reservation_id]
         _require(len(failures) == 1 and control.worker is not None,
-                 "JOURNAL_V2_FAILURE_HISTORY_MISMATCH")
+                 "JOURNAL_V2_BLOCKED_UNSUPPORTED_WITHOUT_FAILURE_HISTORY"
+                 if control.disposition == "BLOCKED" and not all_failures
+                 else "JOURNAL_V2_FAILURE_HISTORY_MISMATCH")
         try:
-            validate_permanent_failure_receipt(
+            validator = (validate_blocked_failure_receipt if control.disposition == "BLOCKED"
+                         else validate_permanent_failure_receipt)
+            validator(
                 failures[0]["pre_model"].get("receipt", {}),
                 failure_receipt_id=control.failure_receipt_id,
                 request_id=value["request_id"], attempt_id=value["attempt_id"],
