@@ -73,8 +73,16 @@ class ArtifactIntegrationTests(unittest.TestCase):
                 private_base=private, environment=ENV, max_bytes=16000, runner=run,
                 verifier=lambda p: p / "dist/upload/index.js")
             scenario.service.metadata_failure = None
+            wrong = GitHubActionsFailureObservationArchiveV3(child=child,
+                adapter=scenario.adapter, snapshot=snapshot,
+                original_packet_id="packet:sha256:" + "0" * 64)
+            with self.assertRaisesRegex(ValueError, "REMOTE_BINDING_INVALID"):
+                wrong.put_once(observation.evidence_id, observation.canonical_bytes,
+                    before_effect=lambda: None)
+            self.assertEqual(spawned, [])
             archive = GitHubActionsFailureObservationArchiveV3(child=child,
-                adapter=scenario.adapter, snapshot=snapshot, active_context=scenario.real.worker.context)
+                adapter=scenario.adapter, snapshot=snapshot, active_context=scenario.real.worker.context,
+                original_packet_id=scenario.handoff.packet_id)
             outcome = archive.put_once(observation.evidence_id, observation.canonical_bytes,
                 before_effect=lambda: None)
             self.assertEqual(outcome.status.value, "ACK")

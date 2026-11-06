@@ -27,12 +27,14 @@ class GitHubActionsFailureObservationArchiveV3:
     separate original observation authority and original decision remain required.
     """
     def __init__(self, *, child: GitHubActionsArtifactChildV3,
-                 adapter: GitHubPreparedArtifactV3, snapshot, active_context=None):
+                 adapter: GitHubPreparedArtifactV3, snapshot, active_context=None,
+                 original_packet_id: str | None = None):
         if (type(child) is not GitHubActionsArtifactChildV3
                 or type(adapter) is not GitHubPreparedArtifactV3):
             raise ValueError("FAILURE_ARCHIVE_CONFIGURATION_INVALID")
         self.child, self.adapter = child, adapter
         self.snapshot, self.context = snapshot, active_context
+        self.original_packet_id = original_packet_id
         self._lock, self._attempted, self._observed = Lock(), False, {}
 
     def put_once(self, evidence_id: str, raw: bytes, *, before_effect):
@@ -45,7 +47,7 @@ class GitHubActionsFailureObservationArchiveV3:
             return FailureRetentionResultV3(FailureRetentionStatusV3.REFUSED)
         observation = FailureObservationV3(raw)
         observation.require_links(self.snapshot,
-            original_packet_id=observation.value["packet_id"], budget=self.adapter.budget)
+            original_packet_id=self.original_packet_id, budget=self.adapter.budget)
         result = self.child.upload_bytes_once(name, raw, before_effect=before_effect)
         status = {UploadStatusV3.ACK: FailureRetentionStatusV3.ACK,
             UploadStatusV3.UNKNOWN: FailureRetentionStatusV3.UNKNOWN,
@@ -72,6 +74,6 @@ class GitHubActionsFailureObservationArchiveV3:
             raise ValueError("FAILURE_ARCHIVE_BYTES_MISMATCH")
         observation = FailureObservationV3(raw)
         observation.require_links(self.snapshot,
-            original_packet_id=observation.value["packet_id"], budget=self.adapter.budget)
+            original_packet_id=self.original_packet_id, budget=self.adapter.budget)
         before_effect()
         return raw
