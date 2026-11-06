@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+from dataclasses import replace
 import hashlib
 import json
 import re
@@ -25,7 +26,7 @@ _CLAIM = re.compile(r"^refs/heads/review-claims-v3/[0-9a-f]{64}$")
 _QUALIFICATION = re.compile(
     r"^refs/heads/review-claims-v3/qualification-transport-[1-9][0-9]*-[1-9][0-9]*$"
 )
-_JOURNAL_PATH = ".review-broker/attempt.json"
+from .github_journal_commit_writer_v3 import JOURNAL_PATH_V3 as _JOURNAL_PATH
 
 from .github_git_database_error_v3 import GitHubTransportLiveV3Error
 
@@ -262,61 +263,7 @@ class GitHubTransportLiveV3:
     def _git_blob_sha(content: bytes) -> str:
         return hashlib.sha1(b"blob " + str(len(content)).encode("ascii") + b"\0" + content).hexdigest()
 
-    def create_journal_commit(self, parent_sha: str, journal_bytes: bytes) -> str:
-        parent_sha = self._sha(parent_sha)
-        if not isinstance(journal_bytes, bytes):
-            raise GitHubTransportLiveV3Error("JOURNAL_BYTES_INVALID")
-        self._establish_repository_identity()
-        parent = self._get_commit(parent_sha)
-        base_tree = parent["tree"]["sha"]
-        parent_entries = self._get_tree_entries(base_tree)
-        namespace_entries = [
-            entry for entry in parent_entries if entry.get("path") == ".review-broker"
-        ]
-        if (namespace_entries and (len(namespace_entries) != 1
-                or namespace_entries[0].get("mode") != "040000"
-                or namespace_entries[0].get("type") != "tree")):
-            raise GitHubTransportLiveV3Error("JOURNAL_NAMESPACE_TYPE_INVALID")
-        self._establish_repository_identity(refresh=True)
-        blob = self._rest("POST", "/git/blobs", {
-            "content": base64.b64encode(journal_bytes).decode("ascii"), "encoding": "base64",
-        })
-        if blob.status != 201:
-            raise GitHubTransportLiveV3Error("GIT_BLOB_CREATION_UNRESOLVED")
-        blob_sha = self._json(blob).get("sha")
-        if blob_sha != self._git_blob_sha(journal_bytes):
-            raise GitHubTransportLiveV3Error("GIT_BLOB_CREATION_IDENTITY_MISMATCH")
-        self._establish_repository_identity(refresh=True)
-        tree_response = self._rest("POST", "/git/trees", {
-            "base_tree": base_tree,
-            "tree": [{"path": _JOURNAL_PATH, "mode": "100644", "type": "blob", "sha": blob_sha}],
-        })
-        if tree_response.status != 201:
-            raise GitHubTransportLiveV3Error("GIT_TREE_CREATION_UNRESOLVED")
-        tree_sha = self._sha(self._json(tree_response).get("sha"))
-        self._establish_repository_identity(refresh=True)
-        commit_response = self._rest("POST", "/git/commits", {
-            "message": "review-broker: experimental v3 journal transition",
-            "tree": tree_sha, "parents": [parent_sha],
-        })
-        if commit_response.status != 201:
-            raise GitHubTransportLiveV3Error("GIT_COMMIT_CREATION_UNRESOLVED")
-        commit_sha = self._sha(self._json(commit_response).get("sha"))
-        observed = self._get_commit(commit_sha, require_one_parent=True)
-        if observed["tree"]["sha"] != tree_sha or observed["parents"][0]["sha"] != parent_sha:
-            raise GitHubTransportLiveV3Error("GIT_COMMIT_CREATION_IDENTITY_MISMATCH")
-        created_entries = self._get_tree_entries(tree_sha)
-        def retained(entries: list[Mapping[str, object]]) -> list[tuple[object, object, object, object]]:
-            return sorted(
-                (entry.get("path"), entry.get("mode"), entry.get("type"), entry.get("sha"))
-                for entry in entries
-                if entry.get("path") not in {_JOURNAL_PATH, ".review-broker"}
-            )
-        if retained(created_entries) != retained(parent_entries):
-            raise GitHubTransportLiveV3Error("GIT_TREE_PRESERVATION_MISMATCH")
-        if self._read_journal_blob(tree_sha) != journal_bytes:
-            raise GitHubTransportLiveV3Error("GIT_COMMIT_PAYLOAD_MISMATCH")
-        return commit_sha
+    from .github_journal_commit_writer_v3 import create_journal_commit_v3 as create_journal_commit
 
     def create_ref(self, claim_ref: str, commit_sha: str) -> CreateRefResultV3:
         ref, sha = self._ref(claim_ref), self._sha(commit_sha)
@@ -394,3 +341,37 @@ class GitHubTransportLiveV3:
                     and not isinstance(update_refs["clientMutationId"], str))):
             return GraphQLUpdateResultV3(200, ("GRAPHQL_RESPONSE_INVALID",))
         return GraphQLUpdateResultV3(200, ())
+
+
+class GitHubJournalEvidenceTransportV3(GitHubTransportLiveV3):
+    """Acknowledged target evidence only; mandatory actor guard at every HTTP call.
+
+    Kept at the existing concrete transport import boundary. Target continuity
+    is not an author signature and never fills a lost operation acknowledgment.
+    """
+    def __init__(self, token: str, *, before_effect, executor=None):
+        if not callable(before_effect):
+            raise ValueError("LIVE_JOURNAL_GUARD_REQUIRED")
+        super().__init__(token, "fanilosendrison/review-broker", executor=executor)
+        self.before_effect = before_effect
+
+    def _target_evidence(self, claim_ref, before, after):
+        from .github_journal_transition_authority_v3 import transition_target_identity_v3
+        return transition_target_identity_v3(repository=self.repository,
+            repository_node_id=self.repository_node_id, claim_ref=claim_ref,
+            predecessor_sha=before, successor_sha=after)
+
+    def create_ref(self, claim_ref, commit_sha):
+        predecessor = self._get_commit(commit_sha, require_one_parent=True)["parents"][0]["sha"]
+        result = super().create_ref(claim_ref, commit_sha)
+        if result.status is not CreateRefStatusV3.CREATED:
+            return result
+        return replace(result, writer_evidence_id=self._target_evidence(
+            claim_ref, predecessor, commit_sha))
+
+    def update_ref(self, update):
+        result = super().update_ref(update)
+        if result.http_status != 200 or result.errors:
+            return result
+        return replace(result, writer_evidence_id=self._target_evidence(
+            update.name, update.before_oid, update.after_oid))

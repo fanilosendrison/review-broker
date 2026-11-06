@@ -11,9 +11,9 @@ from review_broker.admission_v3 import admit_initial_inline_v3
 from review_broker.github_journal_transport_v3 import (
     GraphQLRefUpdateV3, PendingWriteV3, OutcomeStatusV3,
 )
+from review_broker.github_transport_live_v3 import GitHubJournalEvidenceTransportV3
 from review_broker.github_journal_transition_authority_v3 import (
-    GitHubJournalEvidenceTransportV3, GitHubJournalTransitionAuthorityV3,
-    transition_target_identity_v3,
+    GitHubJournalTransitionAuthorityV3, transition_target_identity_v3,
 )
 from review_broker.github_journal_v3 import GitHubJournalV3
 from review_broker.journal_record_v3 import initial_record, encode_journal_v2

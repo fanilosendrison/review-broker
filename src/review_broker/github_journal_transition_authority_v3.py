@@ -1,14 +1,13 @@
 """Deterministic authenticated Git transition targets; NOT GitHub author signatures."""
 from __future__ import annotations
 
-from dataclasses import replace
 import re
+from typing import Protocol
 
 from .github_journal_transport_v3 import (
-    CreateRefStatusV3, GraphQLRefUpdateV3, ReadStatusV3, TransportSnapshotV3,
+    GraphQLRefUpdateV3, ReadResultV3, ReadStatusV3, TransportSnapshotV3,
 )
 from .github_journal_v3 import GitHubJournalV3
-from .github_transport_live_v3 import GitHubTransportLiveV3
 from .identity import artifact_identity, canonical_bytes
 from .journal_record_v3 import decode_journal_v2
 
@@ -33,43 +32,21 @@ def transition_target_identity_v3(*, repository: str, repository_node_id: str,
     }) + b"\n")
 
 
-class GitHubJournalEvidenceTransportV3(GitHubTransportLiveV3):
-    """Only acknowledged operations receive evidence. Guard required on EVERY HTTP call.
+class TransitionTargetReaderV3(Protocol):
+    """Injected authenticated Git reader; provides continuity, not actor permission."""
+    repository: str
+    repository_node_id: str
 
-    Readback equality never fills a lost result. Actor permission belongs to the
-    caller's current Actions/journal guard, not the target digest or this token.
-    """
-    def __init__(self, token: str, *, before_effect, executor=None):
-        if not callable(before_effect):
-            raise ValueError("LIVE_JOURNAL_GUARD_REQUIRED")
-        super().__init__(token, REPOSITORY, executor=executor)
-        self.before_effect = before_effect
-
-    def create_ref(self, claim_ref, commit_sha):
-        predecessor = self._get_commit(commit_sha, require_one_parent=True)["parents"][0]["sha"]
-        result = super().create_ref(claim_ref, commit_sha)
-        if result.status is not CreateRefStatusV3.CREATED:
-            return result
-        evidence = transition_target_identity_v3(repository=self.repository,
-            repository_node_id=self.repository_node_id, claim_ref=claim_ref,
-            predecessor_sha=predecessor, successor_sha=commit_sha)
-        return replace(result, writer_evidence_id=evidence)
-
-    def update_ref(self, update):
-        result = super().update_ref(update)
-        if result.http_status != 200 or result.errors:
-            return result
-        evidence = transition_target_identity_v3(repository=self.repository,
-            repository_node_id=update.repository_id, claim_ref=update.name,
-            predecessor_sha=update.before_oid, successor_sha=update.after_oid)
-        return replace(result, writer_evidence_id=evidence)
+    def before_effect(self) -> None: ...
+    def read_journal_commit(self, commit_sha: str) -> ReadResultV3: ...
 
 
 class GitHubJournalTransitionAuthorityV3:
     """Authenticate target continuity via exact-SHA Git reads, never historical actor identity."""
-    def __init__(self, transport: GitHubJournalEvidenceTransportV3):
-        if type(transport) is not GitHubJournalEvidenceTransportV3:
-            raise ValueError("LIVE_EVIDENCE_TRANSPORT_REQUIRED")
+    def __init__(self, transport: TransitionTargetReaderV3):
+        if (transport.repository != REPOSITORY or not callable(transport.before_effect)
+                or not callable(transport.read_journal_commit)):
+            raise ValueError("AUTHENTICATED_TARGET_READER_REQUIRED")
         self.transport = transport
 
     def evidence_id(self, *, repository: str, claim_ref: str,
