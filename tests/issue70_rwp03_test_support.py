@@ -233,7 +233,7 @@ class RealContinuationScenario:
             result[identifier] = clone
         return result
 
-    def capture(self, admission, before_effect):
+    def capture(self, admission, before_effect, *, failure_observer=None):
         import review_broker.github_subject_capture_v3 as capture_module
         from tests.issue69_test_support import TOKEN, local_acquirer
         before_effect()
@@ -279,7 +279,8 @@ class RealContinuationScenario:
             capture = capture_module.capture_authenticated_subject_v3(
                 scope, reader, self.inputs.source.authorize(scope.repository, scope.repository_id),
                 self.inputs.source.scope_observation.evidence_id, TOKEN,
-                self.root/"continued-source", acquire_repository=guarded_acquire)
+                self.root/"continued-source", acquire_repository=guarded_acquire,
+                failure_observer=failure_observer)
         observation = reader.finalize(scope, capture)
         return capture_module.bind_authenticated_capture_v3(
             capture, self.inputs.source.authorize(scope.repository, scope.repository_id).evidence_id,
