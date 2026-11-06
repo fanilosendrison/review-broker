@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 RWP-05 Failure Handling Candidate"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # Issue 70 RWP-05 — Failure handling candidate
@@ -221,6 +221,11 @@ old A.commit_sha and force=false. Original-choice guards reach observation
 reads/writes and each internal blob/tree/commit and GraphQL request. After
 entry, pending reconciliation is read-only. HTTP 200 errors, an old A or
 unattributed equal B bytes do not establish success or non-application.
+`github_journal_reconciliation_v3.py` owns that single bounded read-only path.
+Thrown ref/origin reads retain the exact pending operation as UNRESOLVED; the
+shared transition also preserves its last independently recognized writer or
+rejection evidence if subsequent result verification/reconciliation throws.
+Invalid caller-supplied pending authority is still rejected before transport I/O.
 
 Results separate journal outcome, authenticated state/disposition, observation
 verification status and diagnostic reason. A committed failure is not a packet

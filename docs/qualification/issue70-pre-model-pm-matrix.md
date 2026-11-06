@@ -5,7 +5,7 @@ asset_type: "qualification-matrix"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 Pre-model PM Matrix"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # Issue 70 — Pre-model PM01–PM35 matrix
@@ -37,6 +37,13 @@ review are bound by the final successor-PR receipt. Until that receipt proves
 exact-tree CI and GO, the global qualification remains NOT_QUALIFIED.
 A passing local subcase does not waive these common gates.
 
+The independent R1 NO_GO on `6cae20fefc577a17ada95085ff07f0f35f80b73b`
+identified a missing thrown-read subcase in PM12/20/35, not an assertion failure
+in that prior CI. E21 now exercises the corrected original-ticket/concrete-HTTP
+paths. A corrected full Darwin run passed 1090 tests in 3743.354 seconds, twelve
+Linux-only skips; fresh corrected-tree Ubuntu CI and GO remain mandatory.
+No prior-tree qualification is transferred.
+
 Each A row is required; each X row is explicitly excluded. E references resolve
 to exact module paths and test names in the register. The Stage 1 report carries
 commands, assumptions, construction failures and operational prerequisites.
@@ -64,7 +71,7 @@ commands, assumptions, construction failures and operational prerequisites.
 | PM10.X | Excluded: Owner recovery and new generation. | No positive qualification claimed | OUT_OF_SCOPE | Separate mandate/operational qualification required. |
 | PM11.A | Ambiguous permission/404 or unknown dispatch ownership — **Selected:** After attributed A, recognized ambiguous source gives UNKNOWN/BLOCKED; before A existing refusal/UNRESOLVED and zero new writer. | E01 E02 E03 E08 E10 | PASS | Pre-A and post-A are separately bounded. |
 | PM11.X | Excluded: Universal BLOCKED for every UNKNOWN irrespective of authority/phase. | No positive qualification claimed | OUT_OF_SCOPE | Separate mandate/operational qualification required. |
-| PM12.A | Crash before failure/disposition CAS — **Selected:** Cuts before failure CAS create no fictitious BLOCKED; after entry only read reconciliation. | E13 E17 | PASS | No redispatch or effect retry. |
+| PM12.A | Crash before failure/disposition CAS — **Selected:** Cuts before failure CAS create no fictitious BLOCKED; after entry only read reconciliation. | E13 E17 E21 | PASS | Corrected thrown-read witness passed locally; final CI/GO remain mandatory. |
 | PM12.X | Excluded: New crash recovery or generation. | No positive qualification claimed | OUT_OF_SCOPE | Separate mandate/operational qualification required. |
 | PM13.A | Worker A and worker B race over one reservation — **Selected:** One bound run; wrong attempt, copied handoff/ticket and restarted process have no new active permission. | E02 E03 E05 E07 E08 E15 E16 | PASS | Original-process decision provenance only. |
 | PM13.X | Excluded: New recovery mechanism. | No positive qualification claimed | OUT_OF_SCOPE | Separate mandate/operational qualification required. |
@@ -78,7 +85,7 @@ commands, assumptions, construction failures and operational prerequisites.
 | PM18.X | Excluded: New terminal receipt. | No positive qualification claimed | OUT_OF_SCOPE | Separate mandate/operational qualification required. |
 | PM19.A | Permanent refusal already `STOPPED` when duplicate event arrives — **Selected:** Distinct BLOCKED and REFUSED_PERMANENT rediscovery/new-worker cases preserve history and have zero new effects. | E16 | PASS | No inference from successful failure status to packet success. |
 | PM19.X | Excluded: Original STOPPED scenario. | No positive qualification claimed | OUT_OF_SCOPE | Separate mandate/operational qualification required. |
-| PM20.A | Reservation and failure-write endpoint return ambiguous status — **Selected:** Reservation ambiguity and post-A failure-write ambiguity preserve attribution and read-only reconciliation. | E01 E13 | PASS | No permission inferred from old A or equal B bytes. |
+| PM20.A | Reservation and failure-write endpoint return ambiguous status — **Selected:** Reservation ambiguity and post-A failure-write ambiguity preserve attribution and read-only reconciliation. | E01 E13 E21 | PASS | Corrected thrown-read/ACK witnesses passed locally; no inferred attribution or retry. |
 | PM20.X | Excluded: New pre-binding writer. | No positive qualification claimed | OUT_OF_SCOPE | Separate mandate/operational qualification required. |
 | PM21.A | Current journal reader receives canonical v2 record with `pre_model_control` — **Selected:** Closed journal v2 BLOCKED roundtrip; original fields/history retained and reopening/version corruption rejected. | E06 E13 E15 | PASS | No downcast to v1. |
 | PM21.X | Excluded: Public v3 adoption. | No positive qualification claimed | OUT_OF_SCOPE | Separate mandate/operational qualification required. |
@@ -108,7 +115,7 @@ commands, assumptions, construction failures and operational prerequisites.
 | PM33.X | Excluded: Terminal trace collection. | No positive qualification claimed | OUT_OF_SCOPE | Separate mandate/operational qualification required. |
 | PM34.A | Unknown run delivery and incomplete step logs — **Selected:** No failure or terminal verdict is derived from missing/skipped logs; cause requires independently recognized original observation. | E06 E07 E15 E16 | PASS | Log absence is not non-acquisition evidence. |
 | PM34.X | Excluded: Universal preventive-gate/non-acquisition proof. | No positive qualification claimed | OUT_OF_SCOPE | Separate mandate/operational qualification required. |
-| PM35.A | Terminal receipt CAS loses to concurrent state change or is replayed — **Selected:** Actual failure/PREPARED and failure/failure races, lost responses, attribution and replays are qualified separately. | E11 E13 E14 | PASS | One disposition/event; no content-based attribution transfer. |
+| PM35.A | Terminal receipt CAS loses to concurrent state change or is replayed — **Selected:** Actual failure/PREPARED and failure/failure races, lost responses, attribution and replays are qualified separately. | E11 E13 E14 E21 | PASS | Corrected pending/evidence preservation passed locally; no verdict transfer to terminal CAS. |
 | PM35.X | Excluded: Future terminal CAS. | No positive qualification claimed | OUT_OF_SCOPE | Separate mandate/operational qualification required. |
 
 ## Bounded PM11 interpretation
@@ -122,7 +129,7 @@ post-A PASS asserts that all UNKNOWN states are journalized.
 
 ## Evidence register
 
-All E groups below ran in the initial exact-tree Ubuntu CI. E20 comprises the
+E01–E20 below ran in the initial exact-tree Ubuntu CI; E21 is separated below. E20 comprises the
 twelve Linux-only tests skipped locally on Darwin and passed without skips in
 that CI. Final-tree Ubuntu regression remains mandatory. Full-suite regression additionally includes the unchanged v1/v2,
 journal reconciliation and legacy identity tests, not just this selected register.
@@ -346,10 +353,21 @@ tests/test_issue70_rwp03_network_isolation.py:
 - `test_11_no_inherited_network_descriptors`
 - `test_12_unsandboxed_linux_cold_invocation_rejected`
 
+### E21
+
+Corrected original-ticket witnesses in tests/test_issue70_rwp05_reconciliation.py:
+
+- `test_R1_F17_F18_real_ref_and_matching_http_exceptions_known_and_lost_ack`
+- `test_R1_F17_origin_verification_read_exception_preserves_pending`
+- `test_R1_F17_reconciliation_authority_exception_keeps_already_recognized_writer`
+- `test_R1_F18_recognized_rejection_evidence_survives_thrown_readback`
+
 ## Gate accounting
 
-This matrix has 35 PASS required subcases, zero FAIL/BLOCKED required subcases,
-and 30 OUT_OF_SCOPE subcases, supported by the initial exact-tree Ubuntu CI.
+This matrix has 35 witnessed PASS required subcases, zero FAIL/BLOCKED required
+subcases, and 30 OUT_OF_SCOPE subcases. E01–E20 have the prior CI evidence above;
+E21 closes the newly exposed local witness gap with the corrected full local run.
+Only fresh corrected-tree CI and GO can establish final global qualification.
 No required gap is labeled OUT_OF_SCOPE. The global exact-tree CI and independent
 GO gates apply to every required row. The versioned implementation report states
 only evidence known before its commit; the final PR receipt supplies the later

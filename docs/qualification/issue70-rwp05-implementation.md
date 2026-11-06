@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 RWP-05 Implementation and Stage 1 Evidence"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # Issue 70 RWP-05 — Implementation and Stage 1 evidence
@@ -32,7 +32,7 @@ this document and its own commit does not qualify itself.
 Related records:
 
 - [Candidate architecture](../architecture/issue70-rwp05-failure-handling-candidate.md).
-- [PM01–PM35 matrix](issue70-pre-model-pm-matrix.md), including exact E01–E20 test names.
+- [PM01–PM35 matrix](issue70-pre-model-pm-matrix.md), including exact E01–E21 test names.
 - [RWP-04 implementation](issue70-rwp04-implementation.md), retained unchanged.
 
 ## Implemented responsibilities
@@ -89,8 +89,14 @@ seconds. A subsequent phase-cut measurement extension explicitly records
 remaining authority and whether the journal still points to A: three tests
 passed in 341.966 seconds. Its log SHA-256 is
 `afedf34aadd4d48135df64d91b980cb2fe5a1eb380d23a1b3657644e509675c0`.
-Unused newly introduced imports were subsequently removed; final CI must cover
-the published tree, not infer acceptance from this local run.
+Unused newly introduced imports were subsequently removed. After the independent
+R1 finding and correction below, a new full local run passed **1090 tests in
+3743.354 seconds**, with 1078 executed, twelve Linux-only skips and no failures.
+Its log SHA-256 is
+`b982440eebd85b39bd87cc264a17a2795998c3d8d67c39be01af933d620a30d2`.
+The corrected reconciliation/Git/journal targeted run passed 55 tests in 149.132
+seconds; its complete four-test R1 module then passed in 36.074 seconds. Final
+CI must cover the corrected published tree, not inherit earlier-tree acceptance.
 
 Compilation, parsing every JSON file under schemas/profiles/programs, and
 `git diff --check` passed. All changed handwritten Python modules/tests are at
@@ -115,7 +121,8 @@ establishes both. No prior-tree acceptance is silently transferred.
 
 ## F01–F23 evidence map
 
-E references resolve to exact test names in the PM matrix. Tests execute real
+E references resolve to exact test names in the PM matrix, including E21's
+corrected thrown-read reconciliation witnesses. Tests execute real
 candidate canonicalizers, decoders, transition functions, readers, verifier,
 continuations and journal code. Fixtures simulate external services and their
 trust, not a replacement broker state machine. Service-side proposals, HTTP
@@ -140,8 +147,8 @@ oracles beyond reason strings.
 | F14 | E12 | Actual simulated acquisition process, reference response and first persistence write may finish, but no next effect/upload/PREPARED follows a competing attributed refusal. |
 | F15 | E13 | Actual pure BLOCKED/permanent and PREPARED successors race the same expected-old in both winning orders; no loser retry. |
 | F16 | E13 | Equal/different failure proposals, known/lost ACK, equal-content ambiguity and post-B replay produce one disposition and one event. |
-| F17 | E13 | Before/after application cuts, lost ACK, GraphQL errors and unavailable readback retain pending; reconciliation does not mutate. |
-| F18 | E13 | Equal B without origin remains UNRESOLVED; delayed recognized write can reconcile COMMITTED; recognized expected-old rejection remains REJECTED; old A is not non-application proof. |
+| F17 | E13 E21 | Before/after application cuts, lost ACK, GraphQL errors and unavailable readback retain pending; reconciliation does not mutate. |
+| F18 | E13 E21 | Equal B without origin remains UNRESOLVED; delayed recognized write can reconcile COMMITTED; recognized expected-old rejection remains REJECTED; old A is not non-application proof. |
 | F19 | E15 | Separate interpreter after full Worker-root deletion recovers original IDs/time from independent service stores; forbidden counters zero. |
 | F20 | E08 E15 | Lost/corrupt/rejected cause preserves authenticated historical BLOCKED with UNAVAILABLE/REJECTED cause status, never reopens RESERVED. |
 | F21 | E13 E15 | Bad parent/origin, canonical/control/history corruption, version loss and coherently rehashed observation/receipt/history forgery are rejected by real decoding and SHA history reads. |
@@ -204,6 +211,40 @@ four following GET requests after commit. Restoring the source byte-for-byte
 returned the tests to PASS. The negative sensitivity log is retained; no mutant
 source is published. These intentional RED runs are not mislabeled full-suite
 failures or removed from the evidence archive.
+
+### Independent R1 — pending evidence lost on thrown reconciliation reads
+
+- **Statement:** A thrown immediate post-CAS read discarded the enriched pending
+  operation from the failure result, despite its consumed ticket.
+- **Source and evidence:** The [independent NO_GO](https://github.com/fanilosendrison/review-broker/pull/90#issuecomment-6687752384)
+  is bound to SHA `6cae20fefc577a17ada95085ff07f0f35f80b73b`, tree
+  `50e214de5678eb252e3816e1108d0ee006abc187`. Its 1086-test CI remains a PASS
+  only on that tree; it did not cover thrown concrete ref/matching-ref reads.
+  The new original-ticket tests reproduced pending loss at both HTTP edges,
+  with acknowledged/lost CAS responses, plus origin/authority-read exceptions.
+- **Existing authority:** Mandate sections 6.3, F17/F18 and PM12/20/35 already
+  require preservation of pending and read-only reconciliation after uncertainty.
+- **Semantic disposition:** no-normative-impact; implementation/qualification fix.
+- **Affected layers:** architecture-or-implementation,
+  verification-or-qualification-evidence, repository-governance-or-documentation.
+- **Related consequences:** The old PM12/20/35 evidence did not cover this case;
+  E21 and the corrected full regression are now required. No historical verdict
+  is rewritten into GO.
+- **Required authority:** Existing owner mandate, no new protocol decision.
+- **Impacts:** A coherent read-only reconciliation module now owns the existing
+  algorithm. The shared transition retains each recognized pending enrichment
+  before later verification; thrown observations return UNRESOLVED, never a
+  retry permit. Invalid external pending authority remains fail-closed.
+- **Next action:** Fresh corrected-tree Ubuntu CI and independent review.
+
+E21 also proves recognized expected-old rejection evidence survives a thrown
+readback, then reconciles REJECTED. A known writer can later reconcile COMMITTED;
+without its ACK even authenticated equal B remains UNRESOLVED. All cases retain
+exact intended/predecessor identities, a consumed ticket, four HTTP mutations
+(blob/tree/commit/CAS), one logical failure CAS and unchanged counters during
+reconciliation. The first reproduction fixture incorrectly lost ADMITTED's ACK;
+that output is retained separately, and the corrected RED applies loss only to
+the post-A failure CAS. Corrected RED/GREEN evidence is preserved privately.
 
 ## Historical 21-case prototype confrontation
 
@@ -278,8 +319,8 @@ EFFECTIVE_CODEX_POLICY=NOT_ATTESTED
 The remaining construction gates are fresh final-tree Ubuntu CI with no required
 skips, substantive Pi GO on that same tree/diff, final evidence publication and
 verified handoff. Initial exact-tree Linux regression closes PM17.A. The matrix
-now has 35 PASS, zero FAIL/BLOCKED and 30 OUT_OF_SCOPE subcases, with their exact
-prior-commit CI identity recorded. Excluded positives remain excluded after
+now has 35 witnessed PASS, zero FAIL/BLOCKED and 30 OUT_OF_SCOPE subcases, with
+prior-commit CI identities and corrected E21 local evidence explicitly separated. Excluded positives remain excluded after
 construction acceptance; final-tree gates remain common to every required row.
 
 Even after bounded Stage 1 qualification, a live plan needs separate owner
