@@ -43,7 +43,7 @@ def _object(response,marker):
 
 class GitHubIssueReferenceReaderV3:
     def __init__(self,token,repository,repository_id,*,authority_evidence_id,
-                 expected_installation_id=None,source_authority=None,qualification_only=False,executor=None,clock=None):
+                 expected_installation_id=None,source_authority=None,qualification_only=False,executor=None,clock=None,failure_observer=None):
         if (type(authority_evidence_id) is not str
             or re.fullmatch(r"artifact:sha256:[0-9a-f]{64}",authority_evidence_id) is None):
             raise ValueError("GITHUB_SOURCE_AUTHORITY_INVALID")
@@ -60,6 +60,7 @@ class GitHubIssueReferenceReaderV3:
         self.qualification_only=qualification_only; self._owner,self._name=repository.split("/",1)
         self._executor=executor or (lambda req: urllib_executor_bounded(req,_RESP))
         self._clock=clock or (lambda:datetime.now(timezone.utc))
+        self.failure_observer=failure_observer
     def _get(self,suffix):
         root=f"/repos/{quote(self._owner,safe='')}/{quote(self._name,safe='')}"
         allowed=(suffix=="" or re.fullmatch(r"/issues/[1-9][0-9]*",suffix)
@@ -70,6 +71,7 @@ class GitHubIssueReferenceReaderV3:
         try: response=self._executor(request)
         except Exception: raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_AUTHORITY_UNAVAILABLE") from None
         if not isinstance(response,HttpResponseV3): raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_RESPONSE_INVALID")
+        if self.failure_observer is not None: self.failure_observer.http(self,request,response)
         if response.status in {403,404}: raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_AUTHORITY_AMBIGUOUS")
         if response.status!=200: raise GitHubIssueReferenceV3Error("ISSUE_REFERENCE_UNAVAILABLE")
         return response

@@ -1,6 +1,7 @@
 """Exact isolated Git-backed subject capture for authenticated v3 PR scope."""
 from __future__ import annotations
 from dataclasses import replace
+from functools import partial
 import hashlib,os,selectors,signal,subprocess,time
 from pathlib import Path
 from typing import Callable,Mapping
@@ -21,19 +22,24 @@ def _terminate(process)->None:
  except OSError:
   if process.poll() is None:process.kill()
  process.communicate();_close_pipes(process)
-def _run(arguments:list[str],environment:Mapping[str,str],timeout:int=300)->bytes:
+def _run(arguments:list[str],environment:Mapping[str,str],timeout:int=300,*,failure_observer=None,repository=None,operation=None)->bytes:
  try:
   process=_popen(arguments,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=dict(environment),start_new_session=True)
   stdout,_=process.communicate(timeout=timeout);_close_pipes(process)
  except subprocess.TimeoutExpired:
-  _terminate(process);raise GitHubSubjectCaptureV3Error("SUBJECT_GIT_COMMAND_TIMEOUT") from None
+  if 'process' in locals():
+   _terminate(process)
+   if failure_observer is not None and process.poll() is not None and operation in {"GIT_CLONE","GIT_FETCH"}:
+    failure_observer.transfer_timeout(repository,operation,arguments,process)
+  raise GitHubSubjectCaptureV3Error("SUBJECT_GIT_COMMAND_TIMEOUT") from None
  except OSError:raise GitHubSubjectCaptureV3Error("SUBJECT_GIT_COMMAND_FAILED") from None
  if process.returncode!=0:raise GitHubSubjectCaptureV3Error("SUBJECT_GIT_COMMAND_FAILED")
  return stdout
-def _default_acquire(repository:str,token:str)->AcquireRepositoryV3:
+def _default_acquire(repository:str,token:str,failure_observer=None)->AcquireRepositoryV3:
  def acquire(destination:Path,environment:Mapping[str,str])->None:
   remote=f"https://github.com/{repository}.git"
-  _run(["gh","repo","clone",remote,str(destination),"--","--filter=blob:none","--no-checkout","--no-tags","--depth=256"],environment)
+  run=_run if failure_observer is None else partial(_run,failure_observer=failure_observer,repository=repository,operation="GIT_CLONE")
+  run(["gh","repo","clone",remote,str(destination),"--","--filter=blob:none","--no-checkout","--no-tags","--depth=256"],environment)
   if token.encode() in _run(["git","-C",str(destination),"remote","get-url","origin"],environment):raise GitHubSubjectCaptureV3Error("SOURCE_TOKEN_IN_GIT_REMOTE")
  return acquire
 def _inventory(reader:GitSourceReader,merge_base:str,head:str)->tuple[dict[str,object],...]:
@@ -82,7 +88,7 @@ def _read_regular(git:GitSourceReader,spec:SourceSpec):
  return SourceRecord.from_bytes(spec.repository,spec.commit,spec.path,oid,data)
 def capture_authenticated_subject_v3(scope:PullRequestScopeV3,reader:GitHubPullRequestObservationReaderV3,
  source_authorization:SourceRepositoryAuthorizationV3,source_authority_scope_evidence_id:str,
- source_token:str,private_root:Path,*,acquire_repository:AcquireRepositoryV3|None=None)->SubjectCaptureV2:
+ source_token:str,private_root:Path,*,acquire_repository:AcquireRepositoryV3|None=None,failure_observer=None)->SubjectCaptureV2:
  """Acquire exact Git objects without checkout or reviewed-code execution."""
  expected_authorization=reader.source_authority.authorize(scope.repository,scope.repository_id)
  if (not reader.source_authority.permits_token(source_token,scope.repository,scope.repository_id)
@@ -96,10 +102,12 @@ def capture_authenticated_subject_v3(scope:PullRequestScopeV3,reader:GitHubPullR
  private_root.mkdir(mode=0o700,parents=True,exist_ok=True)
  with isolated_source_environment(environment) as isolated:
   assert isolated is not None;repository_root=private_root/"source.git"
-  (acquire_repository or _default_acquire(scope.repository,source_token))(repository_root,isolated)
+  acquire=acquire_repository or (_default_acquire(scope.repository,source_token) if failure_observer is None else _default_acquire(scope.repository,source_token,failure_observer))
+  acquire(repository_root,isolated)
   source_environment=isolated
+  run_transfer=_run if failure_observer is None else partial(_run,failure_observer=failure_observer,repository=scope.repository,operation="GIT_FETCH")
   for commit in (scope.base_sha,scope.head_sha):
-   try:_run(["git","-C",str(repository_root),"fetch","origin",commit,"--depth=256"],source_environment,180)
+   try:run_transfer(["git","-C",str(repository_root),"fetch","origin",commit,"--depth=256"],source_environment,180)
    except GitHubSubjectCaptureV3Error:raise GitHubSubjectCaptureV3Error("SUBJECT_COMMIT_FETCH_FAILED") from None
   authenticated_environment={**source_environment,"GIT_NO_REPLACE_OBJECTS":"1"}
   authenticated_git=GitSourceReader(repository_root,environment=authenticated_environment);merge=None
@@ -107,7 +115,7 @@ def capture_authenticated_subject_v3(scope:PullRequestScopeV3,reader:GitHubPullR
    try:merge=authenticated_git._git("merge-base",scope.base_sha,scope.head_sha).decode().strip()
    except Exception:
     if deepen==4096:break
-    _run(["git","-C",str(repository_root),"fetch","origin",f"--deepen={max(1,deepen)}"],source_environment,180);continue
+    run_transfer(["git","-C",str(repository_root),"fetch","origin",f"--deepen={max(1,deepen)}"],source_environment,180);continue
    break
   if merge is None:raise GitHubSubjectCaptureV3Error("SUBJECT_ANCESTRY_UNAVAILABLE")
   if merge!=scope.merge_base_sha:raise GitHubSubjectCaptureV3Error("SUBJECT_MERGE_BASE_MISMATCH")
