@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "RB91 J-CH Journal v2 Core Qualification — Evidence and Cutover Blockers"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # RB91 — J-CH journal v2: core contract qualification (Q4 / offline)
@@ -16,11 +16,13 @@ This report is **non-normative**, tied to [issue #91](https://github.com/fanilos
 
 ## Reproducible inputs and run
 
-- Draft source: [`jch-journal-contract-proposal.md`](../jch-journal-contract-proposal.md) v0.1.1; overarching [`arm-challenge-authority-proposal.md`](../arm-challenge-authority-proposal.md), originally v0.1.2.
+- Draft source: [`jch-journal-contract-proposal.md`](../jch-journal-contract-proposal.md) v0.1.1; overarching [`arm-challenge-authority-proposal.md`](../arm-challenge-authority-proposal.md), v0.1.3.
 - Candidate (NOT accepted) JSON Schema: [`rb91-jch-journal-v2-core.schema.json`](rb91-jch-journal-v2-core.schema.json) — JSON Schema Draft 2020-12, **only 14 top-level core fields**, closed 20-key `arm_binding`, closed synthetic capacity receipt and history events. Deliberately refuses unqualified embedded business objects.
 - Offline model: [`tests/rb91_jch_contract_model.py`](../../../tests/rb91_jch_contract_model.py). Test suite: [`tests/test_rb91_jch_contract_qualification.py`](../../../tests/test_rb91_jch_contract_qualification.py).
 - Local command: `python -m unittest discover -s tests -p 'test_rb91_jch_contract_qualification.py' -v` from repo root with `.[test]` installed; in GitHub Actions the normal `python -m unittest discover -s tests -v` runs this against the **real pinned `review_broker` modules**.
-- Local container without `rfc8785` executes an explicitly limited string/integer fixture fallback; its three project-dependent checks are skipped. **Do not cite local PASS as a real RFC8785 or old-code qualification.** The real CI execution, using the repo dependencies, is authoritative for those three checks.
+- Local container without `rfc8785` executed **23 tests: 20 PASS, 3 SKIP** with an explicitly limited string/integer fixture fallback. **Do not cite local PASS as a real RFC8785 or old-code qualification.** [GitHub CI #42379737090](https://github.com/fanilosendrison/review-broker/actions/runs/42379737090) executed the **real** installed package: **643 total tests, 642 PASS and 1 EXPECTED FAILURE**; all 23 RB91 tests ran, including real code-path checks, with no skips. This is bounded core test evidence, not a cleared cutover gate.
+
+The three exact source SHA-256 values for the candidate schema, model and tests are respectively `c9ea16fb87cd719689282d3ecdb5bcaf969e9c171cc54d1b1201a5d3d63a84dd`, `18c0bb7b96f03a80311db97f1fd7696131da870c53e4c8a19dd67098694566ef`, and `9daa980e31a7646a2734eed2b70a840932fa8d62424b96e70ad8a5df24249ddd`. The CI result proves the *current* legacy behavior is unsafe for v2. It is not a passing v2-upgrade implementation test.
 
 ## Falsification matrix — exact scope
 
@@ -63,6 +65,9 @@ This is **successful falsification/qualification of the bounded core model**, pl
 ```text
 TASK=RB91_JCH_JOURNAL_CORE_OFFLINE_QUALIFICATION
 RESULT=PARTIAL_CORE_PASS_FULL_CUTOVER_NO_GO
+OFFLINE_LOCAL_TESTS=23_WITH_3_SKIPPED
+GITHUB_CI_TESTS=643_WITH_1_EXPECTED_FAILURE
+GITHUB_CI_RUN=42379737090
 SCOPE=NON_NORMATIVE_ATOMIC_ARM_CORE_ONLY
 CANDIDATE_SCHEMA_VERSION=2_NOT_ACCEPTED
 LEGACY_WRITER_V2_REJECTION=FAIL_EXPECTED
