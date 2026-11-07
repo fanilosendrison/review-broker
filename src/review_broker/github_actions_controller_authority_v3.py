@@ -28,10 +28,18 @@ def require_owner_gates_v3(gates,*,sha,request_id,issue,body=None):
 
 
 class GitHubActionsControllerAuthorityV3:
+    def __copy__(self):raise ValueError('CONTROLLER_AUTHORITY_COPY_FORBIDDEN')
+    def __deepcopy__(self,memo):raise ValueError('CONTROLLER_AUTHORITY_COPY_FORBIDDEN')
+    def __reduce__(self):raise ValueError('CONTROLLER_AUTHORITY_SERIALIZATION_FORBIDDEN')
+
+    def _require_original(self):
+        if self._authority_origin is not self:raise ValueError('ORIGINAL_CONTROLLER_AUTHORITY_REQUIRED')
+
     def __init__(self, runtime, *, issue: int, request_id: str, gates):
         if runtime.role != "controller" or type(issue) is not int or issue < 1:
             raise ValueError("CONTROLLER_RUNTIME_BINDING_INVALID")
         require_owner_gates_v3(gates,sha=runtime.checkout.sha,request_id=request_id,issue=issue)
+        self._authority_origin = self
         self.runtime, self.issue, self.request_id = runtime, issue, request_id
         self.gates = {key: gates[key] for key in GATES}
         if runtime.inputs != {"request_issue_number": issue, "request_id": request_id}:
@@ -44,6 +52,7 @@ class GitHubActionsControllerAuthorityV3:
                                                runtime.checkout.sha)
 
     def require_current(self):
+        self._require_original()
         observed = self.runtime.observe()
         if observed.actor_id != OWNER_ID or observed.triggering_actor_id != OWNER_ID:
             raise ValueError("CONTROLLER_ACTOR_UNAUTHORIZED")
@@ -56,6 +65,7 @@ class GitHubActionsControllerAuthorityV3:
         return issue
 
     def accept_source_admission(self,source,admission,issuer):
+        self._require_original()
         from .live_source_admission_v3 import LiveSourceSessionV3
         if type(source) is not LiveSourceSessionV3:
             raise ValueError('ORIGINAL_COMPLETE_SOURCE_PHASE_REQUIRED')
@@ -65,6 +75,7 @@ class GitHubActionsControllerAuthorityV3:
 
     def authorize(self, *, broker_repository, broker_repository_node_id, target,
                   journal_admission_bytes, origin_body_bytes):
+        self._require_original()
         origin = self.require_current()
         value = validate_journal_admission_v3(json.loads(journal_admission_bytes), origin_body_bytes)
         repository = self.runtime.api.get("")
@@ -81,6 +92,7 @@ class GitHubActionsControllerAuthorityV3:
             target, journal_admission_bytes, origin_body_bytes)
 
     def evidence_id(self, *, repository, request, admission):
+        self._require_original()
         self.require_current()
         if (self._admission is None or repository != REPOSITORY
                 or canonical_bytes(admission) != canonical_bytes(self._admission)
