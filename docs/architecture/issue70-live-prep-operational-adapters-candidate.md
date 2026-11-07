@@ -5,12 +5,19 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 Live Preparation Operational Adapter Candidate"
-version: "0.1.1"
+version: "0.2.0"
 ---
 
 # Issue 70 — Live preparation operational adapter candidate
 
-## Status and boundaries
+The sections preceding **Owner-resolved resumption** retain the historical
+PARTIAL candidate at `5041cc267612035a9dc7883fcb2a6f337751acfe`, not descriptions
+of the new implementation. LP-01 was real and is resolved by an explicit owner
+decision, not retrospectively disproved. The [old NO_GO](https://github.com/fanilosendrison/review-broker/pull/93#issuecomment-6694959381)
+and [partial handoff](https://github.com/fanilosendrison/review-broker/issues/70#issuecomment-6695005311)
+remain unchanged. New qualification belongs to a later exact-tree receipt.
+
+## Historical status and boundaries
 
 This is a **partial construction candidate**, not a deployable live preparation
 workflow. The immutable base is draft PR #90, SHA
@@ -207,3 +214,167 @@ recognized real-boundary origin, the original decision ticket, current Worker,
 retention/readback and its sole CAS. Historical origin unavailability cannot be
 replaced by Artifact existence. The stopped live composition supplies no new
 operational failure-origin authority.
+
+## Owner-resolved resumption
+
+The owner mandate `ISSUE70_LIVE_PREP_LP01_LP02_RESOLUTION_AND_COMPLETION`
+resumes the exact partial SHA/tree above on the existing PR #93 branch.
+It changes experimental realization premises, not product specification or public
+v3 contracts. PR #92 and its registration-only GO remain frozen.
+
+```text
+LP01_OWNER_DECISION=DUAL_PHASE_SOURCE_AUTHORITY
+LP01_STATUS=RESOLVED_IN_CANDIDATE
+LP02_OWNER_DECISION=NODE24_LOCAL_ACTION_LAUNCHES_SINGLE_ORIGINAL_PYTHON
+LP02_STATUS=IMPLEMENTED_IN_CANDIDATE
+LIVE_PREMODEL_PREPARED=NOT_QUALIFIED
+```
+
+### Dual-phase source authority
+
+The Controller now consumes ephemeral credential A from the existing pinned
+source-App mint action, with exactly Contents/Pull requests/Metadata/Issues read
+and the singleton broker repository. Before mint, a read-only Controller start
+gate authenticates run/job/owner/Issue/approval context and requires initial claim
+absence. The Controller entrypoint independently repeats that authentication.
+It performs actual PR scope/capture/finalization and all reference admission
+reads before complete PreclaimAdmissionV3 and before the first Git mutation.
+The source session binds that exact admission to its original producer moment;
+canonical bytes or a caller boolean alone do not satisfy Controller authority.
+After source completion, live source clients are closed/dropped from the mutation
+path. Only credential-free admission data remains there.
+
+The Worker consumes a separately minted credential B from the same App,
+installation, selected repository and four-read permission profile. Stable scope
+and authorization evidence intentionally exclude secret token values. A and B
+therefore yield the same logical evidence, while each authority's permits_token
+recognizes only its own concrete credential. B is checked against the committed
+admission before acquisition. It newly captures and Git-verifies the exact
+subject; Controller capture bytes are never a Worker packet cache. Token A is
+not transferred. The issuer/lifecycle policy supplies distinct ephemeral tokens;
+it is not implemented by publishing a token fingerprint in the journal.
+
+These are two credentials, **not two independent signing principals**: the App
+private key/installation remain shared. Transient trusted-Python co-residence of
+source and control credentials is not physical isolation, and dropping references
+is not cryptographic memory erasure. Source Git/gh subprocesses receive only the
+isolated source environment. Journal/Actions/Artifact reads use the control token.
+Broker-owned policy-definition reads are distinct from subject/reference reads.
+
+The journal retains original admission metadata, not reference snapshots.
+OriginalAdmissionEnvelopeV3 is explicitly observer data, not a complete
+PreclaimAdmissionV3 or an effect permit. Only the original attributed ADMITTED
+continuation may hydrate its exact bytes with B. Hydration uses the same canonical
+restorer/byte/provenance checks as historical retained loading; it never renews
+original timestamps or source evidence. Mutable reference reobservation and
+original comparisons remain mandatory. The first live specimen additionally
+requires expected digests for both mutable references.
+
+### Controller/dispatch/ACK authority
+
+The concrete authority confronts the protected checkout, exact repository ID,
+run attempt 1, Controller workflow/ref/SHA/job, numeric owner and triggering owner,
+exact inputs and four owner gates against authenticated run/job/Issue observations.
+The guards are original-operation scoped: fresh expected-old/missing-ref checks
+reach every concrete Git mutation. Observer reads remain permitted after effects
+so lost responses can be reconciled without recursively creating write authority.
+
+The existing PreModelControllerV3 still owns claim/reserve/dispatch/ACK ordering.
+Its attributed reservation opens one original-instance issuance moment consumed
+by GitHubActionsInitialDispatchTransportV3. Read snapshots, copied response data
+and bare transport calls cannot recreate that opportunity. The transport checks
+the exact qualification branch and current original reservation, then emits one
+POST with return_run_details=true. Exact positive run ID plus API/browser URLs
+are required for a candidate. HTTP 204, malformed response or loss yields no ACK
+permission and never another POST.
+
+Dispatch observation schema 1 is closed: the twelve explicit ACK-link fields,
+workflow ID, attempt, event, run head SHA/branch, numeric actor/triggering actor,
+and Controller run/workflow/job IDs. Its evidence type is
+`github-actions-initial-dispatch-observation`; identity is canonical bytes + LF
+under artifact_identity. No clock, token, signed URL or volatile status is in
+that basis. The principal is derived from observed Worker execution, never a
+requester/owner/caller substitute. Historical principal_id redoes authenticated
+observations. The exact terminal Controller is discovered by bounded complete
+Actions listings and matching the committed observation identity, not a private
+Controller archive and never a search for a redispatch target.
+
+ACK11 exposes why equal ACK bytes alone are insufficient: an applied write can
+lose its response, leaving Controller UNRESOLVED while the Worker sees its target.
+The start gate consequently requires the correlated Controller attempt/job's
+terminal success. The pinned Controller CLI exits successfully only after its own
+DISPATCH_ACKNOWLEDGED result. Lost ACK cannot become successful through readback.
+This is a read-only realization of ACK11 inside the required Actions+journal
+corpus; no extra ref write, new permit or actor-signature claim is introduced.
+
+The Worker start gate uses exactly thirty observations separated by two seconds.
+Only after accepted exact REQUESTED/reservation/no-worker/ACK/current-run proof
+and owner-request gates may the workflow mint B and launch the original process.
+Manual, stale, missing, ambiguous or unrecognized ACK produces no binding, source
+mint, packet or upload. Controller ACK observation is also finitely bounded;
+these reads are not mutation retries.
+
+### Local Node24 bridge and original Worker
+
+The local action metadata declares only node24/main index.js, three required
+inputs, no pre/post and no npm dependency. The workflow maps its actual dispatch
+inputs literally to the action. The launcher validates shape, requires Artifact
+runtime values, allowlists context/credentials, rejects private-key presence and
+sets REVIEW_BROKER_NODE_EXECUTABLE exclusively from process.execPath. It spawns
+one Python, waits and propagates exit/signal status, without provider or domain
+operations. There is no prepare/upload/continue split or automatic respawn.
+
+Runtime input provenance relies on the owner-approved exact workflow and local
+action definition, literal mapping, clean exact checkout and authenticated same
+Actions run/job. This is the explicitly selected trusted-runner/code boundary,
+not cryptographic process/OIDC attestation or protection against arbitrary code
+already executing as the same OS user. Current Worker/ref checks remain fresh;
+a context object, environment variable or historical ADMITTED read cannot mint
+the original decision. Historical observers cannot acquire subjects, select a policy, mutate, upload
+or issue an active ticket. The shared Linux seccomp boundary is mechanically
+extracted from the qualified harness without changing its syscall list or tests.
+Cold children receive only minimal environment and a private corpus independently
+verified against GitHub outside the child, never credentials or packet-owned
+approval. The corpus is a trusted local channel, not a signature or public wire
+contract. A restarted observer can recollect it from GitHub and the Artifact.
+
+### Read cost and immutable data
+
+The first genuine nominal witness measured 96,317 Git, 89,539 Actions, 62 source
+and five Artifact-metadata simulated requests. Recursive context observations
+multiplied reads without adding trust. The corrected boundary issues one locally
+identity-bound context from actual observations; existing authorities perform
+fresh current run/job and ref verification before effects. A bounded corpus
+reuses already authenticated immutable Git objects by SHA, never ref state or
+writer acknowledgment. A Worker-local, capabilityless dispatch record reuses
+completed immutable provenance; principal_id still reads GitHub afresh and a
+restart must reconstruct it. There is no Controller-private durable archive.
+
+Authenticated conditional GETs use standard HTTP validators: every mutable read
+still reaches the provider, with exact credential/representation partitioning.
+Only a recognized 304 reuses exact prior bytes; errors, redirects, POSTs and Link
+responses are never cached. No stale-on-error or TTL permission exists. These
+are no-normative-impact implementation/conformance corrections, not weaker
+freshness or at-most-once obligations. Offline request counts do not qualify live
+GitHub quota, latency or availability.
+
+### Failure handling and unchanged limits
+
+The live composition connects RWP-05 to owned actual HTTP, terminated transfer,
+child-start, timeout and completed raw-stream observations, independently of
+archive puts and payload hashes. Retention remains the separate real Artifact
+backend and precedes the original ticket's sole BLOCKED CAS. Unknown provider
+upload retains reconciliation priority. Facts without independently recognized
+boundary provenance remain unconfirmed; no generic exception becomes BLOCKED.
+After restart, an unavailable original live execution corpus is honestly
+UNAVAILABLE, even if its observation Artifact exists. Historical commitment does
+not roll back and no active ticket is restored.
+
+The Artifact helper now reports actual child start to that recorder, and its
+local metadata-Git subprocesses also use a credential-free environment. Baseline
+component GO stays historical; integration changes require new exact-tree CI and
+review. Overwrite/delete/respawn remain absent and provider retries remain inside
+one pinned official child only. Both active workflows are workflow_dispatch-only,
+default-disabled by absent owner configuration, and stop before ARMED. No
+Codespace/model/result path or dependency on #83 is added. No live effect, merge,
+activation, normative adoption or next-stage execution is authorized.

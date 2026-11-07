@@ -5,7 +5,7 @@ asset_type: "qualification-plan"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 Future Live Effect Budget"
-version: "0.1.0"
+version: "0.2.0"
 ---
 
 # Issue 70 — Future live effect budget
@@ -13,9 +13,11 @@ version: "0.1.0"
 ## Authority boundary
 
 This is a ceiling for a **future separately authorized** qualification, not an
-allocation of effects to the current task. The current candidate is PARTIAL and
-not ready for that mandate because LP-01 remains unresolved. All current real
-operational counters are zero. Draft branches/PRs, normal CI and construction
+allocation of effects to the current task. The original PARTIAL candidate at
+5041cc2 used a single future source mint and stopped on LP-01. The explicit owner
+resumption decision resolves that premise with two separately minted credentials;
+it does not authorize any current live effect. All current real operational
+counters are zero. Draft branches/PRs, normal CI and construction
 review are separate permitted construction effects.
 
 ## Future single-attempt ceilings
@@ -34,7 +36,11 @@ JOURNAL_UPDATE_REFS_MAX=5
   admitted            <=1
   prepared_or_blocked <=1
 
-SOURCE_APP_TOKEN_MINTS_MAX=1
+SOURCE_APP_TOKEN_MINTS_MAX=2
+CONTROLLER_SOURCE_APP_TOKEN_MINTS_MAX=1
+WORKER_SOURCE_APP_TOKEN_MINTS_MAX=1
+SOURCE_TOKEN_TRANSFER_CONTROLLER_TO_WORKER=0
+SOURCE_TOKEN_REUSE_ACROSS_RUNS=0
 
 PREPARED_ARTIFACT_UPLOADS_MAX=1
 FAILURE_OBSERVATION_UPLOADS_MAX=1
@@ -78,6 +84,13 @@ cannot authorize another effect.
 The separate live mandate must freeze concrete repo/workflow IDs, branch/SHA,
 request/body/object IDs, original owner authorization, exact source-App scope,
 Artifact retention and transport bounds, actor principals, cleanup, evidence
-retention and no-retry accounting. It must also resolve LP-01 and qualify the
-complete new Controller/Worker composition first. This document supplies none of
-those missing approvals and never authorizes production activation.
+retention and no-retry accounting. The dual-phase owner decision and Node24
+bridge must have complete new exact-tree CI and fresh independent GO before a
+live-effect mandate can be considered. The ACK start gate's thirty read-only
+observations, at two-second intervals, create no mutation/retry allowance.
+Controller provenance discovery is also finitely bounded read-only observation,
+never another Worker dispatch. Standard conditional GET validation and immutable
+Git-data reuse create no permission and no extra mutation budget. No live quota,
+latency, availability or perpetual-retention guarantee follows from offline tests.
+This document supplies none of the missing live approvals and never authorizes
+production activation.

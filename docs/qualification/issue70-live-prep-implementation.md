@@ -5,12 +5,17 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 Partial Live Preparation Implementation"
-version: "0.1.1"
+version: "0.2.0"
 ---
 
 # Issue 70 — Partial live preparation implementation
 
-## Exact construction scope
+The sections preceding **Owner-resolved completion candidate** preserve the
+historical PARTIAL report at 5041cc2 and its old NO_GO. They are not claims about
+the resumed implementation or its later CI/review. The owner decision resolves
+the old conflict without rewriting that history.
+
+## Historical exact construction scope
 
 Base PR #90 remains draft/unmerged at
 `4f715fc6bd52fc5dac87a2f660ba8d2bf535e811`, tree
@@ -200,3 +205,130 @@ Artifact upload, journal/claim mutation, Codespace, ARMED or Review Broker model
 invocation occurred. Construction review/publisher model calls are distinct.
 No merge, Issue closure, Project mutation, generation 2 or next live task follows.
 Useful worktrees and private evidence must be retained on this PARTIAL outcome.
+
+## Owner-resolved completion candidate
+
+The resumption task is
+ISSUE70_LIVE_PREP_LP01_LP02_RESOLUTION_AND_COMPLETION, based exactly on
+5041cc267612035a9dc7883fcb2a6f337751acfe / tree
+e8a513cc6cddc0b6e8a3b86caf121e6d998e81a6. The same worktree/private evidence and
+existing PR #93 branch are reused; PR #92 files, branch, title and body are frozen.
+Its exact registration-only GO stays separate from the new primary gate.
+
+The [architecture resumption](../architecture/issue70-live-prep-operational-adapters-candidate.md)
+records the dual-phase owner decision and Node24 bridge. The implementation uses
+real source/admission/Controller/transition/ACK/Worker/packet/receipt/decision/
+retention/cold-reader code. Only external HTTP, credential issuer and Artifact
+process/network boundaries are doubled in the new composed witnesses.
+
+### Responsibilities and fences
+
+- github_live_runtime_v3 and github_actions_controller_authority_v3 authenticate
+  protected source/context/owner/input/Issue gates. A source-produced original
+  admission moment is required; pure canonical bytes do not recreate it.
+- github_actions_initial_dispatch_v3 consumes the existing Controller's original
+  attributed reservation opportunity once. Its exact 200 details are candidates,
+  never Worker identity. No timeout/204/malformed response causes redispatch.
+- github_actions_dispatch_ack_v3 reconstructs closed immutable observations from
+  GitHub Actions plus the journal, deriving the actual principal. Correlated
+  Controller run/workflow/job IDs bind original successful outcome for ACK11.
+- live_source_admission_v3 and github_initial_history_v3 construct actual complete
+  preclaim admission with A and complete twice-confronted history before claim.
+  Worker B proves the same logical scope but uses a separate concrete secret.
+- pre_model_ack_start_gate_v3 waits read-only before source mint/binding. The
+  Controller start gate is also read-only and precedes mint, with no provisional
+  claim. Both actual entrypoints repeat their own context checks.
+- The local Node24 action validates three literal dispatch inputs, passes an
+  environment allowlist and starts one original Python, with no provider/domain
+  logic, npm dependency, runtime download, pre/post or respawn.
+- live_pre_model_worker_v3 composes the existing RWP chain, not a YAML replacement
+  state machine. OriginalAdmissionEnvelopeV3 has no byte-completeness or permit
+  claim; only original attributed A hydrates the exact complete admission through
+  the shared retained-byte restorer. B freshly captures the subject; mutable
+  reference comparisons and immutable Git semantics remain unchanged.
+- github_policy_authority_v3 recognizes the broker-owned pinned definition and
+  original selection against actual journal/Actions context. Source content is
+  not approval; selection requires the genuine original decision. Historical
+  policy observers cannot select. Effective Codex policy stays NOT_ATTESTED.
+- cold_packet_observer_v3 uses an independently API-verified private corpus outside
+  the packet. It has no effect-capable transport or credentials. The qualified
+  Linux seccomp primitives are shared without changing their existing oracle,
+  syscall list or denial requirements. A fresh observer can recollect proof after
+  original Worker/subject roots disappear; it never renews sources or a ticket.
+
+The concrete Git Database implementation has one canonical shared provider and a
+historical compatibility facade, not hidden imports or duplicate algorithms.
+Existing v1/v2 routes lazily avoid v3 operational providers. Journal operation
+hooks establish fresh expected-old/missing-ref scope at each actual write; the
+existing transition/CAS/reconciliation algorithms and lost-ACK distinctions stay
+intact. Immutable observed Git and completed dispatch DATA are reused without
+caching a mutable Worker/ref permission. Conditional GETs require fresh server
+304 validation; errors/POSTs/redirects/Link responses never become cached success.
+
+### Executable qualification register
+
+- LP01-01–05/16: test_live_prep_dual_source, actual Controller/admission/claim/
+  reservation/dispatch/ACK; provider counters assert claim absence throughout
+  source admission and zero source-after-first-write or wrong-credential use.
+  Token strings differ, logical scope/authorization IDs match, and each
+  permits_token accepts only its own secret.
+- LP01-06–10: wrong App/install/scope/permissions refuse; issuer policy refuses A
+  reuse as B. This is not a claim that stable logical IDs prove secret inequality.
+- LP01-11–15: complete composition and worker_fail_closed cover fresh exact B
+  capture, HEAD/PR-object drift and changed expected-digest body/comment before
+  any packet/upload. No Controller subject snapshot is reused.
+- D01–D13: dispatch_authorities uses genuine Controller results and externally
+  observed runs, exact URLs/payload, one POST, malformed/lost/204 ambiguity,
+  identity faults, actual-principal derivation and cold recognition. Bare
+  transport calls and a new authority with copied admission bytes refuse.
+- ACK01–ACK12: ack_start_gate covers visibility lag, Controller terminal success,
+  bounded expiry, wrong inputs/run/ref/SHA/origin, one emitted POST after loss,
+  genuinely applied ACK CAS with lost response and zero gate mutation/source.
+- LP02-01–12/14: real Node launcher tests and maintained YAML parser oracles cover
+  metadata, exact one Python, allowlists, private-key refusal, execPath, exit and
+  no respawn; active YAML has no split continuation or post-launch mutation.
+- LP02-13/15: real harmless child reports original Python parent PID; metadata
+  Git also receives no source/control credential. The restarted ADMITTED probe
+  starts a distinct interpreter with genuine provider data but zero source,
+  helper, ticket or journal effect. Historical reconstruction survives deletion
+  of Worker, Controller capture and both subject roots without new acquisition.
+- Full live-form four-reference and empty-reference witnesses preserve original
+  packet/remote receipt into PREPARED and independent historical reconstruction,
+  zero invocations and STOP_BEFORE_ARMED. Failure HTTP503 is actually retained/
+  read back before the unique original BLOCKED CAS; unavailable retention emits
+  no BLOCKED. Baseline RWP-01–05, permanent goldens and pending evidence remain
+  unchanged regression oracles.
+
+The first complete witness exposed a cold corpus admission-permits argument
+mismatch after real PREPARED. The failing output is retained; correction uses the
+same original admission/request binding. A full replay passes. An early new test
+also expected ValueError where the existing Actions validator raises its typed
+RuntimeError; only the new test expectation was corrected, preserving rejection.
+No historical assertion was edited.
+
+The initial genuine nominal composition measured 185,923 simulated HTTP calls,
+not live traffic. Duplicate context observations were removed; immutable object
+and historical dispatch data plus standard HTTP validators reduce read cost
+without cached mutation rights. Read-reuse tests require fresh ref observation,
+changed target detection, credential partitioning, no stale-on-403 and no POST
+cache. This is no-normative-impact realization/conformance evidence, not live
+quota/latency qualification. Actual public helper pin verification runs without
+upload. CI provisions that exact public build dependency and Node24; tests use
+no real credential. PyYAML is an exact test-only extra, not a live dependency.
+
+### Qualification status and publication
+
+Focused runs, full local results, exact new normal Ubuntu CI (all twelve Linux
+witnesses without skip), final source/tree/diff and a fresh read-only
+openai-codex-1 / gpt-6.1-sol / high review must be bound by the later PR receipt.
+This document does not predict its own final commit or declare that pending
+review GO exists. Earlier component GO, failed CI, PARTIAL/NO_GO and source trees
+remain separate historical facts. The 45-minute CI budget is unchanged.
+
+No real Controller/Worker dispatch, A/B source mint, fixture/request Issue/PR,
+Artifact upload, operational claim/journal write, Codespace, ARMED, model or
+result effect is authorized or performed. No owner variable/secret, App
+permission/install, default branch, dev, Issue lifecycle or Project field changes.
+The future specimen/budget remain plan-only. READY_FOR_OWNER_LIVE_EFFECT_MANDATE,
+if later jointly established, means a separate bounded owner mandate may be
+considered, never that live PREPARED, production or model readiness is qualified.

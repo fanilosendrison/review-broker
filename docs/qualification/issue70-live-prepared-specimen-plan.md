@@ -5,18 +5,20 @@ asset_type: "qualification-plan"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 Future Bounded Live PREPARED Specimen Plan"
-version: "0.1.0"
+version: "0.2.0"
 ---
 
 # Issue 70 — Future bounded live PREPARED specimen
 
 ## Status and prerequisites
 
-This document creates no GitHub object and authorizes no live effect. The current
-construction is PARTIAL because LP-01 in the
+This document creates no GitHub object and authorizes no live effect. The
+historical 5041cc2 construction was PARTIAL because LP-01 in the
 [adapter candidate](../architecture/issue70-live-prep-operational-adapters-candidate.md)
-blocks the Controller/admission ordering. This plan is not executable until that
-owner decision, complete implementation, exact CI and fresh independent GO exist.
+blocked the selected ordering. The owner resumption mandate resolves LP-01 with
+separate Controller A and Worker B credentials, and LP-02 with the local Node24
+launcher. This plan remains non-executable until complete new exact-tree CI,
+fresh independent GO and a separate owner live-effect mandate exist.
 A separate owner live-effect mandate is required even after all construction gates.
 
 The future subject and references are fixtures, not authority to adopt a v3
@@ -82,6 +84,12 @@ The future canonical request has exactly four references, in this order:
 4. ID `reference-comment`, kind `github_issue_comment`, required true. Repository
    and comment ID are the exact new comment, with its expected comment hash.
 
+For this first specimen, github_issue_body.expected_sha256 and
+github_issue_comment.expected_sha256 are **REQUIRED**, not optional. Their exact
+hashes must be computed and frozen before ReviewRequest creation. A missing
+expected digest is a specimen-plan refusal even where the general candidate
+request schema permits omission.
+
 `atomicity` is false; independent observations do not claim a globally atomic
 cut. No extra reference, path alias, moving git ref or historical fixture is used.
 
@@ -126,8 +134,14 @@ and reconfirm that dev/default-branch and all gates remain as approved. Neither
 draft PR in this construction is merged. An inert registration does not activate
 a live workflow. Both live workflows remain workflow_dispatch-only.
 
-The single authorized Controller must claim/reserve once, dispatch once and
-independently authenticate the ACK. The original bound Worker must record
+The single authorized Controller must authenticate before its one mint A,
+complete source admission before claim, drop the source-live path, claim/reserve
+once, dispatch once and independently authenticate/write the ACK. The Worker
+read-only gate must recognize that exact ACK and correlated terminal Controller
+success before its one mint B. A and B use the same App/installation/singleton
+repository/four-read profile, but are distinct ephemeral credentials; no transfer
+or reuse occurs across runs. The local Node24 action starts the single original
+Python Worker. The original bound Worker must record
 ADMITTED, use its distinct source-App token, retain the original authorized
 packet through one direct upload, authenticate REST metadata and remote bytes,
 commit the sole PREPARED-or-BLOCKED CAS and perform independent historical
