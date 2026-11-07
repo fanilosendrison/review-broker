@@ -240,5 +240,64 @@
         ]
       }
     }
-  ]
+  ],
+  "extended_producer": {
+    "source_commit": "3beff06bff1deffc72772455d89489e50996d416",
+    "source_path": "src/review_broker/queue.py",
+    "note": "Later accepted v1 metadata-extension wire producer. Synthetic STOPPED/count1; explicit four null metadata keys.",
+    "record": {
+      "schema_version": 1,
+      "request_id": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "attempt_id": "attempt:sha256:c373021382c69ed415e182f409c4126deafae1ad9d6176e5ab4207398e1a18a1",
+      "state": "STOPPED",
+      "evidence_ids": [
+        "artifact:sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "packet:sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "artifact:sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "artifact:sha256:4444444444444444444444444444444444444444444444444444444444444444",
+        "artifact:sha256:5555555555555555555555555555555555555555555555555555555555555555"
+      ],
+      "invocation_count": 1,
+      "history": [
+        {
+          "state": "REQUESTED",
+          "evidence_ids": []
+        },
+        {
+          "state": "ADMITTED",
+          "evidence_ids": [
+            "artifact:sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          ]
+        },
+        {
+          "state": "PREPARED",
+          "evidence_ids": [
+            "packet:sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          ]
+        },
+        {
+          "state": "ARMED",
+          "evidence_ids": [
+            "artifact:sha256:3333333333333333333333333333333333333333333333333333333333333333"
+          ]
+        },
+        {
+          "state": "INDETERMINATE",
+          "evidence_ids": [
+            "artifact:sha256:4444444444444444444444444444444444444444444444444444444444444444"
+          ]
+        },
+        {
+          "state": "STOPPED",
+          "evidence_ids": [
+            "artifact:sha256:5555555555555555555555555555555555555555555555555555555555555555"
+          ]
+        }
+      ],
+      "evidence_locator_plan": null,
+      "evidence_locator": null,
+      "publication_intent": null,
+      "publication_receipt": null
+    }
+  }
 }
