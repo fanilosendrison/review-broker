@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 Partial Live Preparation Implementation"
-version: "0.2.1"
+version: "0.2.2"
 ---
 
 # Issue 70 — Partial live preparation implementation
@@ -382,3 +382,53 @@ registry is outside this task's authorized worktree and is not modified.
 The first local full run remains diagnostic if edits overlapped it; its source
 manifest decides exactness. Fresh corrected-source full validation, CI and a new
 independent review are required. No GO is transferred from the earlier tree.
+
+### Exact emitted operation and accepted receiver correction
+
+The second completion review on SHA8b7fe35ca313e1ca0c2a8f666814b325b49d9b97,
+treebe807b4867185b63bf64d46b7dffeaadd9db8140, remains
+[NO_GO](https://github.com/fanilosendrison/review-broker/pull/93#issuecomment-6701685229).
+Its exact Ubuntu CI42331106842/job128277579418 passed1151 tests in1839.079s,
+zero skips, before the newly exposed cases. No prior outcome is relabeled.
+
+Both findings were reproduced against actual complete admission/Controller
+composition with external provider fixtures: a different valid ref borrowed the
+original missing-ref condition and was created; a copied accepted authority
+returned active authorization without original receiver identity. The two RED
+assertions and full review are retained. These are no-normative-impact software
+correctness findings under the mandate's existing exact-operation and
+original-instance requirements, affecting implementation and qualification, not
+new durable protocol semantics or general platform qualification.
+
+The correction binds a short-lived request plan to original ref, exact predecessor,
+encoded journal, parent tree, prepared object identities and exact successor.
+The existing writer must completely verify and return that successor before the
+Core's operation-ready callback can expose the one ref-changing request. Outgoing
+bytes use one shared standard JSON encoder and the same shared GraphQL query;
+duplicate JSON fields, different payloads, parents, refs, successors, query or
+force values refuse before provider emission. Blob/tree/commit preparation and
+the single ref change are distinct exact stages. Each valid stage consumes its
+local opportunity before emission; response loss never resets it. Invalid
+requests do not steal the intended request. Actor/current-ref guards, existing
+CAS, pending evidence and read-only reconciliation remain unchanged.
+
+The active receiving Controller authority is noncopyable/nonserializable and
+checks its original identity before current-context validation, source acceptance,
+authorization and admission evidence. A raw state clone retains the old origin
+and is rejected; a fresh constructor can observe runtime but cannot substitute
+for the accepted source receiver or issue active admission evidence.
+
+`test_live_prep_operation_target_replay.py` preserves the two RED oracles and
+adds wrong successor, duplicate intended emission, all CAS fields/query, false
+versus numeric force, preparation payload/parent, deepcopy/pickle and raw-state
+clone checks. Real service request/ref counters establish zero unrelated writes,
+one intended create, only reservation/ACK CAS and no additional mutation after
+receiver rejection. The original correct composition remains positive. The four
+immediate groups pass16 tests in29.504s. No historical assertion was modified.
+
+The prior local1151-test run finished OK with twelve Darwin skips, but its source
+manifest is changed and it is diagnostic, not an exact corrected-tree PASS.
+Fresh full local, normal Ubuntu CI/tree match and a new read-only correctness
+review are required for this correction. Review scope is code correctness and
+preservation of existing broker invariants; no live effect or broad platform
+qualification is inferred.

@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 Live Preparation Operational Adapter Candidate"
-version: "0.2.1"
+version: "0.2.2"
 ---
 
 # Issue 70 — Live preparation operational adapter candidate
@@ -244,7 +244,12 @@ canonical bytes or a caller boolean alone do not satisfy Controller authority.
 The session is noncopyable/nonserializable, registration names its exact original
 receiver, and a shared mutex irreversibly consumes/clears the one issuance moment.
 Closing invalidates all remaining registration fields. An old copied issuer/data
-pair or a different authority instance cannot register it again.
+pair or a different authority instance cannot register it again. The accepted
+receiving authority itself is noncopyable/nonserializable and checks its original
+identity before current validation, acceptance, authorization or evidence. A raw
+shallow state reconstruction retains the wrong origin and cannot issue either
+decision or evidence; a fresh constructor is not equivalent to the accepted
+source receiver.
 After source completion, live source clients are closed/dropped from the mutation
 path. Only credential-free admission data remains there.
 
@@ -280,7 +285,14 @@ The concrete authority confronts the protected checkout, exact repository ID,
 run attempt 1, Controller workflow/ref/SHA/job, numeric owner and triggering owner,
 exact inputs and four owner gates against authenticated run/job/Issue observations.
 The guards are original-operation scoped: fresh expected-old/missing-ref checks
-reach every concrete Git mutation. Observer reads remain permitted after effects
+reach every concrete Git mutation. The ephemeral exact request plan additionally
+binds the emitted ref, predecessor, prepared journal/parent/object identities and
+intended successor. Only the existing writer's fully verified returned successor
+opens the one ref request. Shared JSON/query definitions confront actual outgoing
+bytes, not merely the logical scope. Each exact preparation stage and ref emission
+consumes once before the provider call; wrong payloads refuse without borrowing
+or consuming the correct request. No CAS/reconciliation rule or durable protocol
+is replaced. Observer reads remain permitted after effects
 so lost responses can be reconciled without recursively creating write authority.
 
 The existing PreModelControllerV3 still owns claim/reserve/dispatch/ACK ordering.
