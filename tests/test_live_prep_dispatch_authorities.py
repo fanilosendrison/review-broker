@@ -44,7 +44,7 @@ class DispatchAuthorityTests(unittest.TestCase):
         calls=[c for c in self.service.calls if c[0]=='POST']
         self.assertEqual(len(calls),1)
         self.assertEqual(json.loads(calls[0][2]),{'ref':'qualification-branch','inputs':{
-            'request_id':self.identifier,'reservation_id':receipt.reservation_id,'generation':1},'return_run_details':True})
+            'request_id':self.identifier,'reservation_id':receipt.reservation_id,'generation':'1'},'return_run_details':True})
         self.assertEqual(ack.principal_id(receipt),PRINCIPAL)
         self.assertNotEqual(PRINCIPAL,30498238)
         self.assertFalse(ack.authenticates(receipt,dispatch_principal_id=30498238))
