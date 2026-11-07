@@ -49,11 +49,13 @@ def run_v3_command(args,source_token):
                     raise ValueError('CONTROLLER_START_GATE_NOT_INITIAL')
                 print(canonical_bytes({'CONTROLLER_START_GATE':'ACCEPTED'}).decode());return 0
             private=Path(tempfile.mkdtemp(prefix='rb-v3-controller-'))
+            observations=[]
             result=run_live_controller_v3(runtime=runtime,issue=args.issue,request_id=args.request_id,
                 gates=gates,source_token=source_token,app_slug=environment['REVIEW_BROKER_SOURCE_APP_SLUG'],
                 installation_id=exact_positive(environment['REVIEW_BROKER_SOURCE_INSTALLATION_ID']),
-                private_root=private,source_executor=urllib_executor)
-            print(canonical_bytes({'status':result.status.value,'reason':result.reason}).decode())
+                private_root=private,source_executor=urllib_executor,observation_sink=observations.append)
+            print(canonical_bytes({'status':result.status.value,'reason':result.reason,
+                'provider_observation':None if not observations else observations[0].as_dict()}).decode())
             return 0 if result.status.value=='DISPATCH_ACKNOWLEDGED' else 1
         from .live_pre_model_worker_v3 import worker_observer_v3,run_live_worker_v3
         from .pre_model_ack_start_gate_v3 import wait_dispatch_ack_v3

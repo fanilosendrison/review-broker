@@ -1,8 +1,13 @@
 """Exactly one real-form Actions dispatch; its response is only a run candidate."""
 from __future__ import annotations
 
-import json
+from collections.abc import Callable
 from threading import Lock
+
+from .github_actions_dispatch_provider_v3 import (
+    GitHubActionsDispatchProviderObservationV3, classify_dispatch_response_v3, dispatch_transport_observation_v3,
+    workflow_dispatch_payload_v3,
+)
 
 from .github_actions_controller_authority_v3 import GitHubActionsControllerAuthorityV3
 from .github_live_runtime_v3 import REPOSITORY, WORKER_PATH
@@ -18,7 +23,8 @@ class GitHubActionsInitialDispatchTransportV3:
     def __deepcopy__(self,memo):raise ValueError('INITIAL_DISPATCH_TRANSPORT_COPY_FORBIDDEN')
     def __reduce__(self):raise ValueError('INITIAL_DISPATCH_TRANSPORT_SERIALIZATION_FORBIDDEN')
 
-    def __init__(self, authority: GitHubActionsControllerAuthorityV3):
+    def __init__(self, authority: GitHubActionsControllerAuthorityV3, *,
+                 observation_sink: Callable[[GitHubActionsDispatchProviderObservationV3], None] | None = None):
         if type(authority) is not GitHubActionsControllerAuthorityV3:
             raise ValueError("CONCRETE_CONTROLLER_AUTHORITY_REQUIRED")
         self.authority = authority
@@ -27,6 +33,8 @@ class GitHubActionsInitialDispatchTransportV3:
         self._origin = self
         self._controller = None
         self._permit = None
+        self.provider_observation: GitHubActionsDispatchProviderObservationV3 | None = None
+        self._observation_sink = observation_sink
 
     def bind_controller(self,controller):
         from .pre_model_controller_v3 import PreModelControllerV3
@@ -74,23 +82,25 @@ class GitHubActionsInitialDispatchTransportV3:
         claim=a.runtime.api.get('/git/ref/'+request.claim_ref.removeprefix('refs/'))
         if (claim.get('ref')!=request.claim_ref or claim.get('object',{}).get('sha')!=permit[3].commit_sha):
             raise ValueError('DISPATCH_RESERVATION_NO_LONGER_CURRENT')
-        payload = {"ref": target.execution_ref.removeprefix("refs/heads/"), "inputs": {
-            "request_id": request.request_id, "reservation_id": request.reservation_id,
-            "generation": 1}, "return_run_details": True}
+        payload = workflow_dispatch_payload_v3(execution_ref=target.execution_ref,
+            request_id=request.request_id, reservation_id=request.reservation_id,
+            generation=request.generation)
+        context = dict(workflow_path=WORKER_PATH, execution_ref=target.execution_ref,
+            request_id=request.request_id, reservation_id=request.reservation_id,
+            generation=request.generation)
         result = InitialDispatchResultV3(InitialDispatchStatusV3.UNRESOLVED)
         try:
             a.require_current()
             response = a.runtime.api.post_dispatch(payload)
-            if response.status == 204:
-                result = InitialDispatchResultV3(InitialDispatchStatusV3.ACCEPTED_NO_RUN_ID)
-            elif response.status == 200:
-                value = a.runtime.api.metadata.object(response)
-                run = value.get("workflow_run_id")
-                if (type(run) is int and run > 0
-                        and value.get("run_url") == f"https://api.github.com/repos/{REPOSITORY}/actions/runs/{run}"
-                        and value.get("html_url") == f"https://github.com/{REPOSITORY}/actions/runs/{run}"):
-                    result = InitialDispatchResultV3(InitialDispatchStatusV3.OBSERVED, run)
-        except Exception:
-            pass  # POST may have applied. No retry, no search for a redispatch target.
+            result, observation = classify_dispatch_response_v3(response, **context)
+        except Exception as error:
+            # POST may have applied. A safe error class creates no retry permission.
+            observation = dispatch_transport_observation_v3(error, **context)
         self.observed_request, self.observed_response = request, result
+        self.provider_observation = observation
+        if self._observation_sink is not None:
+            try:
+                self._observation_sink(observation)
+            except Exception:
+                pass  # Reporting failure never changes the consumed operation/result.
         return result
