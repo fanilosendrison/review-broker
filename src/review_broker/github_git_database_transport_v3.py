@@ -16,7 +16,7 @@ from .github_http_live_v3 import (
 from .github_graphql_response_v3 import graphql_error_code
 from .github_journal_transport_v3 import (
     CreateRefResultV3, CreateRefStatusV3, GraphQLRefUpdateV3, JOURNAL_UPDATE_REFS_QUERY_V3,
-    encode_journal_http_payload_v3,
+    encode_journal_http_payload_v3, JOURNAL_REPOSITORY_QUERY_V3,
     GraphQLUpdateResultV3, ReadResultV3, ReadStatusV3, TransportSnapshotV3,
 )
 
@@ -137,7 +137,7 @@ class GitHubTransportLiveV3:
         if not isinstance(rest_node, str) or not rest_node:
             raise GitHubTransportLiveV3Error("REPOSITORY_NODE_ID_INVALID")
         response = self._graphql(
-            "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){id nameWithOwner}}",
+            JOURNAL_REPOSITORY_QUERY_V3,
             {"owner": self._owner, "name": self._name},
         )
         if response.status != 200:

@@ -44,7 +44,9 @@ def live_journal_v3(runtime,admission_authority,*,write_guard):
     avoid recursively authorizing a journal read through itself.
     """
     from .journal_operation_plan_v3 import JournalOperationPlanV3
-    from .github_journal_transport_v3 import ReadStatusV3,decode_journal_http_payload_v3
+    from .github_journal_transport_v3 import (
+        ReadStatusV3,decode_journal_http_payload_v3,encode_journal_http_payload_v3,JOURNAL_REPOSITORY_QUERY_V3,
+    )
     active=[None];lock=Lock()
     def begin_operation(expected,claim_ref,journal_bytes):
         parent=runtime.checkout.sha if expected is None else expected.commit_sha
@@ -60,10 +62,13 @@ def live_journal_v3(runtime,admission_authority,*,write_guard):
         plan.ready(successor)
     def execute(request):
         runtime.check_locals()
-        payload=decode_journal_http_payload_v3(request.data) if request.data else None
-        query=payload.get('query','') if isinstance(payload,dict) else ''
+        if request.data:decode_journal_http_payload_v3(request.data)
         method=request.get_method()
-        mutation=method!='GET' and not (method=='POST' and query.startswith('query'))
+        read_query=(method=='POST' and request.full_url=='https://api.github.com/graphql'
+            and request.data==encode_journal_http_payload_v3({'query':JOURNAL_REPOSITORY_QUERY_V3,
+                'variables':{'owner':'fanilosendrison','name':'review-broker'}}))
+        if method=='GET' and request.data is not None:raise ValueError('JOURNAL_READ_BODY_FORBIDDEN')
+        mutation=method!='GET' and not read_query
         plan=None
         if mutation:
             with lock:plan=active[0]

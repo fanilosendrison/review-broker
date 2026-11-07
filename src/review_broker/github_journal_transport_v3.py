@@ -9,6 +9,8 @@ from typing import Mapping, Protocol
 from .journal_record_v3 import JournalRecordV3, WorkerIdentityV3
 
 
+JOURNAL_REPOSITORY_QUERY_V3 = "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){id nameWithOwner}}"
+
 JOURNAL_COMMIT_MESSAGE_V3 = "review-broker: experimental v3 journal transition"
 
 JOURNAL_UPDATE_REFS_QUERY_V3 = "mutation($repositoryId:ID!,$name:GitRefname!,$beforeOid:GitObjectID!,$afterOid:GitObjectID!,$force:Boolean!){updateRefs(input:{repositoryId:$repositoryId,refUpdates:[{name:$name,beforeOid:$beforeOid,afterOid:$afterOid,force:$force}]}){clientMutationId}}"
