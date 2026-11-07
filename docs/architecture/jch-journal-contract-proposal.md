@@ -5,12 +5,12 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "J-CH Versioned Journal and AtomicArm Contract Proposal"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
-# J-CH Versioned Journal and AtomicArm Contract — Proposal v0.1.0
+# J-CH Versioned Journal and AtomicArm Contract — Proposal v0.1.1
 
-**DRAFT / NON-NORMATIVE / NOT IMPLEMENTED / NOT QUALIFIED**  
+**DRAFT / NON-NORMATIVE / NOT IMPLEMENTED / CORE SLICE TESTED — FULL CONTRACT NOT QUALIFIED**  
 **Design issue:** [#91](https://github.com/fanilosendrison/review-broker/issues/91). **Companion candidate:** [J-CH ARM-bound Challenge proposal](arm-challenge-authority-proposal.md) (v0.1.2).  
 This document proposes *journal* semantics only. It does **not** amend accepted OIDC ARM v1, ReviewRequest v1/v2, any executable schema, or the production journal. Requirements prefixed `J01`–`J23` are **candidate contract requirements**, not authorization to execute or merge.
 
@@ -35,7 +35,7 @@ This document proposes *journal* semantics only. It does **not** amend accepted 
 
 **J04 — Identity stability.** Validate `request_id` domain, canonical attempt ordinal-1 identity derivation, deterministic claim-ref mapping, exact repository numeric identity and evidence/policy bindings. The request/attempt identities, protocol marker, initial admission, subject/packet identity, once-established capacity receipt and evidence provenance are never substituted by an ARM or later writer. A changed subject requires a distinct authorized ReviewRequest operation, never a new incarnation of an old attempt.
 
-**J05 — Binding presence.** The required `arm_binding` is **JSON null** throughout `REQUESTED/ADMITTED/PREPARED`. The **only** transition allowed to set it non-null is the single atomic `PREPARED/count=0 -> ARMED/count=1` commit. From then on, `arm_binding` must exist, match the original canonical bytes and remain **byte-for-byte immutable** in every descendant record, including `INDETERMINATE`, `REPORTED`, `STOPPED`. Null/absent/conflicting bindings on an armed record are invalid, not grounds for reauthorization.
+**J05 — Binding presence.** The required `arm_binding` is **JSON null** throughout `REQUESTED/ADMITTED/PREPARED` **and any `INDETERMINATE/STOPPED` state reached before AtomicArm**. The **only** transition allowed to set it non-null is the single atomic `PREPARED/count=0 -> ARMED/count=1` commit. From then on, `arm_binding` must exist, match the original canonical bytes and remain **byte-for-byte immutable** in every descendant record, including post-ARM `INDETERMINATE`, `REPORTED`, `STOPPED`. The exact persisted history, not the terminal enum by itself, distinguishes pre-ARM from post-ARM. Null/absent/conflicting bindings on an armed record are invalid, not grounds for reauthorization.
 
 **J06 — Closed `arm_binding`.** The proposed exact object must bind: `binding_version` (fixed `1`), original `prepared_parent_sha` (40 hex), `challenge` (64 lowercase hex, generated only by live L), `request_id`, `attempt_id`, `packet_id`, `input_sha256`, exact capacity-receipt ID/digest, expected subject and reviewer policy/executable identities, `broker_repository_id`, trusted workflow ref/SHA, `controller_run_id`, `controller_run_attempt`, `codespace_name`, `codespace_id`, verified launcher program identity, and recipient/preflight observation digest. The record must reject unrecognized/missing/duplicate fields; all IDs cross-check their existing authoritative records and trusted observed context. This list is a **candidate wire field set**, not an approved final JSON Schema.
 
@@ -65,11 +65,11 @@ No key named `"..."` is permitted in an actual object. The full outer record ret
 
 ## 3. Legal transitions, counts, and monotonicity
 
-**J08 — Consumption state invariant.** For v2: `invocation_count` is a strict JSON integer in `{0,1}`; it is `0` in `REQUESTED/ADMITTED/PREPARED`, **exactly `1` in `ARMED` and every post-ARM state**. `ARMED/count=0`, `PREPARED/count=1`, `ARMED` without binding and any count decrement are invalid. `count=1` is **durable authorization consumption**, **not observed Codex start or provider inference**.
+**J08 — Consumption state invariant.** For v2: `invocation_count` is a strict JSON integer in `{0,1}`; it is `0` in `REQUESTED/ADMITTED/PREPARED`, **exactly `1` in `ARMED` and every state that descends from AtomicArm**. `INDETERMINATE` and `STOPPED` additionally admit **pre-ARM `count=0/arm_binding=null` histories** reached without any `ATOMIC_ARM_CONSUMED` event; the same state names admit post-ARM `count=1/arm_binding=original` histories only when that event is present. Thus neither `INDETERMINATE` nor `STOPPED` can determine consumption from the enum alone. `ARMED/count=0`, `PREPARED/count=1`, `ARMED` without binding and any count decrement are invalid. `count=1` is **durable authorization consumption**, **not observed Codex start or provider inference**.
 
 **J09 — AtomicArm is the only entry into ARMED.** A single versioned `arm_once_challenge_bound` journal operation accepts only an authenticated, canonical, capacity-PASS `PREPARED/count=0/arm_binding=null` snapshot, with its exact parent SHA P and original controller-owned live launcher challenge. It creates *one* A with `state=ARMED`, `invocation_count=1`, fixed `arm_binding` and one new, canonically encoded `ATOMIC_ARM_CONSUMED` history event. Generic `transition(..., ARMED)` and `record_invocation()` are **not** legal v2 operations, including for `ARMED/count=0`; they remain available only under their accepted legacy contract.
 
-**J10 — Post-arm states.** Preserve existing legal transitions and specialized evidence gates: `ARMED -> TERMINAL_CAPTURED -> VALIDATED -> REPORTED -> STOPPED`; alternatives to `INDETERMINATE`, then `STOPPED` under the existing accepted evidence/Shutdown requirements. Post-arm transitions never reduce count, delete binding, change request/attempt/packet/recipient or create another launch authorization. `INDETERMINATE` reports uncertainty, **not retroactive revocation** of a proof already in the original trusted launcher.
+**J10 — Post-arm and pre-arm stop states.** Preserve existing legal transitions and specialized evidence gates: `ARMED -> TERMINAL_CAPTURED -> VALIDATED -> REPORTED -> STOPPED`; alternatives to `INDETERMINATE`, then `STOPPED` under the existing accepted evidence/Shutdown requirements. **Pre-arm** `REQUESTED/ADMITTED/PREPARED -> INDETERMINATE -> STOPPED` also exists: it retains `count=0` and a null binding, and never carries a model grant. Post-arm transitions never reduce count, delete binding, change request/attempt/packet/recipient or create another launch authorization. `INDETERMINATE` reports uncertainty, **not retroactive revocation** of a proof already in the original trusted launcher.
 
 **J11 — Pre-arm work.** Existing `REQUESTED -> ADMITTED -> PREPARED` and separately authorized evidence/retention/capacity metadata operations may continue only with count zero and null binding. A rejected input-capacity receipt is terminal for model-capable admission on that attempt. No legacy migration from a previously claimed v1 PREPARED record is inferred; a separately accepted migration would require an explicit historical non-replay plan.
 
@@ -115,6 +115,8 @@ No key named `"..."` is permitted in an actual object. The full outer record ret
 | v2 ARMED/count0 or null binding | REJECT | Invalid intermediate state |
 | v2 PREPARED/count1 or nonnull binding | REJECT | Inconsistent consumption |
 | v2 ARMED/count1 with unchanged binding -> INDETERMINATE/count1 | PERMIT under evidence gate | Truthful uncertainty |
+| v2 PREPARED/count0 with null binding -> INDETERMINATE/count0 -> STOPPED/count0 | PERMIT under evidence/Shutdown gates | Pre-arm interruption never consumed an invocation |
+| v2 post-ARM INDETERMINATE/count1 without binding or ARM history event | REJECT | Historical consumption cannot be forgotten |
 | v2 INDETERMINATE/count1 -> PREPARED/count0 | REJECT | No re-arm |
 | v2 later commit preserves Git ancestry but drops ARM event | REJECT | Semantic monotonicity |
 | Two C submit same P and different A/B | At most one ref update under expected-old | Exclusive authorization decision |
@@ -125,9 +127,17 @@ No key named `"..."` is permitted in an actual object. The full outer record ret
 | A contains its own full SHA in canonical binding | REJECT contract design | Self-reference impossible |
 | Old reader encounters schema v2 | REJECT and no mutation | Cutover requirement |
 
+## 7. Core qualification findings (2026-11-07; bounded, non-normative)
+
+An executable [candidate core-only schema](qualification/rb91-jch-journal-v2-core.schema.json) and [qualification tests](../../tests/test_rb91_jch_contract_qualification.py) were added to the same **Draft PR #94** for falsification. This is **not** a deployable schema or journal adapter: the slice deliberately refuses embedded `admission`, publication and artifact-locator payloads rather than accepting their nested shapes as arbitrary objects. These domains remain **unqualified**; so do the final `J06` wire-field naming decision, real commit-ancestry observation, full historical writer inventory, runtime OIDC/SSH binding and operational error transport.
+
+- The core suite exercises exact version and field rejection, canonical/duplicate JSON, binding and capacity links, one atomic event, no-op/rebind/rollback refusal, pre/post-ARM INDETERMINATE/STOPPED histories, permission/404 vs UNKNOWN, and no mint/retry on ambiguous GraphQL outcomes.
+- A real-code regression test on current `AttemptRecord.from_dict()` shows it **accepts v2 and `as_dict()` strips the protocol and arm binding**. The required `v2 -> reject without mutation` check is an **expected failure**, not a resolved gate. This blocks publishing any v2 journal. Only a future separate accepted, tested writer upgrade can close that gate.
+- A fixture-only model does not prove every accepted v1 evidence state and publication domain was exercised; it must never be used as a replacement for the operational journal or imply independent hostile review.
+
 ## 7. Open work (honest acceptance status)
 
-1. Translate J01–J23 into **separately approved** JSON Schema, transition implementation and tests with exact domains for nested `arm_binding` and all embedded evidence objects. Nothing here is executable wire approval.
+1. Complete J01–J23 as a **separately approved full** JSON Schema, state-transition adapter and tests with the exact domains for embedded admission/evidence/publication objects; the current core-only candidate is intentionally insufficient. Nothing here is executable wire approval.
 2. Audit every actual writer and running workflow SHA; qualify fail-closed upgrade before any v2 record exists, or choose an explicitly accepted alternate ref namespace.
 3. Resolve exact read/rate-limit/error transport and positive GraphQL response shape with code-level mocks and, if necessary, additional scoped **non-inference** experiments. No live J-CH ARM attempt is authorized.
 4. Qualify same-process original launcher one-use, SSH failure/abrupt disconnect, reconciler interleavings and OIDC binding separately. Q2 is only nominal synthetic transport; Q3 only ref-CAS evidence.
@@ -135,10 +145,12 @@ No key named `"..."` is permitted in an actual object. The full outer record ret
 
 ```text
 CONTRACT_PROPOSAL=RB91_JCH_JOURNAL_ATOMIC_ARM
-PROPOSAL_VERSION=0.1.0
+PROPOSAL_VERSION=0.1.1
 STATUS=DRAFT_NON_NORMATIVE
 ACCEPTED_JOURNAL_SCHEMA=V1_UNCHANGED
-CANDIDATE_JOURNAL_SCHEMA=V2_UNIMPLEMENTED
+CANDIDATE_JOURNAL_SCHEMA=V2_CORE_OFFLINE_QUALIFICATION_ONLY
+SCHEMA_SCOPE=ATOM_ARM_CORE_NO_ADMISSION_OR_POST_RESULT_PAYLOADS
+OLD_WRITER_REJECT_V2=BLOCKED_KNOWN_ACCEPTS_AND_STRIPS
 GRAPHQL_UPDATEREFS_Q3=BOUNDED_REAL_PASS_WITH_GENERIC_ERRORS
 OWNER_TRUST_BOUNDARY=ACCEPTED_FOR_ORDINARY_USE
 OLD_WRITERS_STRICT_UPGRADE=NOT_IMPLEMENTED
