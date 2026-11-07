@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 Live Preparation Operational Adapter Candidate"
-version: "0.2.2"
+version: "0.2.3"
 ---
 
 # Issue 70 — Live preparation operational adapter candidate
@@ -292,7 +292,10 @@ opens the one ref request. Shared JSON/query definitions confront actual outgoin
 bytes, not merely the logical scope. Each exact preparation stage and ref emission
 consumes once before the provider call; wrong payloads refuse without borrowing
 or consuming the correct request. No CAS/reconciliation rule or durable protocol
-is replaced. Observer reads remain permitted after effects
+is replaced. Only the exact shared repository-identity query on the exact GitHub
+GraphQL endpoint is a POST read exception. REST writes cannot be classified as
+reads by a query-looking body field; GET bodies and unrecognized POST read shapes
+refuse. Observer reads remain permitted after effects
 so lost responses can be reconciled without recursively creating write authority.
 
 The existing PreModelControllerV3 still owns claim/reserve/dispatch/ACK ordering.

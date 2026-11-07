@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 Partial Live Preparation Implementation"
-version: "0.2.2"
+version: "0.2.3"
 ---
 
 # Issue 70 — Partial live preparation implementation
@@ -432,3 +432,31 @@ Fresh full local, normal Ubuntu CI/tree match and a new read-only correctness
 review are required for this correction. Review scope is code correctness and
 preservation of existing broker invariants; no live effect or broad platform
 qualification is inferred.
+
+### REST/GraphQL read classification correction
+
+The correctness review on SHA58eb5c9e3a3fa0c43a3d9622129a9a28dc58d8f3 /
+treed02a8b4c0692f90ef1b6146e9a8d659773cd2fa9 remains
+[NO_GO](https://github.com/fanilosendrison/review-broker/pull/93#issuecomment-6706174534).
+It closed the accepted-instance correction and ordinary exact-plan cases, but
+found that a REST POST carrying a query-looking field skipped the write path.
+The original genuine Controller sequence created an unrelated ref, and a
+read-only composition also emitted a REST write. Both actual RED observations
+are preserved; the prior1156-test exact CI does not cover or qualify this case.
+
+The correction recognizes only the exact canonical repository-identity query on
+the exact GitHub GraphQL endpoint as the transport's POST read. Every REST write
+is therefore routed through its actor/write guard, exact operation plan and
+single-use stage regardless of body fields. Other GraphQL requests are not an
+implicit read exception; GET bodies refuse. The existing query bytes are shared
+with the provider implementation, not independently reconstructed string rules.
+This is a no-normative-impact software classification correction within the same
+exact-operation obligation, with no new durable protocol, CAS or retry rule.
+
+The original unrelated-ref oracle is retained with the extra query-field case.
+A separate read-only composition oracle verifies zero provider mutations for
+query-looking REST bodies and unrecognized GraphQL reads. Correct original
+operations remain positive. The four immediate groups pass17 tests in35.218s
+after correction. No historical assertion is relaxed. Fresh complete regression,
+exact-tree Ubuntu CI and independent correctness GO remain required; no earlier
+NO_GO is relabeled and no live permission is created.
