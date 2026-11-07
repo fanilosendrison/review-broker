@@ -39,7 +39,7 @@ class GitHubJournalV3:
                  admission_authority: AdmissionAuthorityV3,
                  mutation_authority: MutationAuthorityV3,
                  rejection_authority: RejectionAuthorityV3,
-                 predecessor_authority: PredecessorAuthorityV3, *, operation_guard=None):
+                 predecessor_authority: PredecessorAuthorityV3, *, operation_guard=None, operation_ready=None):
         if not repository or not repository_node_id or len(base_sha) != 40:
             raise ValueError("V3_JOURNAL_IDENTITY_INVALID")
         self.repository = repository
@@ -51,6 +51,7 @@ class GitHubJournalV3:
         self.rejection_authority = rejection_authority
         self.predecessor_authority = predecessor_authority
         self.operation_guard = operation_guard
+        self.operation_ready = operation_ready
 
     @staticmethod
     def _is_sha(value: str) -> bool:
@@ -105,10 +106,10 @@ class GitHubJournalV3:
             raise GitHubJournalV3Error("ADMISSION_REQUEST_ID_MISMATCH")
         record = initial_record(request_id, admission)
         claim_ref = self.claim_ref(request_id)
-        if self.operation_guard is not None:self.operation_guard(None,claim_ref)
-        intended_sha = self.transport.create_journal_commit(
-            self.base_sha, encode_journal_v2(record)
-        )
+        encoded = encode_journal_v2(record)
+        operation=None if self.operation_guard is None else self.operation_guard(None,claim_ref,encoded)
+        intended_sha = self.transport.create_journal_commit(self.base_sha,encoded)
+        if self.operation_ready is not None:self.operation_ready(intended_sha,operation)
         pending = PendingWriteV3(
             self.repository, claim_ref, None, intended_sha, request_id,
             deepcopy(dict(admission)), "CREATE_REF",
@@ -192,9 +193,10 @@ class GitHubJournalV3:
             encoded = encode_journal_v2(successor)
         except JournalRecordV3Error as exc:
             raise GitHubJournalV3Error(str(exc)) from exc
-        if self.operation_guard is not None:self.operation_guard(current,current.claim_ref)
+        operation=None if self.operation_guard is None else self.operation_guard(current,current.claim_ref,encoded)
         if before_effect is not None: before_effect()
         successor_sha = self.transport.create_journal_commit(current.commit_sha, encoded)
+        if self.operation_ready is not None:self.operation_ready(successor_sha,operation)
         pending = PendingWriteV3(
             self.repository, current.claim_ref, current.commit_sha, successor_sha,
             current.record.attempt.request_id,

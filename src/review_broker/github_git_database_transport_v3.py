@@ -15,7 +15,8 @@ from .github_http_live_v3 import (
 )
 from .github_graphql_response_v3 import graphql_error_code
 from .github_journal_transport_v3 import (
-    CreateRefResultV3, CreateRefStatusV3, GraphQLRefUpdateV3,
+    CreateRefResultV3, CreateRefStatusV3, GraphQLRefUpdateV3, JOURNAL_UPDATE_REFS_QUERY_V3,
+    encode_journal_http_payload_v3,
     GraphQLUpdateResultV3, ReadResultV3, ReadStatusV3, TransportSnapshotV3,
 )
 
@@ -80,9 +81,7 @@ class GitHubTransportLiveV3:
         if (not path.startswith("/") or "//" in path
                 or ("?" in path and not path.endswith("?recursive=1"))):
             raise GitHubTransportLiveV3Error("GITHUB_ENDPOINT_INVALID")
-        body = None if payload is None else json.dumps(
-            payload, separators=(",", ":"), ensure_ascii=False
-        ).encode("utf-8")
+        body = None if payload is None else encode_journal_http_payload_v3(payload)
         headers = {
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {self._token}",
@@ -312,7 +311,7 @@ class GitHubTransportLiveV3:
             raise GitHubTransportLiveV3Error("GRAPHQL_SUCCESSOR_PARENT_MISMATCH")
         variables = {"repositoryId": repository_id, "name": ref, "beforeOid": before,
                      "afterOid": after, "force": False}
-        mutation = "mutation($repositoryId:ID!,$name:GitRefname!,$beforeOid:GitObjectID!,$afterOid:GitObjectID!,$force:Boolean!){updateRefs(input:{repositoryId:$repositoryId,refUpdates:[{name:$name,beforeOid:$beforeOid,afterOid:$afterOid,force:$force}]}){clientMutationId}}"
+        mutation = JOURNAL_UPDATE_REFS_QUERY_V3
         try:
             if self._establish_repository_identity(refresh=True) != repository_id:
                 raise GitHubTransportLiveV3Error("GRAPHQL_REPOSITORY_IDENTITY_DRIFT")

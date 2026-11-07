@@ -3,9 +3,29 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import json
 from typing import Mapping, Protocol
 
 from .journal_record_v3 import JournalRecordV3, WorkerIdentityV3
+
+
+JOURNAL_COMMIT_MESSAGE_V3 = "review-broker: experimental v3 journal transition"
+
+JOURNAL_UPDATE_REFS_QUERY_V3 = "mutation($repositoryId:ID!,$name:GitRefname!,$beforeOid:GitObjectID!,$afterOid:GitObjectID!,$force:Boolean!){updateRefs(input:{repositoryId:$repositoryId,refUpdates:[{name:$name,beforeOid:$beforeOid,afterOid:$afterOid,force:$force}]}){clientMutationId}}"
+
+
+def encode_journal_http_payload_v3(payload):
+    return json.dumps(payload,separators=(',',':'),ensure_ascii=False).encode('utf-8')
+
+
+def decode_journal_http_payload_v3(raw):
+    def unique(pairs):
+        result={}
+        for key,value in pairs:
+            if key in result:raise ValueError('JOURNAL_REQUEST_DUPLICATE_JSON_FIELD')
+            result[key]=value
+        return result
+    return json.loads(raw,object_pairs_hook=unique)
 
 
 class ReadStatusV3(str, Enum):

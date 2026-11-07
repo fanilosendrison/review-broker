@@ -1,5 +1,5 @@
 """Live Git Database composition with separate read-observer and fresh write guards."""
-import json
+from threading import Lock
 
 from .admission_evidence_v3 import validate_journal_admission_v3
 from .github_observed_journal_transport_v3 import GitHubObservedJournalTransportV3
@@ -43,19 +43,36 @@ def live_journal_v3(runtime,admission_authority,*,write_guard):
     reconfront current runtime/journal. Observer reads grant no effect permission and
     avoid recursively authorizing a journal read through itself.
     """
-    scope={'expected':None,'claim_ref':None}
-    def begin_operation(expected,claim_ref):
-        scope['expected'],scope['claim_ref']=expected,claim_ref
+    from .journal_operation_plan_v3 import JournalOperationPlanV3
+    from .github_journal_transport_v3 import ReadStatusV3,decode_journal_http_payload_v3
+    active=[None];lock=Lock()
+    def begin_operation(expected,claim_ref,journal_bytes):
+        parent=runtime.checkout.sha if expected is None else expected.commit_sha
+        parent_tree=transport._get_commit(parent)['tree']['sha']
+        plan=JournalOperationPlanV3(expected=expected,claim_ref=claim_ref,parent_sha=parent,
+            parent_tree=parent_tree,node_id=transport.repository_node_id,journal_bytes=journal_bytes,
+            blob_sha=transport._git_blob_sha(journal_bytes))
+        with lock:active[0]=plan
+        return plan
+    def operation_ready(successor,plan):
+        with lock:
+            if plan is None or active[0] is not plan:raise ValueError('ORIGINAL_JOURNAL_OPERATION_CHANGED')
+        plan.ready(successor)
     def execute(request):
         runtime.check_locals()
-        payload=json.loads(request.data) if request.data else None
+        payload=decode_journal_http_payload_v3(request.data) if request.data else None
         query=payload.get('query','') if isinstance(payload,dict) else ''
-        mutation=request.get_method()=='POST' and not query.startswith('query')
+        method=request.get_method()
+        mutation=method!='GET' and not (method=='POST' and query.startswith('query'))
+        plan=None
         if mutation:
+            with lock:plan=active[0]
+            if plan is None:raise ValueError('ORIGINAL_JOURNAL_OPERATION_REQUIRED')
             write_guard()
-            from .github_journal_transport_v3 import ReadStatusV3
-            if scope['claim_ref'] is None:raise ValueError('ORIGINAL_JOURNAL_OPERATION_REQUIRED')
-            read=transport.read_claim(scope['claim_ref']);expected=scope['expected']
+            with lock:
+                if active[0] is not plan:raise ValueError('ORIGINAL_JOURNAL_OPERATION_CHANGED')
+            plan.before_request(request)
+            read=transport.read_claim(plan.claim_ref);expected=plan.expected
             if expected is None:
                 if read.status is not ReadStatusV3.MISSING:raise ValueError('CLAIM_ALREADY_EXISTS')
             elif (read.status is not ReadStatusV3.FOUND or read.snapshot is None
@@ -63,10 +80,12 @@ def live_journal_v3(runtime,admission_authority,*,write_guard):
                     or read.snapshot.parent_sha!=expected.parent_sha
                     or read.snapshot.journal_bytes!=expected.journal_bytes):
                 raise ValueError('LIVE_JOURNAL_PREDECESSOR_MOVED')
-        return runtime.api.executor(request)
+        response=runtime.api.executor(request)
+        if plan is not None:plan.observe_preparation_response(request,response,transport._json)
+        return response
     transport=GitHubObservedJournalTransportV3(runtime.api.token,
         before_effect=runtime.check_locals,executor=execute)
     node=transport.verify_repository_identity()
     authority=GitHubJournalTransitionAuthorityV3(transport)
     return GitHubJournalV3(REPOSITORY,node,runtime.checkout.sha,transport,admission_authority,
-        authority,NoRejectionAttributionV3(),authority,operation_guard=begin_operation)
+        authority,NoRejectionAttributionV3(),authority,operation_guard=begin_operation,operation_ready=operation_ready)

@@ -5,6 +5,7 @@ import base64
 from typing import Mapping
 
 from .github_git_database_error_v3 import GitHubTransportLiveV3Error
+from .github_journal_transport_v3 import JOURNAL_COMMIT_MESSAGE_V3
 
 JOURNAL_PATH_V3 = ".review-broker/attempt.json"
 
@@ -42,7 +43,7 @@ def create_journal_commit_v3(self, parent_sha: str, journal_bytes: bytes) -> str
     tree_sha = self._sha(self._json(tree_response).get("sha"))
     self._establish_repository_identity(refresh=True)
     commit_response = self._rest("POST", "/git/commits", {
-        "message": "review-broker: experimental v3 journal transition",
+        "message": JOURNAL_COMMIT_MESSAGE_V3,
         "tree": tree_sha, "parents": [parent_sha],
     })
     if commit_response.status != 201:
