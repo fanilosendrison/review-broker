@@ -15,6 +15,7 @@ import unittest
 from review_broker.github_journal import GitHubRefJournal
 from review_broker.identity import attempt_identity, canonical_bytes
 from review_broker.input_capacity import capacity_receipt
+from review_broker.input_capacity import capacity_receipt
 from review_broker.queue import (
     AttemptRecord, AttemptState, StateTransitionError, transition_record,
 )
@@ -213,6 +214,36 @@ class LegacySchemaTests(unittest.TestCase):
             )
         # Current new v1 records continue emitting the extended profile by default.
         self.assertEqual(set(legacy()), ORIGINAL_FIELDS | EXTENDED_METADATA)
+
+    def test_original_v1_prepared_capacity_transition_upgrades_extended_wire(self):
+        corpus = json.loads(GOLDEN_WIRE.read_text(encoding="utf-8"))
+        original = corpus["cases"][1]["record"]
+        self.assertEqual(original["state"], "PREPARED")
+        receipt = capacity_receipt(
+            b"synthetic-input", request_id=REQUEST_ID, packet_id=PACKET_ID,
+            attempt_id=original["attempt_id"], executing_broker_sha="d" * 40,
+        )
+        with TemporaryDirectory() as temp:
+            transport = JournalGitTransport(Path(temp) / "objects.git")
+            journal = GitHubRefJournal("sample/repo", runner=transport)
+            parent = transport.seed(
+                AttemptRecord.from_dict(original), journal._claim_ref(REQUEST_ID),
+            )
+            updated = journal.record_capacity(REQUEST_ID, receipt)
+            self.assertEqual(
+                set(updated.as_dict()),
+                ORIGINAL_FIELDS | EXTENDED_METADATA | {"input_capacity"},
+            )
+            self.assertEqual(updated.input_capacity, receipt)
+            child_sha, recovered = journal.get_snapshot(REQUEST_ID)
+            self.assertNotEqual(child_sha, parent)
+            self.assertEqual(recovered.as_dict(), updated.as_dict())
+            self.assertEqual(recovered.input_capacity, receipt)
+            self.assertFalse(recovered._v1_original_seven_field_wire)
+            self.assertEqual(
+                transport.git("show", parent + ":.review-broker/attempt.json"),
+                canonical_bytes(original) + b"\n",
+            )
 
     def test_unsupported_journal_versions_refused_before_decode(self):
         original = legacy()
