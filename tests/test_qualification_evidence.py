@@ -37,7 +37,7 @@ class EvidenceHygieneTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.tool.check_json({"token_mint_count": value})
         with self.assertRaises(ValueError):
-            self.tool.check_json({"other_token_mint_count": 0})
+            self.tool.check_json(dict(other_token_mint_count=0))
 
     def test_projection_drops_unneeded_fields_before_inspection(self):
         value = {"id": 5, "full_name": "owner/repo", "temp_clone_token": self.inert}
@@ -94,6 +94,11 @@ class EvidenceHygieneTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(output.exists())
             self.assertNotIn(self.inert, result.stdout + result.stderr)
+
+    def test_operator_source_and_tests_are_safe_reviewer_input(self):
+        # Unsafe test objects are constructed only in memory, never logged as data.
+        self.tool.check_text(SCRIPT.read_text())
+        self.tool.check_text(Path(__file__).read_text())
 
     def test_scan_cli_rejects_unstructured_authorization_log(self):
         with tempfile.TemporaryDirectory() as directory:
