@@ -1,84 +1,58 @@
 name: v3 pre-model Controller
+run-name: v3 dispatch provider-only qualification
 
-on:
+'on':
   workflow_dispatch:
     inputs:
       request_issue_number:
+        description: Must be zero; no ReviewRequest Issue is used
         type: number
         required: true
       request_id:
+        description: Exact probe caller SHA, not a Review Broker request identity
         type: string
         required: true
 
-permissions:
-  contents: write
-  actions: write
-  issues: read
+permissions: {}
 
 jobs:
-  controller:
-    name: controller
+  dispatch-provider-probe:
+    name: dispatch-provider-probe
     if: >-
       github.repository == 'fanilosendrison/review-broker' &&
       github.repository_id == '1433701208' &&
       github.event_name == 'workflow_dispatch' && github.run_attempt == 1 &&
       github.actor_id == '30498238' && github.triggering_actor == 'fanilosendrison' &&
-      github.sha == vars.REVIEW_BROKER_V3_LIVE_PREP_SHA &&
-      github.workflow_ref == format('{0}/.github/workflows/v3-pre-model-controller.yml@{1}', github.repository, github.ref) &&
-      inputs.request_id == vars.REVIEW_BROKER_V3_LIVE_REQUEST_ID &&
-      inputs.request_issue_number == vars.REVIEW_BROKER_V3_LIVE_REQUEST_ISSUE &&
-      vars.REVIEW_BROKER_V3_LIVE_REQUEST_BODY_SHA256 != ''
+      github.ref == 'refs/heads/qualification/issue70-dispatch-provider-20261107t181119z-c31f80' &&
+      github.sha == inputs.request_id && inputs.request_issue_number == 0
+    permissions:
+      actions: write
+      contents: read
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    concurrency:
-      group: v3-pre-model-controller-${{ inputs.request_id }}
-      cancel-in-progress: false
-    env:
-      GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
-      REVIEW_BROKER_V3_LIVE_PREP_SHA: ${{ vars.REVIEW_BROKER_V3_LIVE_PREP_SHA }}
-      REVIEW_BROKER_V3_LIVE_REQUEST_ID: ${{ vars.REVIEW_BROKER_V3_LIVE_REQUEST_ID }}
-      REVIEW_BROKER_V3_LIVE_REQUEST_ISSUE: ${{ vars.REVIEW_BROKER_V3_LIVE_REQUEST_ISSUE }}
-      REVIEW_BROKER_V3_LIVE_REQUEST_BODY_SHA256: ${{ vars.REVIEW_BROKER_V3_LIVE_REQUEST_BODY_SHA256 }}
-      REQUEST_ISSUE: ${{ inputs.request_issue_number }}
-      REQUEST_ID: ${{ inputs.request_id }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Verify exact approved executable
+      - name: Verify exact isolated provider-only source
         env:
-          EXPECTED_SHA: ${{ github.sha }}
-          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          EXPECTED_CALLER_SHA: ${{ inputs.request_id }}
         run: |
-          test -n "$REVIEW_BROKER_V3_LIVE_PREP_SHA"
-          test "$EXPECTED_SHA" = "$REVIEW_BROKER_V3_LIVE_PREP_SHA"
-          test "$WORKFLOW_SHA" = "$EXPECTED_SHA"
-          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test "$GITHUB_SHA" = "$EXPECTED_CALLER_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$EXPECTED_CALLER_SHA"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_CALLER_SHA"
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
-          python-version: "3.11"
-      - run: python -m pip install .
-      - name: Authenticate current Controller before source mint (read-only)
+          python-version: '3.11'
+      - name: Install exact trusted provider adapter
+        run: python -m pip install .
+      - name: One job-token dispatch to the inert default Worker stub
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: reviewctl internal-v3-controller-start-gate --issue "$REQUEST_ISSUE" --request-id "$REQUEST_ID"
-      - name: Mint Controller preclaim source credential A
-        id: source
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
-        with:
-          app-id: ${{ vars.REVIEW_BROKER_SOURCE_APP_ID }}
-          private-key: ${{ secrets.REVIEW_BROKER_SOURCE_APP_PRIVATE_KEY }}
-          owner: fanilosendrison
-          repositories: review-broker
-          permission-contents: read
-          permission-pull-requests: read
-          permission-metadata: read
-          permission-issues: read
-      - name: Complete preclaim admission and run the existing Controller once
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          REVIEW_BROKER_SOURCE_TOKEN: ${{ steps.source.outputs.token }}
-          REVIEW_BROKER_SOURCE_APP_SLUG: ${{ steps.source.outputs.app-slug }}
-          REVIEW_BROKER_SOURCE_INSTALLATION_ID: ${{ steps.source.outputs.installation-id }}
-        run: reviewctl internal-v3-pre-model-controller --issue "$REQUEST_ISSUE" --request-id "$REQUEST_ID"
+          EXPECTED_CALLER_SHA: ${{ inputs.request_id }}
+        run: >-
+          python scripts/qualify-dispatch-provider.py
+          --caller-sha "$EXPECTED_CALLER_SHA"
+          --caller-ref refs/heads/qualification/issue70-dispatch-provider-20261107t181119z-c31f80
+          --dev-sha 671ae588f25464b6ac80bddb44af83b8ca6b9af8
