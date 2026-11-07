@@ -87,7 +87,7 @@ class AttemptRecord:
     input_capacity: dict[str, Any] | None = None
     # This describes the accepted historical *wire shape*, not new authority.
     # dataclasses.replace() retains it through transitions of old records.
-    _v1_original_seven_field_wire: bool = field(default=False, repr=False)
+    _v1_original_seven_field_wire: bool = field(default=False, repr=False, compare=False)
 
     def as_dict(self) -> dict[str, Any]:
         value = {
