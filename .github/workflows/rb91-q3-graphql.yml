@@ -1,0 +1,73 @@
+name: RB91 Q3 — isolated GraphQL expected-old qualification
+
+on:
+  push:
+    branches:
+      - qualification/rb91-q3-graphql-20261107
+    paths:
+      - .rb91-q3/trigger.txt
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rb91-q3-graphql-20261107
+  cancel-in-progress: false
+
+jobs:
+  q3:
+    if: >-
+      github.repository == 'fanilosendrison/review-broker' &&
+      github.ref == 'refs/heads/qualification/rb91-q3-graphql-20261107' &&
+      github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify code and preflight
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s .rb91-q3 -p 'test_*.py' -v
+          python3 -m py_compile .rb91-q3/qualify_update_refs.py
+          mkdir -p rb91-q3-receipts
+          sha256sum .rb91-q3/qualify_update_refs.py .rb91-q3/test_qualify_update_refs.py > rb91-q3-receipts/source.sha256
+      - name: Run real GraphQL CAS qualification against disposable refs
+        id: q3
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 .rb91-q3/qualify_update_refs.py run
+      - name: Archive exact pre-cleanup observations
+        id: archive
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rb91-q3-before-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            rb91-q3-receipts/
+            .rb91-q3/qualify_update_refs.py
+            .rb91-q3/test_qualify_update_refs.py
+          if-no-files-found: error
+          retention-days: 90
+      - name: Cleanup only verified disposable refs after archival
+        if: always() && steps.archive.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if test -f rb91-q3-receipts/cleanup-plan.json; then
+            python3 .rb91-q3/qualify_update_refs.py cleanup
+          else
+            echo 'CLEANUP=NO_PLAN_NO_REF_MUTATION'
+          fi
+      - name: Archive cleanup receipt
+        if: always() && steps.archive.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rb91-q3-after-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
+          path: rb91-q3-receipts/
+          if-no-files-found: error
+          retention-days: 90
