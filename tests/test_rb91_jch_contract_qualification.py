@@ -88,6 +88,28 @@ class ContractQualificationTests(unittest.TestCase):
         x=copy.deepcopy(self.ready);x['input_capacity']['status']='REJECTED';self.forbidden(x)
         x=copy.deepcopy(self.arm);x['input_capacity']['status']='REJECTED';self.forbidden(x)
 
+    def test_valid_capacity_rejection_remains_unarmed(self):
+        # A syntactically and domain-valid REJECTED receipt can be retained on
+        # PREPARED without creating any model-capable grant.
+        x=copy.deepcopy(self.ready)
+        cp=x['input_capacity']
+        for field in ('unicode_scalar_characters','utf16_code_units','utf8_bytes','capacity_units'):
+            cp[field]=1048577
+        cp['status']='REJECTED'
+        e=x['history'][-1]
+        x['evidence_ids'][-1]=artifact(cp)
+        e['evidence_ids']=[artifact(cp)]
+        validate(x)
+        armed=fixture_armed(x,parent_sha=PARENT)
+        self.forbidden(armed,parent=x,operation='atomic_arm')
+
+    def test_historical_v1_record_has_no_implicit_v2_promotion(self):
+        x=copy.deepcopy(self.pre)
+        x['schema_version']=1
+        x.pop('protocol_id')
+        x.pop('arm_binding')
+        self.forbidden(x)
+
     def test_atomic_arm_single_transition(self):
         self.assertTrue(validate_transition(self.ready,self.arm,parent_sha=PARENT,operation='atomic_arm'))
         x=copy.deepcopy(self.arm);x['arm_binding']['prepared_parent_sha']='0'*40
