@@ -5,10 +5,10 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "J-CH ARM-Bound Challenge Authority Protocol Proposal"
-version: "0.1.2"
+version: "0.1.3"
 ---
 
-# J-CH ARM-Bound Challenge Authority — Protocol Proposal v0.1.2
+# J-CH ARM-Bound Challenge Authority — Protocol Proposal v0.1.3
 
 **NON-NORMATIVE DESIGN CANDIDATE — NOT ACCEPTED — NOT IMPLEMENTED — NOT QUALIFIED**
 
@@ -20,9 +20,15 @@ It proposes the minimal J-CH (journal-bound, pre-ARM launcher challenge)
 protocol as an alternative to a separate post-ARM consumption CAS (J2-B)
 or durable state inside the Codespace (B). The separate, versioned
 [J-CH journal and AtomicArm contract proposal](jch-journal-contract-proposal.md)
-(v0.1.0, **draft/non-normative**) now specifies the candidate record schema,
+(v0.1.1, **draft/non-normative**) now specifies the candidate record schema,
 expected-old transitions, fail-closed error classes and mandatory compatibility
 cutover. No production source, accepted contract or schema is changed.
+The [bounded offline qualification report](qualification/rb91-jch-journal-qualification.md)
+identifies core schema/model PASS evidence but **NO-GO for v2 cutover**:
+the current legacy reader accepts v2 and discards its authority binding on
+re-serialization; admission, evidence and publication objects remain outside
+the tested core schema. The contract now also distinguishes pre-ARM vs post-ARM
+`INDETERMINATE/STOPPED` by the exact historical arm event.
 
 Proposal rules labeled **P01–P24** are **requirements for a hypothetical
 implementation only**. They have no authority over existing code or operating
@@ -77,7 +83,7 @@ GitHub/host administrator is promised.
 The alternative J2-B adds a **third** CAS after ARM/count-one. Earlier J-CH
 v0.1.0 retained **two** separate ARM/count-one commits; that design leaves
 a stranded `ARMED/count=0` interruption window requiring original-controller
-ownership for the second write. **J-CH v0.1.2 retains the proposal of one atomic GitHub
+ownership for the second write. **J-CH v0.1.3 retains the proposal of one atomic GitHub
 commit** for `PREPARED/count=0 -> ARMED/count=1` with the challenge and
 binding. It eliminates that intermediate state for **new J-CH records only**.
 Legacy accepted OIDC ARM v1 retains its original two-write implementation,
@@ -310,7 +316,7 @@ Shutdown boundaries remain separate.
 | `TERMINAL_CAPTURED/VALIDATED/REPORTED` | No execution grant | Only evidence/validation/publication operations | Existing post-model recovery |
 | `INDETERMINATE/STOPPED` | No execution grant | No new model process | Cleanup or historical read-only |
 
-For J-CH v0.1.2, **ARMED and count-one are the same durable state change**.
+For J-CH v0.1.3, **ARMED and count-one are the same durable state change**.
 `ARMED/count=0` remains possible in historical **legacy** records and
 remains non-replayable under their accepted contracts. No v0.1.1 validator
 may reinterpret a legacy ARM as a fresh challenge-eligible grant. Count-one
@@ -482,16 +488,18 @@ model-capable qualification require separate operational authorization.
 
 ```text
 PROPOSAL=RB91_J_CH_ARM_BOUND_CHALLENGE
-PROPOSAL_VERSION=0.1.2
+PROPOSAL_VERSION=0.1.3
 PROPOSAL_STATUS=DRAFT_NON_NORMATIVE
 DESIGN_PREFERENCE=J_CH_ATOMIC_ARM_BOUND_CONDITIONAL
 ACCEPTED_ARCHITECTURE=NONE
 ACCEPTED_OIDC_CONTRACT=V1_UNCHANGED
 NEW_WIRE_SCHEMA=NOT_IMPLEMENTED
-JOURNAL_CONTRACT_DRAFT=J_CH_JOURNAL_V2_V0_1_0
+JOURNAL_CONTRACT_DRAFT=J_CH_JOURNAL_V2_V0_1_1
 Q2_SSH_REAL_BOUNDED=PASS
 Q3_GRAPHQL_REAL_BOUNDED=PASS_WITH_GENERIC_ERRORS
-OLD_WRITER_REJECT_V2_GATE=NOT_IMPLEMENTED
+OLD_WRITER_REJECT_V2_GATE=CONFIRMED_FAIL_CUTOVER_BLOCKED
+JCH_CORE_JOURNAL_QUALIFICATION=PARTIAL_PASS_ONLY
+JCH_FULL_JOURNAL_ABI_QUALIFICATION=NO_GO
 THREAT_MODEL_OWNER_ADJUDICATION=GITHUB_WRITERS_TRUSTED_FOR_ORDINARY_USE
 INDEPENDENT_HOSTILE_REVIEW=NOT_PERFORMED
 IMPLEMENTATION_AUTHORIZED=NO
