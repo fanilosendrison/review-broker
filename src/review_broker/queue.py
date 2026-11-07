@@ -105,9 +105,10 @@ class AttemptRecord:
         }
         # Re-emitting an original 7-field v1 record must not introduce four
         # explicit null fields just because the implementation gained them.
-        # A subsequent real metadata write upgrades that *child* to the
-        # existing extended v1 shape; the historical parent remains intact.
+        # A subsequent real metadata/admission/capacity write upgrades that
+        # *child* to the extended v1 shape; the historical parent stays intact.
         if (self._v1_original_seven_field_wire
+                and self.admission is None and self.input_capacity is None
                 and all(getattr(self, key) is None for key in _V1_JOURNAL_METADATA_FIELDS)):
             for key in _V1_JOURNAL_METADATA_FIELDS:
                 value.pop(key)
