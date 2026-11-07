@@ -69,7 +69,12 @@ def _gh(args: list[str], data: object | None) -> dict:
     if p.returncode != 0:
         # Retain only a parsed status code; raw stderr may echo sensitive material.
         match = re.search(r"\bHTTP ([1-5][0-9][0-9])\b", p.stderr)
-        kind = "HTTP_" + match.group(1) if match else "CLI_OR_TRANSPORT_FAILURE"
+        if match:
+            kind = "HTTP_" + match.group(1)
+        elif "GraphQL:" in p.stderr or "graphql:" in p.stderr.lower():
+            kind = "GRAPHQL_REFUSAL_FROM_CLI"
+        else:
+            kind = "CLI_OR_TRANSPORT_FAILURE"
         return {"ok": False, "class": kind, "code": p.returncode}
     try:
         value = json.loads(p.stdout)
@@ -205,6 +210,8 @@ def run() -> None:
                 if len(success) != 1 or observed != targets[success[0]]:
                     raise Q3Stop(label.upper()+"_EXPECTED_OLD_VIOLATED")
                 failure_classes = [x.get("class") for x in outcomes if not x["ok"]]
+                if failure_classes != ["GRAPHQL_REFUSAL_FROM_CLI"]:
+                    raise Q3Stop(label.upper() + "_LOSER_CAUSE_UNRESOLVED")
                 result["cases"][label] = {"status": "PASS", "parent": p, "targets": targets,
                     "winner": success[0], "head": observed, "loser_error": failure_classes}
             elif label == "stale":
@@ -213,6 +220,8 @@ def run() -> None:
                 observed = get_ref_sha(ref)
                 if not first["ok"] or second["ok"] or observed != a:
                     raise Q3Stop("STALE_BEFORE_OID_INCORRECT")
+                if second.get("class") != "GRAPHQL_REFUSAL_FROM_CLI":
+                    raise Q3Stop("STALE_ERROR_CAUSE_UNRESOLVED")
                 result["cases"][label] = {"status": "PASS", "parent": p,
                     "head": observed, "stale_error": second.get("class")}
             else:
