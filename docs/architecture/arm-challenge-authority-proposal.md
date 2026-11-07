@@ -5,10 +5,10 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "J-CH ARM-Bound Challenge Authority Protocol Proposal"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
-# J-CH ARM-Bound Challenge Authority — Protocol Proposal v0.1.0
+# J-CH ARM-Bound Challenge Authority — Protocol Proposal v0.1.1
 
 **NON-NORMATIVE DESIGN CANDIDATE — NOT ACCEPTED — NOT IMPLEMENTED — NOT QUALIFIED**
 
@@ -36,6 +36,7 @@ Evidence basis (each result remains bounded to its original model/evidence):
 - [#91 phase 2 — finite-state J2-B exploration](https://github.com/fanilosendrison/review-broker/issues/91#issuecomment-6697694942).
 - [#91 Q1 — live read-only GitHub authority audit](https://github.com/fanilosendrison/review-broker/issues/91#issuecomment-6698134952).
 - [#91 phase 3 — same-model J-CH/J2-B comparison](https://github.com/fanilosendrison/review-broker/issues/91#issuecomment-6699304864).
+- Phase 4 (2026-11-07): bounded split-ARM vs single-CAS AtomicArm comparison; the v0.1.1 proposal adopts **AtomicArmBound as the preferred candidate**, subject to real protocol and threat-model qualification. Model evidence is not a live GitHub guarantee.
 - [#27 — accepted risk-proportionate v1 security decision](https://github.com/fanilosendrison/review-broker/issues/27).
 
 Phase 3 enumerated 3,300 reachable states in the **bounded trusted J-CH
@@ -66,9 +67,14 @@ direct access to Codex credentials. No exactly-once provider effect, execution
 liveness, universal host attestation, or resilience to a fully compromised
 GitHub/host administrator is promised.
 
-The alternative design J2-B makes a **third** journal CAS for final
-consumption. J-CH seeks to avoid that third CAS; **it does not eliminate the
-existing two ARM/count-one commits**.
+The alternative J2-B adds a **third** CAS after ARM/count-one. Earlier J-CH
+v0.1.0 retained **two** separate ARM/count-one commits; that design leaves
+a stranded `ARMED/count=0` interruption window requiring original-controller
+ownership for the second write. **J-CH v0.1.1 proposes one atomic GitHub
+commit** for `PREPARED/count=0 -> ARMED/count=1` with the challenge and
+binding. It eliminates that intermediate state for **new J-CH records only**.
+Legacy accepted OIDC ARM v1 retains its original two-write implementation,
+with no retrospective schema/state rewrite.
 
 ## 2. Actors, privileges, and trust assumptions
 
@@ -163,9 +169,10 @@ copied; those are separate protected-launcher assumptions.
 
 ### 4.2 New journal record's ARM binding (C -> J)
 
-**P07 — One immutable pre-ARM selection.** The proposed
-`PREPARED/count=0 -> ARMED/count=0` commit atomically adds one closed
-`arm_binding` containing at minimum:
+**P07 — Atomic ARM and one consumption.** The proposed **single**
+`PREPARED/count=0 -> ARMED/count=1` fast-forward Git commit atomically
+sets the attempt state, spends its single invocation allocation and records
+one closed, immutable `arm_binding` containing at minimum:
 
 - Protocol/schema version, exact request/attempt/packet/subject evidence
   identities, input/capacity and reviewer executable/policy identities.
@@ -180,47 +187,64 @@ The record must identify the challenge unambiguously. A hello by itself,
 its SHA-256, a Codespace name or the successful SSH connection does not
 grant model execution.
 
-**P08 — Exclusive ARM authorization.** C may create that ARM commit only
-after actual recipient validation, packet/metadata/capacity verification,
-trusted runtime/profile checks, and receipt of the challenge from a live
-launcher it has started. The accepted preparation and source/head rules
+**P08 — Exclusive ARM authorization and original session ownership.**
+C may create that atomic ARM/count-one commit only after fresh, authoritative
+`PREPARED/count=0` and exact capacity/packet observations, actual recipient
+validation, trusted runtime/profile checks, and a challenge produced by
+**the specific passive launcher connected to C's own authenticated session**.
+The full binding and count are committed in **one** updated journal object,
+not written in separate commits. A different controller must not adopt an
+already-open peer launcher challenge merely because it saw that challenge in
+a message or GitHub record. The accepted preparation and source/head rules
 remain independent and mandatory.
 
 **P09 — No rebind after ARM.** Any non-PREPARED snapshot or another
 `arm_binding` is a hard refusal. Crashes and unavailable recipients
 after ARM never authorize another challenge.
 
-### 4.3 Existing count-one transition (C -> J)
+### 4.3 Atomic ARM/count-one ownership (C -> J)
 
-**P10 — Original owner continuation.** Only the same trusted controller
-execution which positively observed its own successful ARM CAS (and retained
-its original active launcher session) may perform the existing
-`ARMED/count=0 -> ARMED/count=1` CAS. It must check the exact
-ARM-binding bytes and parent commit identity. Other workflow deliveries,
-controller restarts, reconciler runs or new processes must not complete a
-stranded `ARMED/count=0`, even if they can read the same record.
+**P10 — No stranded split transition.** New J-CH records MUST NOT use the
+legacy `PREPARED -> ARMED/count=0 -> ARMED/count=1` two-commit path.
+One new, versioned `arm_once_challenge_bound` operation proposes exactly
+one CAS from the fresh `PREPARED/count=0` snapshot to
+`ARMED/count=1`, binding the original controller and live launcher in the
+same committed object. The **single successful commit is the irreversible
+consumption decision**. Any independently observed `ARMED/count=0` record
+is legacy or invalid for J-CH and never an invitation to finish count-one.
 
-This is **not enforced by present `record_invocation()`**, which
-currently tests state and count but not challenge/controller ownership.
-Implementation would need a versioned owner-bound transition and
-corresponding tests. Mere matching GitHub run IDs or access to a broad
-`Contents: write` token is not proof of live process continuity.
+The current `record_invocation()` method has no controller-identity
+argument and allows any appropriately privileged direct caller to advance
+an `ARMED/count=0` record; the normal `arm_and_authorize()` entrypoint
+nonetheless refuses such a record at its PREPARED precondition.
+This is a **primitive-level J-CH design concern**, not evidence of a live
+unauthorized replay through the currently implemented full workflow.
 
-**P11 — Conservative uncertainty.** If either ARM or count-one CAS succeeded
-but its result was not positively observed by the original process,
-**do not retry that CAS, rebind, mint OIDC or launch**. Readback for audit
-and indeterminate cleanup is allowed, but cannot recover authorization.
+**P11 — Original-owner confirmation and ambiguity.** A new CAS must have
+a unique child commit of the exact observed parent. **Only the same live
+controller that submitted it**, with its original authenticated active
+launcher session, may continue after positively verifying the exact commit,
+record, binding and count. Another job, process, runner restart or reconciler
+may observe the consumed result for recovery but MUST NOT mint OIDC from it.
+If the CAS or its acknowledgement is ambiguous, the original caller
+must **not** retry a grant, infer ownership from a matching head, rebind,
+mint OIDC or launch. A lost opportunity is acceptable; a second grant is not.
+The original controller's possession of a live session is a trusted-process
+assumption requiring qualification, not something GitHub ref ancestry proves.
 
 ### 4.4 New OIDC-bound authorization (C -> L)
 
-**P12 — Mint only after confirmed count-one.** Only C, still holding the
-original launcher connection, may request OIDC after it has positively
-verified its own exact `ARMED/count=1` commit with the same binding.
-A second controller cannot mint merely by seeing the consumed record.
+**P12 — Mint only after the confirmed atomic ARM commit.** Only the
+winning live C, still holding its original launcher connection, may request
+OIDC after it has positively verified its own exact `ARMED/count=1`
+versioned atomic commit and complete binding. A second controller cannot mint
+merely by reading that consumed state, replaying a challenge, or sharing a
+GitHub run ID without the original local session authority.
 
 **P13 — Closed new envelope.** The candidate `j-ch-v1` envelope must
-include all accepted ARM v1 claim checks plus the exact challenge, ARM commit
-SHA, count-one commit SHA, arm-binding digest, verified launcher program identity,
+include all accepted ARM v1 claim checks plus the exact challenge, **single
+atomic ARM/count-one commit SHA**, arm-binding digest and verified launcher
+program identity,
 workflow/run identity, request/attempt/packet/input/capacity evidence and
 recipient identity. The custom GitHub OIDC audience must be SHA-256-bound
 to the complete canonical versioned envelope; it is not a generic bearer
@@ -263,15 +287,17 @@ Shutdown boundaries remain separate.
 | Authority state | Live launcher | Allowed model-side operation | Failure disposition |
 | --- | --- | --- | --- |
 | `REQUESTED/ADMITTED/PREPARED` no ARM binding | Optional passive prepared instance | No model; new qualifying pre-ARM session may be prepared under current rules | Existing pre-ARM recovery, subject/capacity revalidation |
-| `ARMED/count=0` with immutable J-CH binding | Original L only | Only original controller may attempt count-one within the same uninterrupted control session; **no Codex** | Any uncertain/lost original owner: terminal ambiguity/cleanup, never re-arm |
-| `ARMED/count=1` with binding | Same original L only | One OIDC-bound local continuation, after positive C observation | Lost token/session/process: permanently consumed, no replay |
+| `ARMED/count=0` in a new J-CH record | None | **Forbidden/unreachable under candidate atomic transition; refuse** | Reject invalid versioned state; preserve legacy records by their own semantics |
+| `ARMED/count=1` with atomic binding | Same original L only | One OIDC-bound local continuation after original C positively observes its single CAS | Lost token/session/process: permanently consumed, no replay |
 | `ARMED` with response/transport ambiguity | Unknown | No new model grant or new launcher | `INDETERMINATE` where evidence requires; stop/observe |
 | `TERMINAL_CAPTURED/VALIDATED/REPORTED` | No execution grant | Only evidence/validation/publication operations | Existing post-model recovery |
 | `INDETERMINATE/STOPPED` | No execution grant | No new model process | Cleanup or historical read-only |
 
-The **earlier `ARMED` boundary remains non-retryable** even when
-count-one has not been committed. Count-one is the proposed final durable
-grant-commit for J-CH, not evidence that a provider request occurred.
+For J-CH v0.1.1, **ARMED and count-one are the same durable state change**.
+`ARMED/count=0` remains possible in historical **legacy** records and
+remains non-replayable under their accepted contracts. No v0.1.1 validator
+may reinterpret a legacy ARM as a fresh challenge-eligible grant. Count-one
+is not evidence that the provider actually received a model request.
 
 ### Protocol trace, ideal non-failing case
 
@@ -279,10 +305,9 @@ grant-commit for J-CH, not evidence that a provider request occurred.
 C validates authorized PREPARED request/packet/capacity/runtime/recipient
 C starts L through authenticated bounded SSH (no model capability yet)
 L -> C : HELLO(j-ch-v1, challenge=N, exact identities)
-C -> J : CAS_ARM(PREPARED -> ARMED/count0, binding(N,L,C))
-J -> C : positive exact-commit readback
-C -> J : CAS_COUNT1(same binding, same live controller/launcher)
-J -> C : positive exact-commit readback
+C -> J : ONE CAS_ATOMIC_ARM(PREPARED/count0 -> ARMED/count1,
+                            immutable binding(N,L,C), new J-CH schema)
+J -> C : positive exact-commit readback of state, count, binding and parent
 C -> GitHub issuer : request OIDC(audience=sha256(versioned envelope + N))
 C -> L : closed envelope + JWT through same protected session
 L : independently verify exact envelope, issuer, claims, nonce, code, inputs
@@ -300,13 +325,12 @@ above. Unknown or conflicting evidence blocks.
 
 | Cut | Required candidate behavior | Evidence to qualify |
 | --- | --- | --- |
-| Two controllers, same request | One wins first ARM CAS; loser has no count-one or minting permission | Exact competing ref parent/head, losing controller refusal |
-| Two passive launchers, distinct challenges | Only challenge recorded at ARM is usable; other process cannot accept the proof | In-process and cross-process rejection |
-| Crash before ARM | Existing PREPARED recovery only, with exact input/capacity revalidation | Journal remained unarmed |
-| ARM CAS committed, ACK lost | No count-one/mint; do not retry ARM; do not rebind | Git head and lost-ACK witness |
-| Crash between ARM/count-one | `ARMED/count0` stranded and non-replayable | No new count-one from another process |
-| Count-one CAS committed, ACK lost | No OIDC mint/launch, attempt spent | Git head, controller fail-closed witness |
-| Controller dies after count-one | Active L must not gain a *new* permission; disconnect/timeout semantics need explicit qualification | Transport and launcher state |
+| Two controllers, same request | One wins the single AtomicArm CAS; loser cannot ARM again or mint | Exact competing ref parent/head, losing controller refusal |
+| Two passive launchers, distinct challenges | A controller must own the session producing its challenge; no peer-hello adoption or new binding after ARM | Session context and cross-process rejection |
+| Crash before AtomicArm commit | Existing PREPARED recovery only, with exact input/capacity revalidation and a fresh controller-owned session | Journal remained unarmed |
+| AtomicArm CAS committed, ACK lost | No OIDC mint, no retry/rebind; attempt spent even if original readback later sees it | Git head and lost-ACK witness |
+| Crash between ARM/count-one | **Impossible in new J-CH atomic history**; legacy ARMED/count0 is read under old non-replay rules | Offline state exclusion and backward-compatibility tests |
+| Controller dies after atomic count-one | Active L must not gain a new permission; disconnect/timeout semantics need explicit qualification | Transport and launcher state |
 | OIDC response or SSH delivery lost | No mint retry, no new launcher, eventual cleanup/uncertainty | Exact issue/run/attempt and no new model start |
 | Same JWT delivered twice to same L | Local atomic fence allows at most one Codex start | Two delivery concurrent test |
 | Old JWT to fresh process/Codespace | Different fresh challenge/recipient, reject | Real recipient and challenge checks |
@@ -358,9 +382,9 @@ full in-scope admin control.
 
 | Existing owner | Minimal change required if J-CH were accepted |
 | --- | --- |
-| `queue.py` and journal record contracts | Separate legacy vs J-CH schema; closed binding; irreversible ARM; owner-bound count-one |
-| `github_journal.py` | Exact compare-and-swap of binding and original process intent; strict unknown/absent transport; history semantics |
-| `arm_controller.py` and workflow | Pre-ARM bidirectional L handshake; exact run/recipient binding; two existing CAS; new OIDC audience |
+| `queue.py` and journal record contracts | Separate legacy vs J-CH schema; closed binding; **atomic ARMED/count1 transition**; forbid J-CH ARMED/count0 |
+| `github_journal.py` | One versioned atomic pre-arm-to-consumed operation with exact parent/binding/readback; strict unknown/absent transport; history semantics |
+| `arm_controller.py` and workflow | Pre-ARM bidirectional L handshake with session ownership; exact run/recipient binding; **one** new J-CH CAS; new OIDC audience |
 | `arm_authority_contract.py` / `arm_oidc.py` | Disjoint versioned envelope and exact challenge/commit validation; no v1 JWT acceptance by J-CH |
 | `arm_execution.py` / `codex.py` | Protected same-incarnation launch continuation; one-shot fence; disable legacy bypass |
 | `arm_consumption.py` | Remains authoritative for accepted legacy path; **no removal prior to an accepted replacement and migration plan** |
@@ -375,8 +399,9 @@ passing an offline fixture, or receiving a favorable independent review.
 ## 9. Falsification and qualification plan
 
 **P22 — Offline model and fixture gate.** Extend the bounded state-model
-from #91 phases 2/3 with exact recorded binding, controller-owner count-one,
-lost ACK, duplicate proof, nonce reuse, reentrant/forked launcher, competing
+from #91 phases 2/3 and phase 4 (AtomicArm) with exact recorded binding,
+original-controller/session ownership of the **single** CAS, lost ACK,
+duplicate proof, nonce reuse, reentrant/forked launcher, competing
 Git writes, semantic rollback, ref deletion, permission failure and reconciler
 races. Assert at most one authorized Codex start; independent actor/call
 counts and traces must make the property non-vacuous. Do not mislabel a
@@ -406,7 +431,7 @@ model-capable qualification require separate operational authorization.
 | D01 | Are compromised writers/admins and process-memory clones excluded for low-sensitivity use? | Explicit owner risk acceptance required; not inferred from #27 |
 | D02 | Where to introduce a new journal schema and J-CH eligibility for never-ARMED attempts? | Favor new claim-time protocol marker; no implicit legacy upgrade |
 | D03 | Can the *same* privileged launcher retain trustworthy bidirectional SSH continuity from hello through launch? | Controlled operational proof needed |
-| D04 | Can the count-one operation be restricted to the original live controller, not just the state `ARMED/count0`? | Mandatory contract/code redesign, no third CAS assumed |
+| D04 | Can a **single** versioned AtomicArm CAS safely combine ARMED and count-one while ensuring only its original live controller/session may mint? | Preferred finite-model candidate; exact GitHub/SSH qualification and contract redesign required |
 | D05 | Can active L be prevented from reentry/bypass and proven non-copyable within accepted threat model? | Core independent-review blocker |
 | D06 | How to fence a possible live continuation during reconciler cancellation/`INDETERMINATE`? | Block design GO until resolved |
 | D07 | What is acceptable anti-semantic-rollback protection with private unprotected refs? | Writer-boundary acceptance or stronger authority |
@@ -416,10 +441,12 @@ model-capable qualification require separate operational authorization.
 
 - Every grant is bound **before ARM** to one exact request/attempt,
   packet, input, workflow/run, recipient and *live launcher challenge*.
-- Existing `ARMED/count=0 -> count=1` CAS is retained, but no
-  new process may complete another controller's stranded ARM.
-- Every token minted after positively confirmed count-one is challenge-
-  and commit-bound, checked only in the intended live L process.
+- For **new** J-CH records, the **single** `PREPARED/count0 -> ARMED/count1`
+  CAS binds the challenge and consumption together; no intermediate
+  `ARMED/count0` state or second completion operation is permissible.
+- Every token minted by the original live controller after positively
+  confirmed **AtomicArm** is challenge- and commit-bound, checked only
+  in its original intended live L process.
 - At most one protected one-shot continuation reaches the Codex process.
   A crash after ARM cannot authorize a fresh launcher or token.
 - Claim deletion, semantic rollback and in-scope privileged compromise
@@ -431,9 +458,9 @@ model-capable qualification require separate operational authorization.
 
 ```text
 PROPOSAL=RB91_J_CH_ARM_BOUND_CHALLENGE
-PROPOSAL_VERSION=0.1.0
+PROPOSAL_VERSION=0.1.1
 PROPOSAL_STATUS=DRAFT_NON_NORMATIVE
-DESIGN_PREFERENCE=J_CH_CONDITIONAL
+DESIGN_PREFERENCE=J_CH_ATOMIC_ARM_BOUND_CONDITIONAL
 ACCEPTED_ARCHITECTURE=NONE
 ACCEPTED_OIDC_CONTRACT=V1_UNCHANGED
 NEW_WIRE_SCHEMA=NOT_IMPLEMENTED
