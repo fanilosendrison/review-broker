@@ -209,7 +209,7 @@ class LegacySchemaTests(unittest.TestCase):
             )
             self.assertEqual(
                 transport.git("show", parent + ":.review-broker/attempt.json"),
-                canonical_bytes(original) + b"\\n",
+                canonical_bytes(original) + b"\n",
             )
         # Current new v1 records continue emitting the extended profile by default.
         self.assertEqual(set(legacy()), ORIGINAL_FIELDS | EXTENDED_METADATA)
