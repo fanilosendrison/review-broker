@@ -27,6 +27,8 @@ class OperationTargetReplayTests(unittest.TestCase):
                 service.git.commits[alternate]=service.git.commits[sha]
                 try:original(transport,ref,alternate)
                 except (ValueError,RuntimeError):attempts.append('successor refused')
+                try:transport._rest('POST','/git/refs',{'ref':other,'sha':sha,'query':'query'})
+                except (ValueError,RuntimeError):attempts.append('REST query field refused')
             return original(transport,ref,sha)
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary).resolve();service=LiveProviderService(root)
@@ -38,6 +40,26 @@ class OperationTargetReplayTests(unittest.TestCase):
             self.assertEqual(len(refs),1)
             self.assertEqual(refs[0][2]['sha'],result.claim_outcome.snapshot.commit_sha)
             self.assertEqual(service.claim_count(),1)
+
+    def test_R5_readonly_composition_never_accepts_REST_write_with_query_field(self):
+        from review_broker.live_journal_composition_v3 import live_journal_v3,GitHubOriginalAdmissionAuthorityV3
+        from review_broker.request_v3 import request_identity_v3
+        from tests.live_prep_actions_support import SHA
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary).resolve();service=LiveProviderService(root)
+            identifier=request_identity_v3(service.request)
+            runtime=service.runtime('controller',{'request_issue_number':51,'request_id':identifier})
+            def deny():raise ValueError('read-only composition')
+            journal=live_journal_v3(runtime,GitHubOriginalAdmissionAuthorityV3(runtime.api),write_guard=deny)
+            before=service.git.mutation_calls
+            for query in ('query','query {}','query($owner:String!){repository{id}}'):
+                with self.assertRaises((ValueError,RuntimeError)):
+                    journal.transport._rest('POST','/git/refs',{
+                        'ref':'refs/heads/review-claims-v3/'+'d'*64,'sha':SHA,'query':query})
+            with self.assertRaises((ValueError,RuntimeError)):
+                journal.transport._graphql('query { viewer { id } }',{})
+            self.assertEqual(service.git.mutation_calls,before)
+            self.assertEqual(service.claim_count(),0)
 
     def test_R3_intended_ref_mutation_opportunity_is_consumed_once(self):
         original=GitHubJournalEvidenceTransportV3.create_ref;attempts=[]
