@@ -88,12 +88,24 @@ class PreModelControllerV3:
         self._attempted: dict[str, bytes] = {}
         self._completed: dict[str, ControllerResultV3] = {}
         self._attempt_lock = Lock()
+        self._controller_origin = self
+        self._dispatch_opportunity_consumed = False
         self._dispatch_issuance_gate = None
         self._dispatch_issuance_request = None
         self._dispatch_issuance_outcome = None
         bind_controller = getattr(dispatch_transport,'bind_controller',None)
         if getattr(dispatch_transport,'original_controller_binding_required',False) is True:
             bind_controller(self)
+
+    def consume_dispatch_opportunity(self,transport,issuer,request):
+        """Consume shared original-owner state, never a copied transport's boolean."""
+        with self._attempt_lock:
+            if (self._controller_origin is not self or self.dispatch_transport is not transport
+                    or self._dispatch_opportunity_consumed or issuer is None
+                    or self._dispatch_issuance_gate is not issuer
+                    or self._dispatch_issuance_request is not request):
+                raise ValueError('ORIGINAL_CONTROLLER_OPPORTUNITY_CONSUMED_OR_INVALID')
+            self._dispatch_opportunity_consumed = True
 
     def _admission(self, admission: PreclaimAdmissionV3,
                    target: InitialDispatchTargetV3) -> dict[str, object]:

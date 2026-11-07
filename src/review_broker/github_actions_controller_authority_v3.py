@@ -57,10 +57,9 @@ class GitHubActionsControllerAuthorityV3:
 
     def accept_source_admission(self,source,admission,issuer):
         from .live_source_admission_v3 import LiveSourceSessionV3
-        if (type(source) is not LiveSourceSessionV3 or source.closed
-                or issuer is None or source._admission_issue_gate is not issuer
-                or source._admission_result is not admission):
+        if type(source) is not LiveSourceSessionV3:
             raise ValueError('ORIGINAL_COMPLETE_SOURCE_PHASE_REQUIRED')
+        source.consume_admission_registration(self,admission,issuer)
         self.require_current()
         self._source_admission_bytes=canonical_bytes(admission.journal_admission())
 
