@@ -14,24 +14,32 @@ from .pre_model_dispatch_v3 import InitialDispatchResultV3, InitialDispatchStatu
 class GitHubActionsInitialDispatchTransportV3:
     original_controller_binding_required = True
 
+    def __copy__(self):raise ValueError('INITIAL_DISPATCH_TRANSPORT_COPY_FORBIDDEN')
+    def __deepcopy__(self,memo):raise ValueError('INITIAL_DISPATCH_TRANSPORT_COPY_FORBIDDEN')
+    def __reduce__(self):raise ValueError('INITIAL_DISPATCH_TRANSPORT_SERIALIZATION_FORBIDDEN')
+
     def __init__(self, authority: GitHubActionsControllerAuthorityV3):
         if type(authority) is not GitHubActionsControllerAuthorityV3:
             raise ValueError("CONCRETE_CONTROLLER_AUTHORITY_REQUIRED")
         self.authority = authority
         self._lock, self._attempted = Lock(), False
         self.observed_request = self.observed_response = None
+        self._origin = self
         self._controller = None
         self._permit = None
 
     def bind_controller(self,controller):
         from .pre_model_controller_v3 import PreModelControllerV3
-        if (type(controller) is not PreModelControllerV3 or self._controller is not None
+        if (type(controller) is not PreModelControllerV3 or self._origin is not self
+                or controller._controller_origin is not controller or self._controller is not None
                 or controller.authority is not self.authority or controller.dispatch_transport is not self):
             raise ValueError('ORIGINAL_CONTROLLER_REQUIRED')
         self._controller=controller
 
     def bind_initial_reservation(self,controller,issuer):
-        if (controller is not self._controller or issuer is None
+        if (self._origin is not self or controller is not self._controller
+                or controller._controller_origin is not controller or controller.dispatch_transport is not self
+                or controller._dispatch_opportunity_consumed or issuer is None
                 or controller._dispatch_issuance_gate is not issuer
                 or controller._dispatch_issuance_outcome is None):
             raise ValueError('ORIGINAL_ATTRIBUTED_RESERVATION_REQUIRED')
@@ -44,9 +52,11 @@ class GitHubActionsInitialDispatchTransportV3:
                 raise ValueError("INITIAL_DISPATCH_ALREADY_ATTEMPTED")
             self._attempted = True
             permit,self._permit=self._permit,None
-        if (permit is None or permit[0] is not self._controller
+        if (self._origin is not self or permit is None or permit[0] is not self._controller
+                or permit[0].dispatch_transport is not self
                 or permit[0]._dispatch_issuance_gate is not permit[1] or permit[2] is not request):
             raise ValueError('ORIGINAL_CONTROLLER_DISPATCH_OPPORTUNITY_REQUIRED')
+        permit[0].consume_dispatch_opportunity(self,permit[1],request)
         a, target = self.authority, self.authority.target
         if (request.broker_repository != REPOSITORY or request.worker_workflow != WORKER_PATH
                 or request.request_id != a.request_id or type(request.generation) is not int

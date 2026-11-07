@@ -5,6 +5,7 @@ from pathlib import Path
 from datetime import datetime
 import copy
 from typing import Callable
+from threading import Lock
 
 from .admission_v3 import admit_initial_inline_v3
 from .github_git_file_v3 import GitHubGitFileReaderV3
@@ -22,13 +23,18 @@ SOURCE_PERMISSIONS=frozenset({'contents:read','pull_requests:read','metadata:rea
 
 
 class LiveSourceSessionV3:
+    def __copy__(self):raise ValueError('SOURCE_SESSION_COPY_FORBIDDEN')
+    def __deepcopy__(self,memo):raise ValueError('SOURCE_SESSION_COPY_FORBIDDEN')
+    def __reduce__(self):raise ValueError('SOURCE_SESSION_SERIALIZATION_FORBIDDEN')
+
     def __init__(self,token,*,app_slug,installation_id,root:Path,guard:Callable,
                  executor=urllib_executor,acquire_repository=None,observer=None):
         if app_slug!='review-broker-app':raise ValueError('SOURCE_APP_SLUG_NOT_APPROVED')
         self._token,self.root,self.guard=token,root,guard
         self._executor,self.acquire_repository,self.observer=executor,acquire_repository,observer
         self.closed=False;self._captures=0
-        self._admission_issue_gate=None;self._admission_result=None
+        self._source_origin=self;self._registration_lock=Lock()
+        self._admission_issue_gate=None;self._admission_result=None;self._admission_receiver=None
         self.authority=GitHubSourceAuthorityV3(token,expected_app_slug=app_slug,
             expected_installation_id=installation_id,repository=REPOSITORY,repository_id=REPOSITORY_ID,
             approved_permissions=SOURCE_PERMISSIONS,authorized_repositories=frozenset({REPOSITORY}),
@@ -43,7 +49,18 @@ class LiveSourceSessionV3:
         return result
 
     def close(self):
-        self.closed=True
+        with self._registration_lock:
+            self.closed=True;self._admission_issue_gate=None
+            self._admission_result=None;self._admission_receiver=None
+
+    def consume_admission_registration(self,receiver,admission,issuer):
+        with self._registration_lock:
+            if (self._source_origin is not self or self.closed or issuer is None
+                    or self._admission_receiver is not receiver
+                    or self._admission_issue_gate is not issuer
+                    or self._admission_result is not admission):
+                raise ValueError('ORIGINAL_SOURCE_REGISTRATION_CONSUMED_OR_INVALID')
+            self._admission_issue_gate=None;self._admission_result=None;self._admission_receiver=None
 
     def readers(self,request):
         evidence=self.authority.authorize(REPOSITORY,REPOSITORY_ID).evidence_id
@@ -93,9 +110,15 @@ class LiveSourceSessionV3:
             requester_authority=authority,pr_authority=reader,
             source_authority=self.authority,history_authority=history,
             git_file_readers=git,issue_reference_readers=issues)
-        issuer=object();self._admission_result=admission;self._admission_issue_gate=issuer
+        issuer=object()
+        with self._registration_lock:
+            if self._source_origin is not self or self.closed or self._admission_issue_gate is not None:
+                raise ValueError('ORIGINAL_SOURCE_REGISTRATION_REQUIRED')
+            self._admission_result=admission;self._admission_issue_gate=issuer;self._admission_receiver=controller
         try:controller.accept_source_admission(self,admission,issuer)
-        finally:self._admission_issue_gate=None
+        finally:
+            with self._registration_lock:
+                self._admission_issue_gate=None;self._admission_result=None;self._admission_receiver=None
         return admission
 
     def require_original_scope(self,admission):
