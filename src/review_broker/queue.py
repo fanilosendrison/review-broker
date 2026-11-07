@@ -1,7 +1,7 @@
 """Durable attempt state, atomic claims, and single-reviewer serialization."""
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from enum import Enum
 import threading
 from typing import Any, Mapping
@@ -55,6 +55,22 @@ class ReviewerBusy(StateTransitionError):
     pass
 
 
+# These are the keys serialized by the accepted v1 AttemptRecord.as_dict().
+# A v1 reader must never decode an unknown/newer record and then silently
+# reserialize it without its authorization binding or other future fields.
+_V1_JOURNAL_REQUIRED_FIELDS = frozenset({
+    "schema_version", "request_id", "attempt_id", "state", "evidence_ids",
+    "invocation_count", "history",
+})
+# The original v1 persisted exactly seven fields. A later v1 producer added
+# these four fields together, including their explicit null values.
+_V1_JOURNAL_METADATA_FIELDS = frozenset({
+    "evidence_locator_plan", "evidence_locator",
+    "publication_intent", "publication_receipt",
+})
+_V1_JOURNAL_OPTIONAL_FIELDS = frozenset({"admission", "input_capacity"})
+
+
 @dataclass(frozen=True)
 class AttemptRecord:
     request_id: str
@@ -69,6 +85,9 @@ class AttemptRecord:
     admission: dict[str, Any] | None = None
     history: tuple[dict[str, Any], ...] = ()
     input_capacity: dict[str, Any] | None = None
+    # This describes the accepted historical *wire shape*, not new authority.
+    # dataclasses.replace() retains it through transitions of old records.
+    _v1_original_seven_field_wire: bool = field(default=False, repr=False, compare=False)
 
     def as_dict(self) -> dict[str, Any]:
         value = {
@@ -84,6 +103,15 @@ class AttemptRecord:
             "publication_receipt": self.publication_receipt,
             "history": list(self.history),
         }
+        # Re-emitting an original 7-field v1 record must not introduce four
+        # explicit null fields just because the implementation gained them.
+        # A subsequent real metadata/admission/capacity write upgrades that
+        # *child* to the extended v1 shape; the historical parent stays intact.
+        if (self._v1_original_seven_field_wire
+                and self.admission is None and self.input_capacity is None
+                and all(getattr(self, key) is None for key in _V1_JOURNAL_METADATA_FIELDS)):
+            for key in _V1_JOURNAL_METADATA_FIELDS:
+                value.pop(key)
         if self.admission is not None:
             value["admission"] = self.admission
         if self.input_capacity is not None:
@@ -92,6 +120,29 @@ class AttemptRecord:
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "AttemptRecord":
+        """Decode *only* accepted v1 records, with no lossy future-data rewrite.
+
+        This guard must land in every trusted v1 reader/writer before the first
+        v2 claim can exist. It does not activate or understand J-CH v2.
+        """
+        if (type(value) is not dict
+                or type(value.get("schema_version")) is not int
+                or value["schema_version"] != 1):
+            raise ValueError("JOURNAL_V1_SCHEMA_UNSUPPORTED")
+        keys = set(value)
+        all_fields = (_V1_JOURNAL_REQUIRED_FIELDS | _V1_JOURNAL_METADATA_FIELDS
+                      | _V1_JOURNAL_OPTIONAL_FIELDS)
+        present_metadata = keys & _V1_JOURNAL_METADATA_FIELDS
+        if (not _V1_JOURNAL_REQUIRED_FIELDS.issubset(keys)
+                or not keys.issubset(all_fields)
+                or present_metadata not in (frozenset(), _V1_JOURNAL_METADATA_FIELDS)
+                or (not present_metadata and keys & _V1_JOURNAL_OPTIONAL_FIELDS)):
+            raise ValueError("JOURNAL_V1_FIELD_SET_INVALID")
+        if (type(value["invocation_count"]) is not int
+                or value["invocation_count"] not in {0, 1}
+                or type(value["evidence_ids"]) is not list
+                or type(value["history"]) is not list):
+            raise ValueError("JOURNAL_V1_FIELD_TYPES_INVALID")
         if "input_capacity" in value:
             validate_capacity_receipt(value["input_capacity"])
             if any(value["input_capacity"][k] != value[k] for k in ("request_id", "attempt_id")):
@@ -109,8 +160,13 @@ class AttemptRecord:
             admission=value.get("admission"),
             history=tuple(value.get("history", [])),
             input_capacity=value.get("input_capacity"),
+            _v1_original_seven_field_wire=not bool(present_metadata),
         )
         has_capacity_rejection(record)
+        # Accept both documented v1 producer shapes, but reject optional
+        # nulls, malformed containers and any other lossy value.
+        if record.as_dict() != value:
+            raise ValueError("JOURNAL_V1_ROUND_TRIP_LOSS")
         return record
 
 
