@@ -67,3 +67,30 @@ JCH_V2_CLAIM_ADMISSION=DISABLED
 PR94=OPEN_DRAFT
 PRODUCTION_ARM_QUALIFIED=NO
 ```
+
+<!-- rb91-r2-original-seven-field-remediation-addendum-20261107 -->
+## Addendum — R2 historical-v1 regression remediation (2026-11-07)
+
+**Original independent verdict remains [NO_GO on prior HEAD d88fa0e8](https://github.com/fanilosendrison/review-broker/pull/100#issuecomment-6708992062).** The reviewer identified a HIGH **introduced** regression: the earlier patch treated all 11 fields emitted by today's v1 serializer as mandatory, thereby rejecting the authentic 7-field v1 wire shape emitted by source revision `fb34cb687fbe46edcdae4d5aebd18d22ffdc4cdc`. The intermediate extension at `3beff06bff1deffc72772455d89489e50996d416` added the four metadata fields as an all-at-once extension (including null values), retaining journal schema version 1. Ten later-profile live claim heads were insufficient to prove earlier version compatibility.
+
+The revised code supports **exactly two established v1 field profiles**: original seven required fields, or those seven plus all four evidence/publication metadata fields; the extended profile may additionally carry established optional `admission` and `input_capacity` fields. Partial metadata profiles, unknown keys or journal versions (including v2, even disguised with v1 version plus J-CH fields) remain fail-closed. A private dataclass provenance field `_v1_original_seven_field_wire` preserves the original wire profile on reads and compatible state transitions. **It is excluded from semantic equality** because a legitimate later metadata write upgrades the child to the extended v1 profile, and the exact Git commit/readback comparison must then succeed. A new v1 record still emits the 11-field extended profile unchanged; historical parent Git bytes never change.
+
+Independent *source-derived* golden JSON fixtures now live at `tests/fixtures/rb91-original-seven-field-journal-v1.json` with six original-profile states (REQUESTED/0, PREPARED/0, ARMED/0, ARMED/1, INDETERMINATE/1 and STOPPED/1) and one post-metadata extended wire profile. The fixtures are synthetic and carry both exact producer commit IDs; they are **not** a claim that these exact synthetic records existed on production refs. Tests cover:
+- Frozen original and extended profile decode → exact structural re-encoding.
+- True `GitHubRefJournal` + real local Git object/ref transport: unchanged historical read, idempotent `claim()`, valid original-profile transition and invocation-count update; consumed STOPPED cannot re-arm; original parent bytes never change.
+- Controlled synthetic metadata upgrade with one new direct-child Git commit, post-write SHA/readback and preserved metadata, without treating arbitrary synthetic metadata as a genuine evidence authorization.
+- Strict future/unknown schema and unknown-field refusal, missing *mandatory* 7 core fields and partial metadata, malformed types and optional legacy v1 behavior.
+
+The existing historical failed review remains authoritative for its **old SHA**. This addendum and later CI results are **remediation evidence only**; they do not supersede NO_GO or authorize merging PR #100 without a **fresh independent hostile review pinned to the new exact HEAD**. The **inherited R1/JQ-004** GitHub unknown-read/false-absence flaw is not fixed here and remains an independent gate, as does old-workflow SHA drain/revocation before v2 activation.
+
+```text
+R2_ORIGINAL_V1_PRODUCER=fb34cb687fbe46edcdae4d5aebd18d22ffdc4cdc
+R2_METADATA_EXTENSION_PRODUCER=3beff06bff1deffc72772455d89489e50996d416
+R2_REMEDIATION=SOURCE_AND_GOLDEN_TESTS_UPDATED
+HISTORICAL_PROFILES=ORIGINAL_7_FIELDS_AND_EXTENDED_11_FIELDS
+HISTORICAL_WIRE_PRESERVATION=TESTED_IN_REAL_LOCAL_GIT_TRANSPORT
+R1_UNKNOWN_READ=SEPARATE_NOT_REMEDIATED
+NEW_INDEPENDENT_REVIEW=PENDING
+PR100=OPEN_DRAFT_NOT_MERGED
+JCH_V2_ADMISSION=DISABLED
+```
