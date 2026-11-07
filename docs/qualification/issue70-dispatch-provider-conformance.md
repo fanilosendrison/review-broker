@@ -112,8 +112,12 @@ as a provider-only caller on an isolated qualification branch. No new default
 workflow, registration PR or merge is needed. Default Controller and Worker
 stubs remain their exact qualified PR92 bytes. The fixture
 `tests/fixtures/dispatch-provider/probe-controller-active.yml` is not a registered
-workflow; its exact bytes are published only as the active counterpart on the
-isolated caller branch after the corrected candidate is qualified.
+workflow. Its guards, permissions and commands are fixed. Before publication on
+the isolated caller branch, only the literal --dev-sha lease argument is bound
+to the freshly observed default commit whose Worker stub still matches the
+qualified bytes. Record template/bound hashes and the sole substitution. This is
+an immutable identity binding before any probe, not an alternate dispatch payload.
+The corrected candidate is qualified before the caller is emitted.
 
 The caller run-name is v3 dispatch provider-only qualification and it has only
 job `dispatch-provider-probe`, not controller. The registered workflow name stays
