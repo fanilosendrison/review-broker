@@ -5,10 +5,10 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "J-CH ARM-Bound Challenge Authority Protocol Proposal"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
-# J-CH ARM-Bound Challenge Authority — Protocol Proposal v0.1.1
+# J-CH ARM-Bound Challenge Authority — Protocol Proposal v0.1.2
 
 **NON-NORMATIVE DESIGN CANDIDATE — NOT ACCEPTED — NOT IMPLEMENTED — NOT QUALIFIED**
 
@@ -18,7 +18,11 @@ This document is a *versioned candidate specification* for
 [RB-ARCH-ARM-01 #91](https://github.com/fanilosendrison/review-broker/issues/91).
 It proposes the minimal J-CH (journal-bound, pre-ARM launcher challenge)
 protocol as an alternative to a separate post-ARM consumption CAS (J2-B)
-or durable state inside the Codespace (B).
+or durable state inside the Codespace (B). The separate, versioned
+[J-CH journal and AtomicArm contract proposal](jch-journal-contract-proposal.md)
+(v0.1.0, **draft/non-normative**) now specifies the candidate record schema,
+expected-old transitions, fail-closed error classes and mandatory compatibility
+cutover. No production source, accepted contract or schema is changed.
 
 Proposal rules labeled **P01–P24** are **requirements for a hypothetical
 implementation only**. They have no authority over existing code or operating
@@ -36,7 +40,10 @@ Evidence basis (each result remains bounded to its original model/evidence):
 - [#91 phase 2 — finite-state J2-B exploration](https://github.com/fanilosendrison/review-broker/issues/91#issuecomment-6697694942).
 - [#91 Q1 — live read-only GitHub authority audit](https://github.com/fanilosendrison/review-broker/issues/91#issuecomment-6698134952).
 - [#91 phase 3 — same-model J-CH/J2-B comparison](https://github.com/fanilosendrison/review-broker/issues/91#issuecomment-6699304864).
-- Phase 4 (2026-11-07): bounded split-ARM vs single-CAS AtomicArm comparison; the v0.1.1 proposal adopts **AtomicArmBound as the preferred candidate**, subject to real protocol and threat-model qualification. Model evidence is not a live GitHub guarantee.
+- Phase 4 (2026-11-07): bounded split-ARM vs single-CAS AtomicArm comparison; **AtomicArmBound remains a preferred candidate**, subject to real protocol and threat-model qualification. Model evidence is not a live GitHub guarantee.
+- [#91 owner decision](https://github.com/fanilosendrison/review-broker/issues/91#issuecomment-6706691402): GitHub, approved authoritative writers/controllers and their scoped credentials are **trusted** for ordinary risk-proportionate reviews; deliberate privileged history falsification is an explicit residual risk. This does not waive code-level hardening or grant J-CH adoption.
+- [Q2 on a disposable real Codespace](https://github.com/fanilosendrison/review-broker/issues/95#issuecomment-6706224409) qualified bounded *synthetic full-duplex SSH* with one live launcher. Abrupt controller/socket failure and real J-CH OIDC were not qualified.
+- [Q3 in real GitHub Actions](https://github.com/fanilosendrison/review-broker/issues/96#issuecomment-6706990153) qualified bounded `updateRefs` with `beforeOid` and scoped `GITHUB_TOKEN` under A/B and A/A contention. Rejected calls reported **generic GitHub internal errors**; the lost acknowledgement was client-injected, and exact error taxonomy is not established.
 - [#27 — accepted risk-proportionate v1 security decision](https://github.com/fanilosendrison/review-broker/issues/27).
 
 Phase 3 enumerated 3,300 reachable states in the **bounded trusted J-CH
@@ -70,7 +77,7 @@ GitHub/host administrator is promised.
 The alternative J2-B adds a **third** CAS after ARM/count-one. Earlier J-CH
 v0.1.0 retained **two** separate ARM/count-one commits; that design leaves
 a stranded `ARMED/count=0` interruption window requiring original-controller
-ownership for the second write. **J-CH v0.1.1 proposes one atomic GitHub
+ownership for the second write. **J-CH v0.1.2 retains the proposal of one atomic GitHub
 commit** for `PREPARED/count=0 -> ARMED/count=1` with the challenge and
 binding. It eliminates that intermediate state for **new J-CH records only**.
 Legacy accepted OIDC ARM v1 retains its original two-write implementation,
@@ -87,16 +94,16 @@ with no retrospective schema/state rewrite.
 | Privileged launcher L | Trusted verified program, protected execution context, challenge generator; **no GitHub journal-write credential** | Create a new authority, re-enter launch, fork/copy authorized state |
 | Codex reviewer R | Separate untrusted/model-visible execution boundary, pinned distribution/profile | Receive OIDC JWT, claim-writer credentials, controller credentials or launcher control |
 
-**Candidate, not owner-accepted threat boundary:** ordinary crashes,
+**Owner-confirmed GitHub writer trust boundary, not architecture acceptance:** ordinary crashes,
 concurrency, duplicate delivery, replay, stale reads, network/SSH ambiguity,
-host restarts/replacements and malicious reviewed material **are in scope**.
-An adversary controlling a GitHub journal writer/administrator, GitHub itself,
-or the privileged host at arbitrary memory/snapshot level is proposed as an
-explicit residual trust failure, **not a supported guarantee**. A demonstrated
-secret leak or unexpected privileged access always blocks the affected path.
-
-This perimeter is consistent in spirit with #27 but **does not follow
-automatically from #27**. Owner adjudication remains an open gate.
+host restarts/replacements and malicious reviewed material **remain in scope**.
+GitHub, the approved journal writers and their authorized credential custody
+are trusted dependencies for ordinary reviews. Resistance to their fully
+malicious/compromised privilege, or arbitrary privileged host memory/snapshot
+control, is not claimed. A demonstrated secret leak or unexpectedly privileged
+capability still blocks the affected path. The owner decision does **not**
+make arbitrary faulty-but-privileged deletion safe; it requires controlled,
+fail-closed writers and openly records this residual impossibility.
 
 **P01 — Credential separation.** C alone performs journal mutations and
 requests GitHub OIDC; L/R must not receive the GitHub journal, publication,
@@ -134,6 +141,10 @@ invariants. Older code must reject unsupported future records instead of
 dropping unknown fields during serialization. Existing
 `AttemptRecord.from_dict` and `as_dict` need qualification
 for this issue; **current permissive decoding is not sufficient**.
+The companion contract **J01–J06/J20** explicitly requires a reject-before-publish
+migration: every active old writer must reject v2 losslessly before any new
+v2 claim is allowed, otherwise refuse activation or adopt a separately
+accepted disjoint ref namespace.
 
 **P06 — Legacy permanent non-replay.** Request #82 and every historical
 `ARMED`, `INDETERMINATE`, `STOPPED` or otherwise
@@ -204,7 +215,8 @@ after ARM never authorize another challenge.
 
 ### 4.3 Atomic ARM/count-one ownership (C -> J)
 
-**P10 — No stranded split transition.** New J-CH records MUST NOT use the
+**P10 — No stranded split transition.** In the companion journal contract
+this is **J08–J13**. New J-CH records MUST NOT use the
 legacy `PREPARED -> ARMED/count=0 -> ARMED/count=1` two-commit path.
 One new, versioned `arm_once_challenge_bound` operation proposes exactly
 one CAS from the fresh `PREPARED/count=0` snapshot to
@@ -220,7 +232,12 @@ nonetheless refuses such a record at its PREPARED precondition.
 This is a **primitive-level J-CH design concern**, not evidence of a live
 unauthorized replay through the currently implemented full workflow.
 
-**P11 — Original-owner confirmation and ambiguity.** A new CAS must have
+**P11 — Original-owner confirmation and ambiguity.** The companion
+journal contract **J14–J19** uses *GraphQL `updateRefs` (plural)* with
+explicit `beforeOid=P`, `afterOid=A` and `force:false`. Q3 has qualified
+bounded real exclusivity but GitHub returns a **generic internal error** to
+losing/stale calls, which must be classified UNKNOWN and never retried or
+interpreted as a typed conflict. A new CAS must have
 a unique child commit of the exact observed parent. **Only the same live
 controller that submitted it**, with its original authenticated active
 launcher session, may continue after positively verifying the exact commit,
@@ -293,7 +310,7 @@ Shutdown boundaries remain separate.
 | `TERMINAL_CAPTURED/VALIDATED/REPORTED` | No execution grant | Only evidence/validation/publication operations | Existing post-model recovery |
 | `INDETERMINATE/STOPPED` | No execution grant | No new model process | Cleanup or historical read-only |
 
-For J-CH v0.1.1, **ARMED and count-one are the same durable state change**.
+For J-CH v0.1.2, **ARMED and count-one are the same durable state change**.
 `ARMED/count=0` remains possible in historical **legacy** records and
 remains non-replayable under their accepted contracts. No v0.1.1 validator
 may reinterpret a legacy ARM as a fresh challenge-eligible grant. Count-one
@@ -356,34 +373,41 @@ GitHub-plan-related 403; branch-protection detail was inaccessible to the
 integration. The owner has admin access. A full inventory of writers and
 bypass actors has **not** been established.
 
-**P19 — Writer trust or stronger authority.** Production cannot claim
-monotonic consumption against compromised/misbehaving authorized writers
-merely because the broker uses a non-forced Git ref update. A descendant
-commit can carry a semantically older `attempt.json`. Ref deletion
-can make a formerly consumed request indistinguishable from a request whose
-claim was never created. If these threats remain *in scope*, J-CH needs a
-separately justified non-rollback anchor or a different trust architecture.
+**P19 — Approved writer boundary and remaining residual risk.** The owner
+explicitly accepted trusted GitHub/authorized writers for ordinary reviews
+(#91 comment 6706691402); J-CH therefore does not require a second external
+anti-admin-rollback authority **solely** for that threat. Nevertheless a
+privileged writer, including one acting erroneously, can append a semantically
+regressive descendant or delete the ref and make a previously consumed attempt
+indistinguishable from a new one. GraphQL expected-old does not solve this.
+All approved writers must validate monotonic transitions and forbid deletion;
+post-compromise or uncontrolled privileged mutation remains a declared
+residual risk, not something hashes or Git ancestry defeat.
 
-**P20 — Fail-closed journal errors.** Proposed journal reads distinguish
-an authenticated, exact not-found response from permission/network/server
-errors; the latter must not be interpreted as absence and must never permit
-fresh claim/ARM. **Even a genuine 404 cannot prove that a claim was never
-created and then deleted**. Claim creation after a missing historical ref is
-an unresolved authority problem, not solved by better HTTP status parsing.
+**P20 — Fail-closed journal errors.** The companion contract **J14/J17**
+distinguishes `PRESENT_VERIFIED`, `ABSENT_AUTHENTICATED` and `UNKNOWN`.
+All permission/network/server/GraphQL generic errors are `UNKNOWN`, never
+absence or a typed CAS loss; no retry or model grant on an ambiguous AtomicArm
+result. **Even a genuine authenticated 404 cannot prove a previous claim
+was never created and deleted.** The accepted writer boundary forbids such
+deletion in protocol-conformant operation, while its consequences remain an
+explicit residual incident scenario.
 
-**P21 — No silent semantic rollback.** Every versioned writer must reject
-invalid state regressions and preserve recorded binding/history/count fields.
-Append-only/ancestor validation may detect some faults **only if** the
-authoritative history and refs themselves remain trustworthy. No proposed
-hash, Git ancestry test or branch rule is claimed to defeat an actor with
-full in-scope admin control.
+**P21 — No silent semantic rollback or version stripping.** Under the
+companion contract **J01–J13/J20–J22**, every v2 writer validates the
+observed parent and proposed child, rejects state/count/history/binding
+regression and refuses unknown schemas. Existing legacy code must be
+upgraded to **reject v2 without mutation before the first v2 claim**; it
+currently discards unrecognized keys and ignores `schema_version`.
+Only trusted, protocol-conformant writers can maintain semantic monotonicity;
+no hash or Git ancestry check can recover history after a privileged deletion.
 
 ## 8. Versioned interface changes (proposal, not implementation authorization)
 
 | Existing owner | Minimal change required if J-CH were accepted |
 | --- | --- |
-| `queue.py` and journal record contracts | Separate legacy vs J-CH schema; closed binding; **atomic ARMED/count1 transition**; forbid J-CH ARMED/count0 |
-| `github_journal.py` | One versioned atomic pre-arm-to-consumed operation with exact parent/binding/readback; strict unknown/absent transport; history semantics |
+| `queue.py` and journal record contracts | Proposed `schema_version=2` from claim time, closed immutable binding and parent/child monotonicity; **atomic ARMED/count1 transition**; forbid J-CH ARMED/count0; reject unknown v2 in all old writers first |
+| `github_journal.py` | Versioned `updateRefs(beforeOid,afterOid,force:false)` from verified P to unique direct child A; exact positive readback; strict present/absent/unknown transport; no grant after ambiguous ACK |
 | `arm_controller.py` and workflow | Pre-ARM bidirectional L handshake with session ownership; exact run/recipient binding; **one** new J-CH CAS; new OIDC audience |
 | `arm_authority_contract.py` / `arm_oidc.py` | Disjoint versioned envelope and exact challenge/commit validation; no v1 JWT acceptance by J-CH |
 | `arm_execution.py` / `codex.py` | Protected same-incarnation launch continuation; one-shot fence; disable legacy bypass |
@@ -407,13 +431,13 @@ races. Assert at most one authorized Codex start; independent actor/call
 counts and traces must make the property non-vacuous. Do not mislabel a
 bounded finite checker as an unbounded formal proof.
 
-**P23 — Sacrificial non-inference gate.** Only under *separate* owner
-authorization, test an isolated disposable GitHub claim namespace/repository,
-real GitHub Actions and Codespaces SSH/stdin, bound OIDC, process start/reentry,
-disconnection, restart and shutdown. Replace Codex with a fake executable
-whose process-start observation is independent and non-volatile. Never use
-Request #82 or a real consumer source for these tests. No API/model token
-is used for a fake-model probe. An absent receipt alone is not proof of
+**P23 — Sacrificial non-inference gates.** Bounded Q2 nominal SSH and Q3
+GraphQL expected-old **have been observed** with isolated assets and synthetic
+records; neither constitutes a real J-CH/OIDC or crash-continuation proof.
+Any additional test of bound OIDC, protected launcher reentry, abrupt SSH
+loss, restart/Shutdown and journal error/migration hardening requires
+**separate owner authorization** with disposable assets, no historical #82
+replay and no real model until production admission is separately qualified. An absent receipt alone is not proof of
 zero process starts.
 
 **P24 — Independent review and adoption gate.** Obtain an independent
@@ -428,13 +452,13 @@ model-capable qualification require separate operational authorization.
 
 | ID | Open decision / missing evidence | Recommended provisional disposition |
 | --- | --- | --- |
-| D01 | Are compromised writers/admins and process-memory clones excluded for low-sensitivity use? | Explicit owner risk acceptance required; not inferred from #27 |
-| D02 | Where to introduce a new journal schema and J-CH eligibility for never-ARMED attempts? | Favor new claim-time protocol marker; no implicit legacy upgrade |
-| D03 | Can the *same* privileged launcher retain trustworthy bidirectional SSH continuity from hello through launch? | Controlled operational proof needed |
-| D04 | Can a **single** versioned AtomicArm CAS safely combine ARMED and count-one while ensuring only its original live controller/session may mint? | Preferred finite-model candidate; exact GitHub/SSH qualification and contract redesign required |
+| D01 | Are GitHub authorized writers/admins trusted for ordinary reviews? What about privileged process cloning? | **GitHub writer/admin threat decision ACCEPTED** in #91; launcher memory cloning remains an explicit separate risk to bound and qualify |
+| D02 | Where to introduce new journal schema and J-CH eligibility? | Companion journal contract proposes `schema_version=2` at claim; **all old writers must reject v2 before cutover**; no implicit migration; activation remains open |
+| D03 | Can the same launcher retain SSH continuity? | Q2 bounded real synthetic HELLO/PROOF/PID PASS; abrupt failure, authentic OIDC and hostile clone cases still require qualification |
+| D04 | Can one AtomicArm CAS combine ARMED/count-one? | Q3 bounded GraphQL expected-old PASS; generic provider errors must fail closed; real combined commit/controller/launcher binding still not implemented |
 | D05 | Can active L be prevented from reentry/bypass and proven non-copyable within accepted threat model? | Core independent-review blocker |
 | D06 | How to fence a possible live continuation during reconciler cancellation/`INDETERMINATE`? | Block design GO until resolved |
-| D07 | What is acceptable anti-semantic-rollback protection with private unprotected refs? | Writer-boundary acceptance or stronger authority |
+| D07 | What protection is required against in-scope semantic rollback? | **Owner accepts trusted authoritative GitHub writers**; strict validators/upgrade required; arbitrary privileged deletion/rewrite still an expressly unprotected residual risk |
 | D08 | Is J-CH still cheaper/safer than J2-A, J2-B, E and B once all obligations are counted? | Compare before architecture adoption |
 
 ## 11. Acceptance criteria for this *draft specification*
@@ -458,13 +482,17 @@ model-capable qualification require separate operational authorization.
 
 ```text
 PROPOSAL=RB91_J_CH_ARM_BOUND_CHALLENGE
-PROPOSAL_VERSION=0.1.1
+PROPOSAL_VERSION=0.1.2
 PROPOSAL_STATUS=DRAFT_NON_NORMATIVE
 DESIGN_PREFERENCE=J_CH_ATOMIC_ARM_BOUND_CONDITIONAL
 ACCEPTED_ARCHITECTURE=NONE
 ACCEPTED_OIDC_CONTRACT=V1_UNCHANGED
 NEW_WIRE_SCHEMA=NOT_IMPLEMENTED
-THREAT_MODEL_OWNER_ADJUDICATION=PENDING
+JOURNAL_CONTRACT_DRAFT=J_CH_JOURNAL_V2_V0_1_0
+Q2_SSH_REAL_BOUNDED=PASS
+Q3_GRAPHQL_REAL_BOUNDED=PASS_WITH_GENERIC_ERRORS
+OLD_WRITER_REJECT_V2_GATE=NOT_IMPLEMENTED
+THREAT_MODEL_OWNER_ADJUDICATION=GITHUB_WRITERS_TRUSTED_FOR_ORDINARY_USE
 INDEPENDENT_HOSTILE_REVIEW=NOT_PERFORMED
 IMPLEMENTATION_AUTHORIZED=NO
 PRODUCTION_ARM_AUTHORITY_QUALIFIED=NO
