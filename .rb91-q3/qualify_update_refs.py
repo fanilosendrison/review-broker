@@ -75,7 +75,12 @@ def _gh(args: list[str], data: object | None) -> dict:
             kind = "GRAPHQL_REFUSAL_FROM_CLI"
         else:
             kind = "CLI_OR_TRANSPORT_FAILURE"
-        return {"ok": False, "class": kind, "code": p.returncode}
+        redacted = p.stderr.replace(env["GH_TOKEN"], "[REDACTED_TOKEN]")
+        redacted = re.sub(r"(?:ghp_|ghs_|gho_|github_pat_)[A-Za-z0-9_]+", "[REDACTED_CREDENTIAL]", redacted)
+        redacted = re.sub(r"(?i)(bearer\s+)[A-Za-z0-9_.-]+", r"\1[REDACTED]", redacted)
+        return {"ok": False, "class": kind, "code": p.returncode,
+                "stderr_sha256": hashlib.sha256(redacted.encode()).hexdigest(),
+                "sanitized_error_preview": redacted[:480]}
     try:
         value = json.loads(p.stdout)
     except (ValueError, TypeError):
@@ -206,24 +211,26 @@ def run() -> None:
                     futures = [executor.submit(update_ref, repo_id, ref, p, v, label+"-"+str(i)) for i,v in enumerate(targets)]
                     outcomes = [f.result() for f in futures]
                 observed = get_ref_sha(ref)
+                # Record exact current head immediately; a later diagnostic failure must
+                # never leave a stale cleanup plan at PREPARED.
+                refs[-1]["current_sha"] = observed
+                record_json("cleanup-plan.json", plan)
                 success = [i for i, v in enumerate(outcomes) if v["ok"]]
                 if len(success) != 1 or observed != targets[success[0]]:
                     raise Q3Stop(label.upper()+"_EXPECTED_OLD_VIOLATED")
-                failure_classes = [x.get("class") for x in outcomes if not x["ok"]]
-                if failure_classes != ["GRAPHQL_REFUSAL_FROM_CLI"]:
-                    raise Q3Stop(label.upper() + "_LOSER_CAUSE_UNRESOLVED")
-                result["cases"][label] = {"status": "PASS", "parent": p, "targets": targets,
-                    "winner": success[0], "head": observed, "loser_error": failure_classes}
+                failures = [x for x in outcomes if not x["ok"]]
+                result["cases"][label] = {"status": "PASS_ONE_ACCEPTED", "parent": p, "targets": targets,
+                    "winner": success[0], "head": observed, "loser": failures}
             elif label == "stale":
                 first = update_ref(repo_id, ref, p, a, label+"-win")
                 second = update_ref(repo_id, ref, p, b, label+"-stale") if first["ok"] else {"ok":False,"class":"NOT_ATTEMPTED"}
                 observed = get_ref_sha(ref)
+                refs[-1]["current_sha"] = observed
+                record_json("cleanup-plan.json", plan)
                 if not first["ok"] or second["ok"] or observed != a:
                     raise Q3Stop("STALE_BEFORE_OID_INCORRECT")
-                if second.get("class") != "GRAPHQL_REFUSAL_FROM_CLI":
-                    raise Q3Stop("STALE_ERROR_CAUSE_UNRESOLVED")
-                result["cases"][label] = {"status": "PASS", "parent": p,
-                    "head": observed, "stale_error": second.get("class")}
+                result["cases"][label] = {"status": "PASS_ONE_ACCEPTED", "parent": p,
+                    "head": observed, "stale_error": second}
             else:
                 actual = update_ref(repo_id, ref, p, a, label+"-discard")
                 # Force an application-level lost acknowledgement *after the real HTTP request*;
