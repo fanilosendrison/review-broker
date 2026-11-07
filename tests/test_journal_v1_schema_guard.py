@@ -162,7 +162,7 @@ class LegacySchemaTests(unittest.TestCase):
                 calls = []
                 def runner(command, **_kwargs):
                     calls.append(tuple(command))
-                    self.assertEqual(command[2], "GET", "refused journal must not be written")
+                    self.assertEqual(command[3], "GET", "refused journal must not be written")
                     endpoint = command[4]
                     if "/git/refs/heads/review-claims/" in endpoint:
                         return subprocess.CompletedProcess(
@@ -181,14 +181,14 @@ class LegacySchemaTests(unittest.TestCase):
                     ):
                         operation(journal)
                     self.assertEqual(len(calls), 2)
-                    self.assertTrue(all(call[2] == "GET" for call in calls))
+                    self.assertTrue(all(call[3] == "GET" for call in calls))
 
     def test_gh_journal_still_reads_v1_and_does_not_reencode_optional_admission(self):
         item = legacy(AttemptState.STOPPED, count=1)  # No admission is historical and valid.
         calls = []
         def runner(command, **_kwargs):
             calls.append(tuple(command))
-            self.assertEqual(command[2], "GET")
+            self.assertEqual(command[3], "GET")
             if "/git/refs/heads/review-claims/" in command[4]:
                 return subprocess.CompletedProcess(command, 0, json.dumps({"object": {"sha": COMMIT}}), "")
             if command[4].endswith("?ref=" + COMMIT):
