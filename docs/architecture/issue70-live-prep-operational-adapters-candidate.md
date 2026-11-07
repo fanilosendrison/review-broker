@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 Live Preparation Operational Adapter Candidate"
-version: "0.2.0"
+version: "0.2.1"
 ---
 
 # Issue 70 — Live preparation operational adapter candidate
@@ -241,6 +241,10 @@ It performs actual PR scope/capture/finalization and all reference admission
 reads before complete PreclaimAdmissionV3 and before the first Git mutation.
 The source session binds that exact admission to its original producer moment;
 canonical bytes or a caller boolean alone do not satisfy Controller authority.
+The session is noncopyable/nonserializable, registration names its exact original
+receiver, and a shared mutex irreversibly consumes/clears the one issuance moment.
+Closing invalidates all remaining registration fields. An old copied issuer/data
+pair or a different authority instance cannot register it again.
 After source completion, live source clients are closed/dropped from the mutation
 path. Only credential-free admission data remains there.
 
@@ -282,7 +286,10 @@ so lost responses can be reconciled without recursively creating write authority
 The existing PreModelControllerV3 still owns claim/reserve/dispatch/ACK ordering.
 Its attributed reservation opens one original-instance issuance moment consumed
 by GitHubActionsInitialDispatchTransportV3. Read snapshots, copied response data
-and bare transport calls cannot recreate that opportunity. The transport checks
+and bare transport calls cannot recreate that opportunity. The transport rejects
+copy/deepcopy/serialization and checks its exact original binding at both entry
+points; consumption is shared original-Controller state under the Controller
+mutex, never an independently copied per-transport boolean. The transport checks
 the exact qualification branch and current original reservation, then emits one
 POST with return_run_details=true. Exact positive run ID plus API/browser URLs
 are required for a candidate. HTTP 204, malformed response or loss yields no ACK

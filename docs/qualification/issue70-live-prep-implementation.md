@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "Issue 70 Partial Live Preparation Implementation"
-version: "0.2.0"
+version: "0.2.1"
 ---
 
 # Issue 70 — Partial live preparation implementation
@@ -332,3 +332,53 @@ permission/install, default branch, dev, Issue lifecycle or Project field change
 The future specimen/budget remain plan-only. READY_FOR_OWNER_LIVE_EFFECT_MANDATE,
 if later jointly established, means a separate bounded owner mandate may be
 considered, never that live PREPARED, production or model readiness is qualified.
+
+### New independent NO_GO and original-instance correction
+
+The first completion candidate was SHA
+1ddc5dfa70631a94099c6d29bd216a1a02866e41, tree
+4088398af9478ffaf7c4c2af5a330d7b770603ca. Its exact normal Ubuntu CI
+[42326963685](https://github.com/fanilosendrison/review-broker/actions/runs/42326963685),
+job128264378342, passed1149 tests in1369.913 seconds without skips, including all
+twelve Linux witnesses and Node24.22.2. Synthetic checkout d2f489ddf2086fcee844fa14f95140d8ea10f280
+has that exact tree. This PASS did not qualify the two subsequent copy-replay
+counterexamples. The [fresh independent NO_GO](https://github.com/fanilosendrison/review-broker/pull/93#issuecomment-6701105210)
+is preserved unmodified on that source; old5041cc2 history also remains unchanged.
+
+Both discoveries are no-normative-impact implementation/verification corrections
+under the existing owner mandate, affecting original-instance provenance and
+at-most-one effects, not a new protocol or product decision. Their controlling
+requirements are source-production provenance, single original reservation
+opportunity and no permission recreation through copies. Required authority is
+this task's explicit in-scope correction/requalification mandate.
+
+- R1: a shallow-copied bound transport shared its lock but not its attempted/
+  permit booleans. During a genuine dispatch HTTP observation, the copy bound the
+  still-active Controller issuance and emitted a second POST. The real-source
+  RED observed two POSTs, not merely a source hypothesis. Correction rejects
+  copy/deepcopy/serialization, checks original transport and Controller identity
+  at binding and consumption, and consumes shared original-Controller state under
+  its mutex. A copied per-transport boolean is never the consumption authority.
+- R2: a source-session copy retained closed=false plus the genuine issuer/result
+  after the original closed. A fresh receiver accepted that expired registration.
+  The real-source RED observed that acceptance and an incorrect receiver inside
+  the genuine source-production moment. Correction rejects copying/serialization,
+  binds exact producing session and exact receiving authority, and atomically
+  consumes/clears the issuer/result/receiver once under the source mutex. Closing
+  also invalidates every registration field. No credential/fingerprint is stored.
+
+The two original regression oracles in
+`test_live_prep_original_instance_replay.py` produced two expected RED failures
+before correction and passed with the original positive Controller flow intact.
+Those oracles were preserved and additional copy/serialization checks were added.
+They observe genuine source and attributable reservation moments; instrumentation
+calls the actual original methods and doubles only external provider observations.
+Copy, deepcopy, serialization, wrong receiver, post-close reuse and total POST
+count are explicit oracles. A focused correction run passed31 tests, including
+RWP01 and concrete source/dispatch invariants. No historical test was relaxed.
+The owning repository report preserves the validated lesson; the global bug
+registry is outside this task's authorized worktree and is not modified.
+
+The first local full run remains diagnostic if edits overlapped it; its source
+manifest decides exactness. Fresh corrected-source full validation, CI and a new
+independent review are required. No GO is transferred from the earlier tree.
