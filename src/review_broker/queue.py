@@ -55,6 +55,17 @@ class ReviewerBusy(StateTransitionError):
     pass
 
 
+# These are the keys serialized by the accepted v1 AttemptRecord.as_dict().
+# A v1 reader must never decode an unknown/newer record and then silently
+# reserialize it without its authorization binding or other future fields.
+_V1_JOURNAL_REQUIRED_FIELDS = frozenset({
+    "schema_version", "request_id", "attempt_id", "state", "evidence_ids",
+    "invocation_count", "evidence_locator_plan", "evidence_locator",
+    "publication_intent", "publication_receipt", "history",
+})
+_V1_JOURNAL_OPTIONAL_FIELDS = frozenset({"admission", "input_capacity"})
+
+
 @dataclass(frozen=True)
 class AttemptRecord:
     request_id: str
@@ -92,6 +103,24 @@ class AttemptRecord:
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "AttemptRecord":
+        """Decode *only* accepted v1 records, with no lossy future-data rewrite.
+
+        This guard must land in every trusted v1 reader/writer before the first
+        v2 claim can exist. It does not activate or understand J-CH v2.
+        """
+        if (type(value) is not dict
+                or type(value.get("schema_version")) is not int
+                or value["schema_version"] != 1):
+            raise ValueError("JOURNAL_V1_SCHEMA_UNSUPPORTED")
+        keys = set(value)
+        if (not _V1_JOURNAL_REQUIRED_FIELDS.issubset(keys)
+                or not keys.issubset(_V1_JOURNAL_REQUIRED_FIELDS | _V1_JOURNAL_OPTIONAL_FIELDS)):
+            raise ValueError("JOURNAL_V1_FIELD_SET_INVALID")
+        if (type(value["invocation_count"]) is not int
+                or value["invocation_count"] not in {0, 1}
+                or type(value["evidence_ids"]) is not list
+                or type(value["history"]) is not list):
+            raise ValueError("JOURNAL_V1_FIELD_TYPES_INVALID")
         if "input_capacity" in value:
             validate_capacity_receipt(value["input_capacity"])
             if any(value["input_capacity"][k] != value[k] for k in ("request_id", "attempt_id")):
@@ -111,6 +140,10 @@ class AttemptRecord:
             input_capacity=value.get("input_capacity"),
         )
         has_capacity_rejection(record)
+        # Reject optional nulls, malformed containers and any other v1 input
+        # that the current serializer would silently change or drop.
+        if record.as_dict() != value:
+            raise ValueError("JOURNAL_V1_ROUND_TRIP_LOSS")
         return record
 
 
