@@ -117,6 +117,18 @@ class LegacySchemaTests(unittest.TestCase):
                 elif observed.state in {AttemptState.REQUESTED, AttemptState.PREPARED}:
                     self.assertEqual(recovery.action, RecoveryAction.RESUME_PRE_MODEL)
 
+    def test_source_derived_extended_metadata_profile(self):
+        corpus = json.loads(GOLDEN_WIRE.read_text(encoding="utf-8"))
+        extended = corpus["extended_producer"]
+        self.assertEqual(extended["source_commit"],
+                         "3beff06bff1deffc72772455d89489e50996d416")
+        value = extended["record"]
+        self.assertEqual(set(value), ORIGINAL_FIELDS | EXTENDED_METADATA)
+        self.assertEqual(value["state"], "STOPPED")
+        decoded = AttemptRecord.from_dict(copy.deepcopy(value))
+        self.assertEqual(decoded.as_dict(), value)
+        self.assertFalse(decoded._v1_original_seven_field_wire)
+
     def test_original_v1_real_git_read_claim_and_transition_preserve_profile(self):
         corpus = json.loads(GOLDEN_WIRE.read_text(encoding="utf-8"))
         for sample in corpus["cases"]:
@@ -177,6 +189,28 @@ class LegacySchemaTests(unittest.TestCase):
         self.assertEqual(encoded["invocation_count"], original["invocation_count"])
         self.assertEqual(AttemptRecord.from_dict(encoded).as_dict(), encoded)
         self.assertFalse(AttemptRecord.from_dict(encoded)._v1_original_seven_field_wire)
+        # Verify a real Git candidate commit/readback with the original
+        # seven-field parent and an extended eleven-field child. The adapter
+        # call is deliberately a synthetic transport-level test, not proof
+        # that an arbitrary test-only metadata receipt is authorized.
+        with TemporaryDirectory() as temp:
+            transport = JournalGitTransport(Path(temp) / "objects.git")
+            journal = GitHubRefJournal("sample/repo", runner=transport)
+            parent = transport.seed(value, journal._claim_ref(REQUEST_ID))
+            journal._compare_and_swap(REQUEST_ID, parent, upgraded)
+            sha, observed = journal.get_snapshot(REQUEST_ID)
+            self.assertNotEqual(sha, parent)
+            self.assertEqual(observed.as_dict(), encoded)
+            self.assertEqual(
+                set(json.loads(transport.git(
+                    "show", sha + ":.review-broker/attempt.json"
+                ))),
+                ORIGINAL_FIELDS | EXTENDED_METADATA,
+            )
+            self.assertEqual(
+                transport.git("show", parent + ":.review-broker/attempt.json"),
+                canonical_bytes(original) + b"\\n",
+            )
         # Current new v1 records continue emitting the extended profile by default.
         self.assertEqual(set(legacy()), ORIGINAL_FIELDS | EXTENDED_METADATA)
 
