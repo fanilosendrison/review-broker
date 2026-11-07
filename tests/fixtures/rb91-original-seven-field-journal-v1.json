@@ -1,0 +1,244 @@
+{
+  "fixture_kind": "synthetic-records-derived-from-original-v1-wire-producer",
+  "source_repository": "fanilosendrison/review-broker",
+  "source_commit": "fb34cb687fbe46edcdae4d5aebd18d22ffdc4cdc",
+  "source_path": "src/review_broker/queue.py",
+  "record_fields": [
+    "schema_version",
+    "request_id",
+    "attempt_id",
+    "state",
+    "evidence_ids",
+    "invocation_count",
+    "history"
+  ],
+  "note": "Source-derived seven-field wire shape. Synthetic identity and evidence; not a production attempt, authorization or migration.",
+  "cases": [
+    {
+      "label": "REQUESTED_count0",
+      "record": {
+        "schema_version": 1,
+        "request_id": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "attempt_id": "attempt:sha256:c373021382c69ed415e182f409c4126deafae1ad9d6176e5ab4207398e1a18a1",
+        "state": "REQUESTED",
+        "evidence_ids": [],
+        "invocation_count": 0,
+        "history": [
+          {
+            "state": "REQUESTED",
+            "evidence_ids": []
+          }
+        ]
+      }
+    },
+    {
+      "label": "PREPARED_count0",
+      "record": {
+        "schema_version": 1,
+        "request_id": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "attempt_id": "attempt:sha256:c373021382c69ed415e182f409c4126deafae1ad9d6176e5ab4207398e1a18a1",
+        "state": "PREPARED",
+        "evidence_ids": [
+          "artifact:sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "packet:sha256:2222222222222222222222222222222222222222222222222222222222222222"
+        ],
+        "invocation_count": 0,
+        "history": [
+          {
+            "state": "REQUESTED",
+            "evidence_ids": []
+          },
+          {
+            "state": "ADMITTED",
+            "evidence_ids": [
+              "artifact:sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            ]
+          },
+          {
+            "state": "PREPARED",
+            "evidence_ids": [
+              "packet:sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "label": "ARMED_count0",
+      "record": {
+        "schema_version": 1,
+        "request_id": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "attempt_id": "attempt:sha256:c373021382c69ed415e182f409c4126deafae1ad9d6176e5ab4207398e1a18a1",
+        "state": "ARMED",
+        "evidence_ids": [
+          "artifact:sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "packet:sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "artifact:sha256:3333333333333333333333333333333333333333333333333333333333333333"
+        ],
+        "invocation_count": 0,
+        "history": [
+          {
+            "state": "REQUESTED",
+            "evidence_ids": []
+          },
+          {
+            "state": "ADMITTED",
+            "evidence_ids": [
+              "artifact:sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            ]
+          },
+          {
+            "state": "PREPARED",
+            "evidence_ids": [
+              "packet:sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            ]
+          },
+          {
+            "state": "ARMED",
+            "evidence_ids": [
+              "artifact:sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "label": "ARMED_count1",
+      "record": {
+        "schema_version": 1,
+        "request_id": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "attempt_id": "attempt:sha256:c373021382c69ed415e182f409c4126deafae1ad9d6176e5ab4207398e1a18a1",
+        "state": "ARMED",
+        "evidence_ids": [
+          "artifact:sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "packet:sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "artifact:sha256:3333333333333333333333333333333333333333333333333333333333333333"
+        ],
+        "invocation_count": 1,
+        "history": [
+          {
+            "state": "REQUESTED",
+            "evidence_ids": []
+          },
+          {
+            "state": "ADMITTED",
+            "evidence_ids": [
+              "artifact:sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            ]
+          },
+          {
+            "state": "PREPARED",
+            "evidence_ids": [
+              "packet:sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            ]
+          },
+          {
+            "state": "ARMED",
+            "evidence_ids": [
+              "artifact:sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "label": "INDETERMINATE_count1",
+      "record": {
+        "schema_version": 1,
+        "request_id": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "attempt_id": "attempt:sha256:c373021382c69ed415e182f409c4126deafae1ad9d6176e5ab4207398e1a18a1",
+        "state": "INDETERMINATE",
+        "evidence_ids": [
+          "artifact:sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "packet:sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "artifact:sha256:3333333333333333333333333333333333333333333333333333333333333333",
+          "artifact:sha256:4444444444444444444444444444444444444444444444444444444444444444"
+        ],
+        "invocation_count": 1,
+        "history": [
+          {
+            "state": "REQUESTED",
+            "evidence_ids": []
+          },
+          {
+            "state": "ADMITTED",
+            "evidence_ids": [
+              "artifact:sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            ]
+          },
+          {
+            "state": "PREPARED",
+            "evidence_ids": [
+              "packet:sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            ]
+          },
+          {
+            "state": "ARMED",
+            "evidence_ids": [
+              "artifact:sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            ]
+          },
+          {
+            "state": "INDETERMINATE",
+            "evidence_ids": [
+              "artifact:sha256:4444444444444444444444444444444444444444444444444444444444444444"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "label": "STOPPED_count1",
+      "record": {
+        "schema_version": 1,
+        "request_id": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "attempt_id": "attempt:sha256:c373021382c69ed415e182f409c4126deafae1ad9d6176e5ab4207398e1a18a1",
+        "state": "STOPPED",
+        "evidence_ids": [
+          "artifact:sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "packet:sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "artifact:sha256:3333333333333333333333333333333333333333333333333333333333333333",
+          "artifact:sha256:4444444444444444444444444444444444444444444444444444444444444444",
+          "artifact:sha256:5555555555555555555555555555555555555555555555555555555555555555"
+        ],
+        "invocation_count": 1,
+        "history": [
+          {
+            "state": "REQUESTED",
+            "evidence_ids": []
+          },
+          {
+            "state": "ADMITTED",
+            "evidence_ids": [
+              "artifact:sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            ]
+          },
+          {
+            "state": "PREPARED",
+            "evidence_ids": [
+              "packet:sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            ]
+          },
+          {
+            "state": "ARMED",
+            "evidence_ids": [
+              "artifact:sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            ]
+          },
+          {
+            "state": "INDETERMINATE",
+            "evidence_ids": [
+              "artifact:sha256:4444444444444444444444444444444444444444444444444444444444444444"
+            ]
+          },
+          {
+            "state": "STOPPED",
+            "evidence_ids": [
+              "artifact:sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
