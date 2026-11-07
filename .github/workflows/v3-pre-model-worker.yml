@@ -1,24 +1,104 @@
-name: Experimental v3 pre-model Worker (disarmed)
+name: v3 pre-model Worker
 
 on:
   workflow_dispatch:
     inputs:
       request_id:
-        required: true
         type: string
+        required: true
       reservation_id:
-        required: true
         type: string
-      generation:
         required: true
+      generation:
         type: number
+        required: true
 
-permissions: {}
+permissions:
+  contents: write
+  actions: read
+  issues: read
 
 jobs:
   worker:
-    if: ${{ false }}
-    runs-on: ubuntu-latest
+    name: worker
+    if: >-
+      github.repository == 'fanilosendrison/review-broker' &&
+      github.repository_id == '1433701208' &&
+      github.event_name == 'workflow_dispatch' && github.run_attempt == 1 &&
+      inputs.generation == 1 &&
+      github.workflow_ref == format('{0}/.github/workflows/v3-pre-model-worker.yml@{1}', github.repository, github.ref) &&
+      github.sha == vars.REVIEW_BROKER_V3_LIVE_PREP_SHA &&
+      inputs.request_id == vars.REVIEW_BROKER_V3_LIVE_REQUEST_ID &&
+      vars.REVIEW_BROKER_V3_LIVE_REQUEST_ISSUE != '' &&
+      vars.REVIEW_BROKER_V3_LIVE_REQUEST_BODY_SHA256 != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
     steps:
-      - name: Inert preparation artifact
-        run: ":"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify exact approved executable
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          APPROVED_SHA: ${{ vars.REVIEW_BROKER_V3_LIVE_PREP_SHA }}
+        run: |
+          test -n "$APPROVED_SHA"
+          test "$EXPECTED_SHA" = "$APPROVED_SHA"
+          test "$WORKFLOW_SHA" = "$EXPECTED_SHA"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Acquire pinned public official Artifact helper
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: actions/upload-artifact
+          ref: cf430e030ddbb5b0abf93d22962f4752f3646cd9
+          path: artifacts/v3-upload-artifact
+          persist-credentials: false
+      - name: Verify exact helper HEAD and executable blob
+        run: |
+          chmod 700 artifacts/v3-upload-artifact
+          test "$(git -C artifacts/v3-upload-artifact rev-parse HEAD)" = cf430e030ddbb5b0abf93d22962f4752f3646cd9
+          test "$(git -C artifacts/v3-upload-artifact rev-parse HEAD:dist/upload/index.js)" = 7b3f92ae681d6eeca5f5e5e4cf892ad0dfb254ea
+          test "$(git -C artifacts/v3-upload-artifact hash-object dist/upload/index.js)" = 7b3f92ae681d6eeca5f5e5e4cf892ad0dfb254ea
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11"
+      - run: python -m pip install .
+      - name: Wait for exact Controller ACK before Worker mint (read-only)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REQUEST_ID: ${{ inputs.request_id }}
+          RESERVATION_ID: ${{ inputs.reservation_id }}
+          GENERATION: ${{ inputs.generation }}
+          REVIEW_BROKER_V3_LIVE_PREP_SHA: ${{ vars.REVIEW_BROKER_V3_LIVE_PREP_SHA }}
+          REVIEW_BROKER_V3_LIVE_REQUEST_ID: ${{ vars.REVIEW_BROKER_V3_LIVE_REQUEST_ID }}
+          REVIEW_BROKER_V3_LIVE_REQUEST_ISSUE: ${{ vars.REVIEW_BROKER_V3_LIVE_REQUEST_ISSUE }}
+          REVIEW_BROKER_V3_LIVE_REQUEST_BODY_SHA256: ${{ vars.REVIEW_BROKER_V3_LIVE_REQUEST_BODY_SHA256 }}
+        run: reviewctl internal-v3-wait-dispatch-ack --request-id "$REQUEST_ID" --reservation-id "$RESERVATION_ID" --generation "$GENERATION"
+      - name: Mint Worker packet source credential B
+        id: source
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ vars.REVIEW_BROKER_SOURCE_APP_ID }}
+          private-key: ${{ secrets.REVIEW_BROKER_SOURCE_APP_PRIVATE_KEY }}
+          owner: fanilosendrison
+          repositories: review-broker
+          permission-contents: read
+          permission-pull-requests: read
+          permission-metadata: read
+          permission-issues: read
+      - name: Launch the single original Python Worker through Node24
+        uses: ./.github/actions/v3-pre-model-worker-launch
+        with:
+          request-id: ${{ inputs.request_id }}
+          reservation-id: ${{ inputs.reservation_id }}
+          generation: ${{ inputs.generation }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REVIEW_BROKER_SOURCE_TOKEN: ${{ steps.source.outputs.token }}
+          REVIEW_BROKER_SOURCE_APP_SLUG: ${{ steps.source.outputs.app-slug }}
+          REVIEW_BROKER_SOURCE_INSTALLATION_ID: ${{ steps.source.outputs.installation-id }}
+          REVIEW_BROKER_ARTIFACT_HELPER_ROOT: ${{ github.workspace }}/artifacts/v3-upload-artifact

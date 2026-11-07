@@ -18,7 +18,21 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install
-        run: python -m pip install .
+        run: python -m pip install '.[test]'
+      - name: Qualify launcher on Node24
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Acquire exact public Artifact helper fixture (never executed)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: actions/upload-artifact
+          ref: cf430e030ddbb5b0abf93d22962f4752f3646cd9
+          path: artifacts/v3-upload-artifact
+          persist-credentials: false
+      - name: Protect Artifact helper fixture
+        run: chmod 700 artifacts/v3-upload-artifact
       - name: Unit and adversarial tests
         run: python -m unittest discover -s tests -v
       - name: Compile package
