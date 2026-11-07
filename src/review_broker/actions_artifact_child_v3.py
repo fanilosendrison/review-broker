@@ -35,15 +35,18 @@ def verify_upload_helper_v3(root: Path) -> Path:
         raise ValueError("ARTIFACT_TRUST_ROOT_INVALID")
     if stat.S_IMODE(root.stat().st_mode) != 0o700:
         raise ValueError("ARTIFACT_TRUST_ROOT_NOT_PRIVATE")
+    environment={key:os.environ[key] for key in ('PATH','HOME','LANG','TMPDIR') if key in os.environ}
+    environment.update(GIT_CONFIG_NOSYSTEM='1',GIT_CONFIG_GLOBAL=os.devnull,
+        GIT_NO_LAZY_FETCH='1',GIT_NO_REPLACE_OBJECTS='1',GIT_TERMINAL_PROMPT='0')
     head = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
-        capture_output=True, check=True, timeout=10).stdout.strip().decode("ascii")
+        env=environment, capture_output=True, check=True, timeout=10).stdout.strip().decode("ascii")
     if head != UPLOAD_ACTION_COMMIT:
         raise ValueError("ARTIFACT_HELPER_HEAD_MISMATCH")
     target = root / "dist/upload/index.js"
     if any(p.is_symlink() for p in (root / "dist", target.parent, target)):
         raise ValueError("ARTIFACT_HELPER_SYMLINK")
     entry = subprocess.run(["git", "-C", str(root), "ls-tree", "HEAD", "--",
-        "dist/upload/index.js"], capture_output=True, check=True, timeout=10).stdout
+        "dist/upload/index.js"], env=environment, capture_output=True, check=True, timeout=10).stdout
     if entry != (f"100644 blob {UPLOAD_ACTION_DIST_BLOB}\tdist/upload/index.js\n".encode()):
         raise ValueError("ARTIFACT_HELPER_TREE_MISMATCH")
     if not stat.S_ISREG(target.stat().st_mode):
@@ -71,7 +74,7 @@ def artifact_child_environment_v3(source: Mapping[str, str], file: Path,
 
 
 def run_artifact_child_v3(argv: list[str], environment: Mapping[str, str],
-                          log: Path, *, timeout: float, max_log_bytes: int) -> int:
+                          log: Path, *, timeout: float, max_log_bytes: int, on_started=None) -> int:
     """Drain output to a private bounded file; timeout/output overflow terminates the child."""
     descriptor = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     process = None
@@ -80,6 +83,7 @@ def run_artifact_child_v3(argv: list[str], environment: Mapping[str, str],
             process = subprocess.Popen(argv, env=dict(environment), stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True,
                 start_new_session=True)
+            if on_started is not None:on_started(process.pid)
             assert process.stdout is not None
             deadline, written = time.monotonic() + timeout, 0
             with selectors.DefaultSelector() as selector:
@@ -124,7 +128,7 @@ class GitHubActionsArtifactChildV3:
                  environment: Mapping[str, str], max_bytes: int,
                  runner: Callable = run_artifact_child_v3,
                  verifier: Callable = verify_upload_helper_v3,
-                 timeout: float = 300, max_log_bytes: int = 65536):
+                 timeout: float = 300, max_log_bytes: int = 65536, on_started=None):
         if (not Path(node).is_absolute() or type(max_bytes) is not int or max_bytes < 1
                 or timeout <= 0 or type(max_log_bytes) is not int or max_log_bytes < 1):
             raise ValueError("ARTIFACT_CHILD_CONFIGURATION_INVALID")
@@ -132,6 +136,7 @@ class GitHubActionsArtifactChildV3:
         self.environment = dict(environment)
         self.max_bytes, self.runner, self.verifier = max_bytes, runner, verifier
         self.timeout, self.max_log_bytes = timeout, max_log_bytes
+        self.on_started = on_started
         self._lock, self._attempted = Lock(), False
 
     def upload_bytes_once(self, name: str, raw: bytes, *, before_effect) -> PreparedUploadResultV3:
@@ -158,9 +163,10 @@ class GitHubActionsArtifactChildV3:
         environment = artifact_child_environment_v3(self.environment, target, directory)
         before_effect()  # Immediately before the single opaque provider launch.
         try:
+            notification = {} if self.on_started is None else {"on_started": self.on_started}
             code = self.runner([str(self.node), str(executable)], environment,
                 directory / "child-output.log", timeout=self.timeout,
-                max_log_bytes=self.max_log_bytes)
+                max_log_bytes=self.max_log_bytes, **notification)
             result = UploadStatusV3.ACK if type(code) is int and code == 0 else UploadStatusV3.UNKNOWN
         except Exception:
             result = UploadStatusV3.UNKNOWN

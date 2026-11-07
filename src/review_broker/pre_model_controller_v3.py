@@ -88,6 +88,12 @@ class PreModelControllerV3:
         self._attempted: dict[str, bytes] = {}
         self._completed: dict[str, ControllerResultV3] = {}
         self._attempt_lock = Lock()
+        self._dispatch_issuance_gate = None
+        self._dispatch_issuance_request = None
+        self._dispatch_issuance_outcome = None
+        bind_controller = getattr(dispatch_transport,'bind_controller',None)
+        if getattr(dispatch_transport,'original_controller_binding_required',False) is True:
+            bind_controller(self)
 
     def _admission(self, admission: PreclaimAdmissionV3,
                    target: InitialDispatchTargetV3) -> dict[str, object]:
@@ -258,11 +264,20 @@ class PreModelControllerV3:
             claim_ref, snapshot.record.control.reservation_id, 1,
             target.worker_workflow, target.execution_ref, target.executable_sha,
         )
+        issuer = object()
+        self._dispatch_issuance_gate = issuer
+        self._dispatch_issuance_request = request
+        self._dispatch_issuance_outcome = reservation
         try:
+            bind = getattr(self.dispatch_transport,'bind_initial_reservation',None)
+            if getattr(self.dispatch_transport,'original_controller_binding_required',False) is True:
+                bind(self,issuer)
             response = self.dispatch_transport.dispatch(request)
         except Exception:
             return ControllerResultV3(ControllerStatusV3.DISPATCH_UNRESOLVED,
                                       "DISPATCH_RESPONSE_UNAVAILABLE", claim, reservation, request)
+        finally:
+            self._dispatch_issuance_gate = None
         observed = (type(response) is InitialDispatchResultV3
                     and response.status is InitialDispatchStatusV3.OBSERVED
                     and type(response.run_id) is int and response.run_id > 0)

@@ -49,6 +49,8 @@ from .reviewer_profile import install_reviewer_profile, reviewer_home_from_envir
 from .security_probe import run_installed_reviewer_isolation_probe
 from .validation import validate_evidence
 
+from .live_pre_model_cli import add_v3_commands, run_v3_command
+
 DEFAULT_BROKER_REPOSITORY = "fanilosendrison/review-broker"
 
 
@@ -164,6 +166,7 @@ def _parser() -> argparse.ArgumentParser:
     add_publication_recovery_command(subcommands)
     reconcile = subcommands.add_parser("internal-reconcile")
     reconcile.add_argument("--codespace", required=True)
+    add_v3_commands(subcommands)
     return parser
 
 
@@ -176,6 +179,8 @@ def main(argv: list[str] | None = None) -> int:
         else os.environ.pop("REVIEW_BROKER_SOURCE_TOKEN", None)
     )
     try:
+        if args.command.startswith("internal-v3-"):
+            return run_v3_command(args, source_token)
         if args.command == "pilot-synthetic":
             result = run_synthetic_pilot(
                 args.run_dir,

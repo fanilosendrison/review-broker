@@ -131,6 +131,24 @@ def _issue_observation(meta:dict[str,object],data:bytes)->GitHubIssueReferenceOb
  if artifact_identity(canonical_bytes(value.provenance_basis())+b"\n")!=value.evidence_id: raise PacketRetentionV3Error("RETAINED_ISSUE_EVIDENCE_MISMATCH")
  return value
 
+def restore_preclaim_bytes_v3(validated,origin,read_reference):
+ """Reconstruct original admission, never renew its original provenance or timestamps.
+
+ The caller supplies independently obtained exact bytes: retained files for cold
+ observers, or source-App reads after the original attributed ADMITTED for live.
+ """
+ validated=validate_journal_admission_v3(validated,origin)
+ request=validated["canonical_request"]
+ git_meta=iter(validated.get("reference_admissions",[]));issue_meta=iter(validated.get("issue_reference_admissions",[]));git=[];issues=[]
+ for reference in request["references"]:
+  if reference["source"]["kind"]=="inline":continue
+  data=read_reference(reference["id"])
+  if reference["source"]["kind"]=="git_file":git.append(_git_observation(next(git_meta),data))
+  else:issues.append(_issue_observation(next(issue_meta),data))
+ source=validated["source_observation"];origin_meta=validated["origin_observation"]
+ return PreclaimAdmissionV3(canonical_bytes(request),validated["request_id"],validated["review_intent_id"],validated["broker_issue_id"],validated["requester_id"],origin_meta["requester_login_observed"],source["repository"],source["repository_id"],source["pull_request"],source["pull_request_id"],source["head_sha"],validated["source_admission_id"],tuple(validated["reference_ids"]),origin,canonical_bytes(origin_meta),canonical_bytes(source),canonical_bytes(validated["requester_authorization"]),canonical_bytes(validated["history_observation"]),validated["origin_evidence_id"],validated["requester_authorization_evidence_id"],validated["history_evidence_id"],validated["history_scan_boundary"],validated["admission_evidence_id"],tuple(git),tuple(issues),source_scope_evidence_id=validated.get("source_app_scope_evidence_id"))
+
+
 def _require_retained_capture_mode(manifest:object)->None:
  """Pure legacy diagnostics, before full schema validation and all directed reads."""
  if not isinstance(manifest,dict) or not isinstance(manifest.get("subject"),dict): return
@@ -178,13 +196,8 @@ def load_packet_evidence_v3(retention_root:Path,journal_admission:Mapping[str,ob
  if (inspect(admitted_dir.is_symlink) or not inspect(admitted_dir.is_dir) or inspect(admitted_dir.stat).st_mode&0o077
   or {item.name for item in entries(admitted_dir)}!=expected_files):
   raise PacketRetentionV3Error("RETAINED_REFERENCE_INVENTORY_INVALID")
- git_meta=iter(validated.get("reference_admissions",[]));issue_meta=iter(validated.get("issue_reference_admissions",[]));git=[];issues=[]
- for identifier,reference in refs.items():
-  data=read(admitted_dir/f"{identifier}.bin")
-  if reference["source"]["kind"]=="git_file": git.append(_git_observation(next(git_meta),data))
-  else: issues.append(_issue_observation(next(issue_meta),data))
- source=validated["source_observation"];origin_meta=validated["origin_observation"]
- admission=PreclaimAdmissionV3(canonical_bytes(request),validated["request_id"],validated["review_intent_id"],validated["broker_issue_id"],validated["requester_id"],origin_meta["requester_login_observed"],source["repository"],source["repository_id"],source["pull_request"],source["pull_request_id"],source["head_sha"],validated["source_admission_id"],tuple(validated["reference_ids"]),origin,canonical_bytes(origin_meta),canonical_bytes(source),canonical_bytes(validated["requester_authorization"]),canonical_bytes(validated["history_observation"]),validated["origin_evidence_id"],validated["requester_authorization_evidence_id"],validated["history_evidence_id"],validated["history_scan_boundary"],validated["admission_evidence_id"],tuple(git),tuple(issues),source_scope_evidence_id=validated.get("source_app_scope_evidence_id"))
+ admission=restore_preclaim_bytes_v3(validated,origin,lambda identifier:read(admitted_dir/f"{identifier}.bin"))
+ source=validated["source_observation"]
  records=[]
  for entry in manifest["subject_sources"]:
   data=read(packet/packet_snapshot_relative_path_v2(entry));record=SourceRecord.from_bytes(entry["repository"],entry["commit"],entry["path"],entry["git_blob_oid"],data)

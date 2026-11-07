@@ -24,6 +24,20 @@ def validate_worker_dispatch_run(run: Mapping[str, object],
         raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_WORKER_DISPATCH_MISMATCH")
 
 
+def validate_controller_dispatch_run(run, expected):
+    """Separate controller role; the historical Worker validator stays unchanged."""
+    from .github_actions_identity_v3 import GitHubActionsIdentityV3Error
+    if (not expected.worker_dispatch
+            or expected.workflow_path != ".github/workflows/v3-pre-model-controller.yml"
+            or expected.job_key != "controller" or expected.job_name != "controller"
+            or expected.workflow_ref != f"{expected.repository}/{expected.workflow_path}@{expected.workflow_execution_ref}"
+            or run.get("name") != expected.workflow_name
+            or type(run.get("run_attempt")) is not int or run["run_attempt"] != 1
+            or run.get("head_sha") != expected.executing_source_sha
+            or run.get("head_branch") != expected.workflow_execution_ref.removeprefix("refs/heads/")):
+        raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_CONTROLLER_DISPATCH_MISMATCH")
+
+
 def validate_worker_dispatch_job(job: Mapping[str, object], *, run_id: int,
                                  run_attempt: int, source_sha: str) -> None:
     from .github_actions_identity_v3 import GitHubActionsIdentityV3Error

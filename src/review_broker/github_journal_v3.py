@@ -39,7 +39,7 @@ class GitHubJournalV3:
                  admission_authority: AdmissionAuthorityV3,
                  mutation_authority: MutationAuthorityV3,
                  rejection_authority: RejectionAuthorityV3,
-                 predecessor_authority: PredecessorAuthorityV3):
+                 predecessor_authority: PredecessorAuthorityV3, *, operation_guard=None):
         if not repository or not repository_node_id or len(base_sha) != 40:
             raise ValueError("V3_JOURNAL_IDENTITY_INVALID")
         self.repository = repository
@@ -50,6 +50,7 @@ class GitHubJournalV3:
         self.mutation_authority = mutation_authority
         self.rejection_authority = rejection_authority
         self.predecessor_authority = predecessor_authority
+        self.operation_guard = operation_guard
 
     @staticmethod
     def _is_sha(value: str) -> bool:
@@ -104,6 +105,7 @@ class GitHubJournalV3:
             raise GitHubJournalV3Error("ADMISSION_REQUEST_ID_MISMATCH")
         record = initial_record(request_id, admission)
         claim_ref = self.claim_ref(request_id)
+        if self.operation_guard is not None:self.operation_guard(None,claim_ref)
         intended_sha = self.transport.create_journal_commit(
             self.base_sha, encode_journal_v2(record)
         )
@@ -190,6 +192,7 @@ class GitHubJournalV3:
             encoded = encode_journal_v2(successor)
         except JournalRecordV3Error as exc:
             raise GitHubJournalV3Error(str(exc)) from exc
+        if self.operation_guard is not None:self.operation_guard(current,current.claim_ref)
         if before_effect is not None: before_effect()
         successor_sha = self.transport.create_journal_commit(current.commit_sha, encoded)
         pending = PendingWriteV3(

@@ -98,11 +98,16 @@ class PreModelPacketContinuationV3:
                  policy_source_authority: PolicySourceAuthorityV3,
                  policy_selection_authority: PolicySelectionAuthorityV3,
                  packet_stages: PacketContinuationStagesV3,
-                 failure_evidence: PreModelFailureEvidenceV3 | None = None):
+                 failure_evidence: PreModelFailureEvidenceV3 | None = None,
+                 original_admission_loader=None):
         if current_worker_authority.journal is not journal:
             raise ValueError("CONTINUATION_AUTHORITY_JOURNAL_MISMATCH")
         self.journal, self.authority = journal, current_worker_authority
         self.admission, self.capture_provider = original_admission, capture_provider
+        from .original_admission_envelope_v3 import OriginalAdmissionEnvelopeV3
+        if type(original_admission) is OriginalAdmissionEnvelopeV3 and not callable(original_admission_loader):
+            raise ValueError("ORIGINAL_ADMISSION_HYDRATOR_REQUIRED")
+        self.original_admission_loader = original_admission_loader
         self.reference_readers = reference_readers
         self.source_authority, self.selection_authority = (
             policy_source_authority, policy_selection_authority)
@@ -113,6 +118,14 @@ class PreModelPacketContinuationV3:
             raise ValueError("CLOSED_FAILURE_EVIDENCE_BOUNDARY_REQUIRED")
         self.failure_evidence = failure_evidence
         self._decision, self._decision_issue_gate, self._decision_admitted_outcome = None, None, None
+
+    def require_original_selection(self, selection_context):
+        """A policy producer cannot recreate selection permission from an ADMITTED read."""
+        if self._decision is None:
+            raise ValueError('ORIGINAL_POLICY_SELECTION_DECISION_REQUIRED')
+        self._decision.require_active(self)
+        if self._decision.snapshot.commit_sha != selection_context.admitted_commit_sha:
+            raise ValueError('ORIGINAL_POLICY_SELECTION_CONTEXT_MISMATCH')
 
     def claim_remote_continuation(self, context, handoff, *, remote_owner=None):
         """Consume this original process's completed handoff, never an ADMITTED read."""
@@ -183,6 +196,14 @@ class PreModelPacketContinuationV3:
                 collector = PreModelFailureCollectorV3(decision=decision, owner=self,
                     evidence=self.failure_evidence, before_effect=before_effect)
             before_effect()
+            if self.original_admission_loader is not None:
+                hydrated = self.original_admission_loader(after, before_effect, failure_observer=collector)
+                if (type(hydrated) is not PreclaimAdmissionV3
+                        or hydrated.journal_admission() != admission.journal_admission()
+                        or hydrated.origin_body_bytes != admission.origin_body_bytes):
+                    raise ValueError("ORIGINAL_ADMISSION_HYDRATION_MISMATCH")
+                admission = self.admission = hydrated
+                before_effect()
             capture = (self.capture_provider.capture(admission, before_effect) if collector is None
                        else self.capture_provider.capture(admission, before_effect, failure_observer=collector))
             before_effect()

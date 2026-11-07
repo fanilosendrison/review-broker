@@ -263,8 +263,13 @@ class GitHubActionsIdentityReaderV3(GitHubActionsJobsReaderV3):
         elif pr_head is not None or merge_sha is not None:
             raise GitHubActionsIdentityV3Error("GITHUB_ACTIONS_EVENT_CONTEXT_INVALID")
         if expected.event_name == "workflow_dispatch":
-            from .github_actions_workflow_dispatch_v3 import validate_worker_dispatch_run
-            validate_worker_dispatch_run(run, expected)
+            from .github_actions_workflow_dispatch_v3 import (
+                validate_worker_dispatch_run, validate_controller_dispatch_run,
+            )
+            if expected.job_key == "controller":
+                validate_controller_dispatch_run(run, expected)
+            else:
+                validate_worker_dispatch_run(run, expected)
         jobs = self._jobs(run_id, run_attempt)
         matches = [job for job in jobs if job.get("name") == expected.job_name]
         if len(matches) != 1:
