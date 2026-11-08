@@ -1,0 +1,5 @@
+Review Broker v3 terminal bounded live PREPARED qualification fixture.
+schema=1
+purpose=pre-model-only
+specimen=terminal-live-prepared
+model-invocation=forbidden
