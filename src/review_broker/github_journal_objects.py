@@ -10,7 +10,7 @@ from typing import Any, Callable
 from .github_journal_http import JournalReadUnknown
 from .github_contents import decode_github_contents_base64
 from .git_blob_identity import blob_identity
-from .github_journal_identity import blob_sizes, git_object_identity, git_object_sha, object_links, object_roles, verify_tree_paths
+from .github_journal_identity import blob_sizes, git_object_facts, git_object_sha, object_links, object_roles, verify_tree_paths
 from .identity import canonical_bytes
 from .queue import AttemptRecord
 
@@ -67,7 +67,7 @@ def _create_object(
             roles = object_roles([(payload['tree'], 'tree'), *[(p, 'commit') for p in payload['parents']]], roles)
         result = api('POST', f'repos/{repository}/git/{resource}', payload)
         value = json.loads(result.stdout)
-        sha, roles, sizes, links = git_object_identity(value, repository, resource,
+        sha, roles, sizes, links = git_object_facts(value, repository, resource,
             known_roles=roles, known_sizes=sizes, known_links=links)
         if resource == 'blobs':
             if sha != expected_blob:
@@ -100,7 +100,7 @@ def state_commit(
     result = api('GET', f'repos/{repository}/git/commits/{parent_sha}')
     try:
         parent = json.loads(result.stdout)
-        observed_parent, roles, sizes, links = git_object_identity(parent, repository, 'commits')
+        observed_parent, roles, sizes, links = git_object_facts(parent, repository, 'commits')
         if observed_parent != parent_sha:
             raise ValueError
         parent_tree = git_object_sha(parent['tree'], repository, 'trees')

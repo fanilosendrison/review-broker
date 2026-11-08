@@ -87,6 +87,17 @@ def git_object_identity(
     value: object, repository: str, resource: str, *, known_roles: Mapping[str, str] | None = None,
     known_sizes: Mapping[str, int] | None = None,
     known_links: Mapping[str, frozenset[str]] | None = None,
+) -> tuple[str, dict[str, str], dict[str, int]]:
+    """Preserve the established identity/role/size projection for read callers."""
+    sha, roles, sizes, _ = git_object_facts(value, repository, resource,
+        known_roles=known_roles, known_sizes=known_sizes, known_links=known_links)
+    return sha, roles, sizes
+
+
+def git_object_facts(
+    value: object, repository: str, resource: str, *, known_roles: Mapping[str, str] | None = None,
+    known_sizes: Mapping[str, int] | None = None,
+    known_links: Mapping[str, frozenset[str]] | None = None,
 ) -> tuple[str, dict[str, str], dict[str, int], dict[str, frozenset[str]]]:
     roles = object_roles([], known_roles)
     sizes = blob_sizes([], known_sizes)
