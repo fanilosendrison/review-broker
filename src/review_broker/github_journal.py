@@ -14,9 +14,8 @@ from .artifact_locator import (
 )
 from .identity import attempt_identity, canonical_bytes
 from .github_journal_http import GitHubJournalResponse, JournalReadUnknown, journal_request
-from .github_journal_read import (
-    JournalObservation, JournalReadKind, commit_sha, observe_journal, ref_commit_sha,
-)
+from .github_journal_identity import git_object_sha, ref_commit_sha
+from .github_journal_read import JournalObservation, JournalReadKind, observe_journal
 from .publication import validate_publication_intent, validate_publication_receipt
 from .queue import (
     AttemptRecord,
@@ -336,10 +335,10 @@ class GitHubRefJournal:
     def _state_commit(self, parent_sha: str, record: AttemptRecord) -> str:
         parent = json.loads(self._api("GET", f"repos/{self.repository}/git/commits/{parent_sha}").stdout)
         try:
-            if parent["sha"] != parent_sha:
+            if git_object_sha(parent, self.repository, "commits") != parent_sha:
                 raise ValueError
-            parent_tree = commit_sha(parent["tree"]["sha"])
-        except (KeyError, TypeError, ValueError):
+            parent_tree = git_object_sha(parent["tree"], self.repository, "trees")
+        except (KeyError, TypeError, ValueError, RecursionError):
             raise JournalReadUnknown("JOURNAL_PARENT_TREE_UNKNOWN") from None
         encoded = base64.b64encode(canonical_bytes(record.as_dict()) + b"\n").decode("ascii")
         blob = self._create_object("blobs", {"content": encoded, "encoding": "base64"})
@@ -355,8 +354,15 @@ class GitHubRefJournal:
     def _create_object(self, resource: str, payload: dict[str, Any]) -> str:
         result = self._api("POST", f"repos/{self.repository}/git/{resource}", payload)
         try:
-            return commit_sha(json.loads(result.stdout)["sha"])
-        except (KeyError, TypeError, ValueError):
+            value = json.loads(result.stdout)
+            sha = git_object_sha(value, self.repository, resource)
+            if resource == "commits":
+                if "tree" in value and git_object_sha(value["tree"], self.repository, "trees") != payload["tree"]:
+                    raise ValueError
+                if "parents" in value and [git_object_sha(p, self.repository, "commits") for p in value["parents"]] != payload["parents"]:
+                    raise ValueError
+            return sha
+        except (KeyError, TypeError, ValueError, RecursionError):
             raise JournalReadUnknown("JOURNAL_OBJECT_RESPONSE_UNKNOWN") from None
 
     def _ref_sha(self, ref: str) -> str:

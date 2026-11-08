@@ -4,10 +4,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 import json
-import re
 from typing import Callable
 
-from .github_contents import decode_github_contents_base64
+from .github_journal_identity import commit_sha, contents_bytes, ref_commit_sha
 from .github_journal_http import GitHubJournalResponse, JournalReadUnknown
 from .identity import attempt_identity, canonical_bytes
 from .queue import AttemptRecord, StateTransitionError
@@ -24,28 +23,6 @@ class JournalObservation:
     kind: JournalReadKind
     snapshot: tuple[str, AttemptRecord] | None = None
     reason: str = ''
-
-
-def commit_sha(value: object) -> str:
-    if not isinstance(value, str) or re.fullmatch('[0-9a-f]{40}', value) is None:
-        raise ValueError
-    return value
-
-
-def ref_commit_sha(
-    value: object, repository: str, ref: str, *, require_url: bool = True,
-) -> str:
-    if not isinstance(value, dict):
-        raise ValueError
-    if value['ref'] != ref or value['object']['type'] != 'commit':
-        raise ValueError
-    if (require_url or 'url' in value) and value.get('url') != f'https://api.github.com/repos/{repository}/git/{ref}':
-        raise ValueError
-    sha = commit_sha(value['object']['sha'])
-    target = value['object']
-    if 'url' in target and target['url'] != f'https://api.github.com/repos/{repository}/git/commits/{sha}':
-        raise ValueError
-    return sha
 
 
 def verified_absence(repository: str, base_branch: str, request: Callable[..., GitHubJournalResponse]) -> bool:
@@ -104,11 +81,9 @@ def observe_journal(
         sha = ref_commit_sha(ref.value, repository, claim_ref)
         reason = 'JOURNAL_CONTENT_RESPONSE_INVALID'
         content = request('GET', f'repos/{repository}/contents/{state_path}?ref={sha}')
-        value = content.value
-        if (content.status != 200 or value['path'] != state_path or value['type'] != 'file'
-                or value['encoding'] != 'base64' or not isinstance(value['content'], str)):
+        if content.status != 200:
             raise ValueError
-        raw = decode_github_contents_base64(value['content'])
+        raw = contents_bytes(content.value, repository, state_path, sha)
         decoded = json.loads(raw.decode('utf-8'))
         if not isinstance(decoded, dict) or raw != canonical_bytes(decoded) + b'\n':
             raise ValueError
