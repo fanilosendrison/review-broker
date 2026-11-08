@@ -1,0 +1,5 @@
+Review Broker v3 independent bounded live PREPARED qualification fixture.
+schema=1
+purpose=pre-model-only
+specimen=independent-live-prepared
+model-invocation=forbidden
