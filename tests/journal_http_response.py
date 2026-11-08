@@ -22,6 +22,7 @@ def scoped_response(command, value, code=0):
         value = dict(value)
         value.setdefault('path', '.review-broker/attempt.json')
         value.setdefault('type', 'file')
+        value.setdefault('url', 'https://api.github.com/' + endpoint)
     if isinstance(value, dict) and command[3] == 'GET' and '/git/commits/' in endpoint:
         value = dict(value)
         value.setdefault('sha', endpoint.rsplit('/', 1)[-1])

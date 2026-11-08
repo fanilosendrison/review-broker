@@ -109,6 +109,7 @@ class UnknownReadTests(unittest.TestCase):
                         return subprocess.CompletedProcess(command, 0, 'HTTP/2.0 200 OK\n\n' + nested, '')
                     if boundary == 'content' and '/contents/' in command[4]:
                         return http_response(command, {'encoding': 'base64', 'type': 'file',
+                            'url': 'https://api.github.com/' + command[4],
                             'path': '.review-broker/attempt.json',
                             'content': base64.b64encode(nested.encode()).decode()})
                 self.transport.fault = fault
@@ -119,6 +120,7 @@ class UnknownReadTests(unittest.TestCase):
         import base64
         from review_broker.identity import canonical_bytes
         valid = dict(encoding='base64', type='file', path='.review-broker/attempt.json',
+                     url='https://api.github.com/repos/sample/repo/contents/.review-broker/attempt.json?ref=' + self.parent,
                      content=base64.b64encode(canonical_bytes(self.original.as_dict()) + b'\n').decode())
         cases = [dict(valid, path='other.json'), dict(valid, type='symlink'),
                  {k: v for k, v in valid.items() if k != 'path'},
