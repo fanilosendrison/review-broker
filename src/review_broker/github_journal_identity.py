@@ -8,6 +8,28 @@ from .github_contents import decode_github_contents_base64
 from .git_blob_identity import blob_identity, sha1_oid as commit_sha
 
 
+_GIT_RESOURCES = {'blob': 'blobs', 'tree': 'trees', 'commit': 'commits'}
+_GIT_KINDS = {resource: kind for kind, resource in _GIT_RESOURCES.items()}
+
+
+def _add_object_role(roles: dict[str, str], sha: str, kind: str) -> None:
+    commit_sha(sha)
+    if kind not in _GIT_RESOURCES or (sha in roles and roles[sha] != kind):
+        raise ValueError
+    roles[sha] = kind
+
+
+def object_roles(
+    assertions: Iterable[tuple[str, str]], known: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    roles: dict[str, str] = {}
+    for sha, kind in (known or {}).items():
+        _add_object_role(roles, sha, kind)
+    for sha, kind in assertions:
+        _add_object_role(roles, sha, kind)
+    return roles
+
+
 def verify_object_links(sha: str, linked: Iterable[str]) -> None:
     if any(sha == target for target in linked):
         raise ValueError  # A Git object cannot be its own ancestor/child.
@@ -24,15 +46,18 @@ def verify_tree_paths(paths: Mapping[str, str]) -> None:
                 raise ValueError
 
 
-def git_object_sha(value: object, repository: str, resource: str) -> str:
-    """Validate an object identity and any supplied repository-scoped link.
+def git_object_sha(
+    value: object, repository: str, resource: str, *, known_roles: Mapping[str, str] | None = None,
+) -> str:
+    """Validate one response's root/child roles and its repository-scoped links."""
+    return _git_object_sha(value, repository, resource, object_roles([], known_roles))
 
-    A response's optional URL cannot contradict its request context. This is
-    GitHub endpoint validation, not independent reconstruction of remote Git.
-    """
+
+def _git_object_sha(value: object, repository: str, resource: str, roles: dict[str, str]) -> str:
     if not isinstance(value, dict):
         raise ValueError
     sha = commit_sha(value['sha'])
+    _add_object_role(roles, sha, _GIT_KINDS[resource])
     if 'url' in value and value['url'] != f'https://api.github.com/repos/{repository}/git/{resource}/{sha}':
         raise ValueError
     if resource == 'trees':
@@ -42,7 +67,6 @@ def git_object_sha(value: object, repository: str, resource: str) -> str:
             if not isinstance(value['tree'], list):
                 raise ValueError
             paths = {}
-            kinds = {'blob': 'blobs', 'tree': 'trees', 'commit': 'commits'}
             modes = {'blob': {'100644', '100755', '120000'}, 'tree': {'040000'}, 'commit': {'160000'}}
             for entry in value['tree']:
                 if (not isinstance(entry, dict) or not isinstance(entry['path'], str)
@@ -53,19 +77,19 @@ def git_object_sha(value: object, repository: str, resource: str) -> str:
                     raise ValueError
                 if entry['mode'] not in modes[entry['type']]:
                     raise ValueError
-                verify_object_links(sha, [git_object_sha(entry, repository, kinds[entry['type']])])
+                verify_object_links(sha, [_git_object_sha(entry, repository, _GIT_RESOURCES[entry['type']], roles)])
             verify_tree_paths(paths)
     if resource == 'commits':
         if 'html_url' in value and value['html_url'] != f'https://github.com/{repository}/commit/{sha}':
             raise ValueError
         linked = []
         if 'tree' in value:
-            linked.append(git_object_sha(value['tree'], repository, 'trees'))
+            linked.append(_git_object_sha(value['tree'], repository, 'trees', roles))
         if 'parents' in value:
             if not isinstance(value['parents'], list):
                 raise ValueError
             for parent in value['parents']:
-                linked.append(git_object_sha(parent, repository, 'commits'))
+                linked.append(_git_object_sha(parent, repository, 'commits', roles))
         verify_object_links(sha, linked)
     return sha
 
@@ -145,8 +169,10 @@ def contents_bytes(value: object, repository: str, state_path: str, sha: str) ->
     if 'html_url' in value and value['html_url'] != html_url:
         raise ValueError
     blob = commit_sha(value['sha']) if 'sha' in value else None
-    if blob is not None and blob_identity(raw) != blob:
-        raise ValueError
+    if blob is not None:
+        if blob_identity(raw) != blob:
+            raise ValueError
+        object_roles([(sha, 'commit'), (blob, 'blob')])
     git_url = f'https://api.github.com/repos/{repository}/git/blobs/{blob}' if blob is not None else None
     if 'git_url' in value and (git_url is None or value['git_url'] != git_url):
         raise ValueError

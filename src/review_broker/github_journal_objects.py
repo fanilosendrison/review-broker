@@ -10,7 +10,7 @@ from typing import Any, Callable
 from .github_journal_http import JournalReadUnknown
 from .github_contents import decode_github_contents_base64
 from .git_blob_identity import blob_identity
-from .github_journal_identity import git_object_sha, verify_object_links, verify_tree_paths
+from .github_journal_identity import git_object_sha, object_roles, verify_object_links, verify_tree_paths
 from .identity import canonical_bytes
 from .queue import AttemptRecord
 
@@ -19,19 +19,11 @@ Api = Callable[..., subprocess.CompletedProcess[str]]
 
 
 def _verify_tree_bindings(
-    value: dict[str, Any], payload: dict[str, Any], sizes: dict[str, int], known_types: dict[str, str],
+    value: dict[str, Any], payload: dict[str, Any], sizes: dict[str, int],
 ) -> None:
     if 'tree' not in value:
         return
     returned = {entry['path']: entry for entry in value['tree']}
-    types = dict(known_types)
-    for expected in payload['tree']:
-        if expected['sha'] in types and types[expected['sha']] != expected['type']:
-            raise ValueError
-        types[expected['sha']] = expected['type']
-    for entry in returned.values():
-        if entry['sha'] in types and entry['type'] != types[entry['sha']]:
-            raise ValueError
     described = {path: entry['type'] for path, entry in returned.items()}
     described.update({entry['path']: entry['type'] for entry in payload['tree']})
     verify_tree_paths(described)
@@ -59,6 +51,7 @@ def _create_object(
     known_object_types: dict[str, str] | None = None,
 ) -> str:
     try:
+        roles = object_roles([], known_object_types)
         expected_blob = None
         raw = b''
         if resource == 'blobs':
@@ -66,9 +59,14 @@ def _create_object(
                 raise ValueError
             raw = decode_github_contents_base64(payload['content'])
             expected_blob = blob_identity(raw)
+            roles = object_roles([(expected_blob, 'blob')], roles)
+        elif resource == 'trees':
+            roles = object_roles([(entry['sha'], entry['type']) for entry in payload['tree']], roles)
+        elif resource == 'commits':
+            roles = object_roles([(payload['tree'], 'tree'), *[(p, 'commit') for p in payload['parents']]], roles)
         result = api('POST', f'repos/{repository}/git/{resource}', payload)
         value = json.loads(result.stdout)
-        sha = git_object_sha(value, repository, resource)
+        sha = git_object_sha(value, repository, resource, known_roles=roles)
         if resource == 'blobs':
             if sha != expected_blob:
                 raise ValueError
@@ -79,8 +77,7 @@ def _create_object(
                         or decode_github_contents_base64(value['content']) != raw):
                     raise ValueError
         if resource == 'trees':
-            verify_object_links(sha, known_blob_sizes or {})
-            _verify_tree_bindings(value, payload, known_blob_sizes or {}, known_object_types or {})
+            _verify_tree_bindings(value, payload, known_blob_sizes or {})
         if resource == 'commits':
             verify_object_links(sha, [payload['tree'], *payload['parents']])
             if 'message' in value and value['message'] not in (payload['message'], payload['message'] + '\n'):
@@ -109,13 +106,16 @@ def state_commit(
         raise JournalReadUnknown('JOURNAL_PARENT_TREE_UNKNOWN') from None
     raw = canonical_bytes(record.as_dict()) + b'\n'
     encoded = base64.b64encode(raw).decode('ascii')
-    blob = _create_object(api, repository, 'blobs', {'content': encoded, 'encoding': 'base64'})
+    roles = object_roles([(parent_sha, 'commit'), (parent_tree, 'tree')])
+    blob = _create_object(api, repository, 'blobs', {'content': encoded, 'encoding': 'base64'}, known_object_types=roles)
+    roles = object_roles([(blob, 'blob')], roles)
     tree = _create_object(api, repository, 'trees', {
         'base_tree': parent_tree,
         'tree': [{'path': state_path, 'mode': '100644', 'type': 'blob', 'sha': blob}],
     }, known_blob_sizes={blob: len(raw)},
-        known_object_types={parent_sha: 'commit', parent_tree: 'tree', blob: 'blob'})
+        known_object_types=roles)
+    roles = object_roles([(tree, 'tree')], roles)
     return _create_object(api, repository, 'commits', {
         'message': f'state: {record.state.value} {record.attempt_id}\n\ntransaction: {secrets.token_hex(32)}',
         'tree': tree, 'parents': [parent_sha],
-    })
+    }, known_object_types=roles)
