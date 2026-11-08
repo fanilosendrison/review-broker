@@ -21,6 +21,7 @@ from review_broker.queue import (
 )
 from review_broker.recovery import RecoveryAction, decide_recovery
 from tests.journal_git_transport import JournalGitTransport
+from tests.journal_http_transport import scoped_response
 
 REQUEST_ID = "request:sha256:" + "a" * 64
 COMMIT = "1" * 40
@@ -346,14 +347,10 @@ class LegacySchemaTests(unittest.TestCase):
                     self.assertEqual(command[3], "GET", "refused journal must not be written")
                     endpoint = command[4]
                     if "/git/refs/heads/review-claims/" in endpoint:
-                        return subprocess.CompletedProcess(
-                            command, 0, json.dumps({"object": {"sha": COMMIT}}), ""
-                        )
+                        return scoped_response(command, {"object": {"sha": COMMIT}})
                     if endpoint.endswith("?ref=" + COMMIT):
                         encoded = base64.b64encode(canonical_bytes(item) + b"\n").decode("ascii")
-                        return subprocess.CompletedProcess(
-                            command, 0, json.dumps({"content": encoded, "encoding": "base64"}), ""
-                        )
+                        return scoped_response(command, {"content": encoded, "encoding": "base64"})
                     self.fail("Unexpected journal endpoint: " + endpoint)
                 journal = GitHubRefJournal("sample/repo", runner=runner)
                 with self.subTest(schema=item["schema_version"], operation=name):
@@ -371,10 +368,10 @@ class LegacySchemaTests(unittest.TestCase):
             calls.append(tuple(command))
             self.assertEqual(command[3], "GET")
             if "/git/refs/heads/review-claims/" in command[4]:
-                return subprocess.CompletedProcess(command, 0, json.dumps({"object": {"sha": COMMIT}}), "")
+                return scoped_response(command, {"object": {"sha": COMMIT}})
             if command[4].endswith("?ref=" + COMMIT):
                 encoded = base64.b64encode(canonical_bytes(item) + b"\n").decode("ascii")
-                return subprocess.CompletedProcess(command, 0, json.dumps({"content": encoded, "encoding": "base64"}), "")
+                return scoped_response(command, {"content": encoded, "encoding": "base64"})
             self.fail(command[4])
         journal = GitHubRefJournal("sample/repo", runner=runner)
         observed_sha, value = journal.get_snapshot(REQUEST_ID)
