@@ -46,7 +46,7 @@ class RemoteRetainedPacketAuthorityV3:
     def permits(self, *, snapshot, packet_evidence_id, reservation_id, generation, worker):
         self.decision.enter_once(self.owner, "PREPARED", self, self.receipt.evidence_id)
         v = self.verification
-        v.before_effect()
+        v.require_current_effect()
         if (snapshot != v.snapshot or type(generation) is not int or generation != 1
                 or reservation_id != snapshot.record.control.reservation_id
                 or worker != snapshot.record.control.worker
@@ -57,7 +57,7 @@ class RemoteRetainedPacketAuthorityV3:
         inventory = retained_inventory_v3(self.root, before_effect=v.before_effect)
         offline = offline_packet_receipt_v3(snapshot, manifest, inventory_identity_v3(inventory))
         self.receipt.require_links(offline, v.expected, self.job_id, snapshot.claim_ref)
-        v.before_effect()
+        v.require_current_effect()
         return True
 
 
@@ -113,10 +113,10 @@ class PreModelRemoteRetentionV3:
                         a.repository_node_id, a.claim_ref, a.parent_sha, a.commit_sha, False),
                         a.writer_evidence_id) is not True):
                 raise ValueError("RWP03_HANDOFF_NOT_ATTRIBUTED")
-            def guard():
+            def decision_guard():
                 if selected_operation is None: decision.require_active(self)
                 else: decision.require_selected(self, "PREPARED", selected_operation)
-                self.producer.authority.require_current(context, a, AttemptState.ADMITTED)
+            guard = self.producer.authority.phase_guard(context, a, AttemptState.ADMITTED, decision_guard)
             v = AuthorizedPolicyVerificationV3(journal, a, v.expected,
                                                v.source_authority, v.selection_authority, guard)
             root = packet_retention_locator_v3(self.base, a.claim_ref)
@@ -130,7 +130,7 @@ class PreModelRemoteRetentionV3:
             adapter = self.adapter
             if self.failure_evidence is not None:
                 collector = PreModelFailureCollectorV3(decision=decision, owner=self,
-                    evidence=self.failure_evidence, before_effect=v.before_effect,
+                    evidence=self.failure_evidence, before_effect=v.require_current_effect,
                     original_packet_id=handoff.packet_id, budget=adapter.budget)
                 adapter = collector.bind_artifact_adapter(adapter)
             inventory = retained_inventory_v3(root, before_effect=v.before_effect)
@@ -138,17 +138,20 @@ class PreModelRemoteRetentionV3:
             archive = archive_packet_v3(root, inventory, adapter.budget, v.before_effect)
             plan = PreparedUploadPlanV3(prepared_artifact_name_v3(
                 a.claim_ref, a.record.control.worker.run_id, 1), canonical_bytes(inventory) + b"\n", context)
-            v.before_effect()
+            v.require_current_effect()
             effect_started = True
-            upload = (self.uploader.upload_once(plan, archive, before_effect=v.before_effect) if collector is None
-                      else self.uploader.upload_once(plan, archive, before_effect=v.before_effect, failure_observer=collector))
+            upload = (self.uploader.upload_once(plan, archive, before_effect=v.require_current_effect) if collector is None
+                      else self.uploader.upload_once(plan, archive, before_effect=v.require_current_effect, failure_observer=collector))
+            v.require_current_effect()
             if upload.status is UploadStatusV3.REFUSED:
                 return RemoteRetentionResultV3(OutcomeStatusV3.REJECTED, "ADMITTED",
                                                "UNAVAILABLE", "UPLOAD_ESTABLISHED_REFUSAL")
             # A lost ACK permits only bounded observation, never a second upload.
-            storage = adapter.observe(a, v.before_effect, active_context=context)
+            storage = adapter.observe(a, v.require_current_effect, active_context=context)
+            v.require_current_effect()
             if collector is not None: collector.established_artifact(storage)
-            raw = adapter.download(storage, v.before_effect)
+            raw = adapter.download(storage, v.require_current_effect)
+            v.require_current_effect()
             extraction = {} if collector is None else {"failure_observer": collector}
             extract_prepared_packet_v3(raw, self.remote_root, adapter.budget,
                                        v.before_effect, expected_inventory=inventory, **extraction)
@@ -167,14 +170,14 @@ class PreModelRemoteRetentionV3:
             authority = RemoteRetainedPacketAuthorityV3(
                 verification=v, remote_root=self.remote_root, receipt=receipt, job_id=job_id,
                 decision=decision, owner=self)
-            v.before_effect()
+            v.require_current_effect()
             decision.choose(self, "PREPARED", authority, receipt.evidence_id)
             selected_operation = authority
             writer = copy.copy(journal)
-            writer.transport = _GuardedPreparedWriter(journal.transport, v.before_effect, capture_unknown_updates=True)
+            writer.transport = _GuardedPreparedWriter(journal.transport, v.require_current_effect, capture_unknown_updates=True)
             outcome = writer.prepare(a, receipt.evidence_id, a.record.control.reservation_id,
                                      1, a.record.control.worker, authority,
-                                     before_effect=v.before_effect)
+                                     before_effect=v.require_current_effect)
             if outcome.status is not OutcomeStatusV3.COMMITTED:
                 return RemoteRetentionResultV3(outcome.status, "UNCONFIRMED", "VERIFIED",
                     "PREPARED_CAS_NOT_ATTRIBUTED_NO_RETRY", outcome, receipt, raw)

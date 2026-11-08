@@ -125,6 +125,8 @@ class GitHubActionsDispatchAcknowledgmentAuthorityV3:
         return None
 
     def _reconstruct(self,receipt,*,require_success):
+        diagnostics=getattr(self.api,'diagnostics',None)
+        if diagnostics is not None:diagnostics.count('ACK_RECONSTRUCTION_COUNT')
         runs=self.api.metadata.listing('/actions/workflows/v3-pre-model-controller.yml/runs',
             {'event':'workflow_dispatch','head_sha':self.expected.executing_source_sha},
             'workflow_runs',self.api.guard)

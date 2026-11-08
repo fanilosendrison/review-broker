@@ -58,12 +58,14 @@ def run_v3_command(args,source_token):
                 'provider_observation':None if not observations else observations[0].as_dict()}).decode())
             return 0 if result.status.value=='DISPATCH_ACKNOWLEDGED' else 1
         from .live_pre_model_worker_v3 import worker_observer_v3,run_live_worker_v3
+        runtime.diagnostics.sink = lambda value: print(canonical_bytes({'pre_model_diagnostics':value}).decode())
         from .pre_model_ack_start_gate_v3 import wait_dispatch_ack_v3
         context=runtime.worker_context()
         if args.command=='internal-v3-wait-dispatch-ack':
             if source_token is not None:raise ValueError('ACK_GATE_SOURCE_CREDENTIAL_FORBIDDEN')
             journal,dispatch=worker_observer_v3(runtime)
-            result=wait_dispatch_ack_v3(journal=journal,runtime=runtime,inputs=context.inputs,dispatch_authority=dispatch)
+            with runtime.diagnostics.phase('ACK_GATE'):
+                result=wait_dispatch_ack_v3(journal=journal,runtime=runtime,inputs=context.inputs,dispatch_authority=dispatch)
             if result.accepted:
                 original=journal.read(args.request_id).record.attempt.admission
                 body=journal.admission_authority.origin(original)

@@ -11,6 +11,7 @@ import stat
 import subprocess
 import tempfile
 from threading import Lock
+from .pre_model_observation_diagnostics_v3 import measured_phase_v3
 import time
 from typing import Callable, Mapping
 
@@ -173,6 +174,7 @@ class GitHubActionsArtifactChildV3:
         before_effect()  # No ACK (or UNKNOWN) overrides moved authority.
         return PreparedUploadResultV3(result)
 
+    @measured_phase_v3('ARTIFACT_UPLOAD')
     def upload_once(self, plan: PreparedUploadPlanV3, archive: bytes, *, before_effect):
         if type(plan) is not PreparedUploadPlanV3 or plan.retention_days != 30:
             raise ValueError("ARTIFACT_PREPARED_PLAN_INVALID")

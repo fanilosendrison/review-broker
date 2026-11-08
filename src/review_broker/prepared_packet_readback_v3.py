@@ -76,7 +76,7 @@ def readback_prepared_packet_v3(*, journal, request_id: str, adapter,
     try:
         storage = adapter.observe(history.admitted, history.verify)
         raw = adapter.download(storage, history.verify)
-        extract_prepared_packet_v3(raw, destination, adapter.budget, history.verify)
+        extract_prepared_packet_v3(raw, destination, adapter.budget, history.require_local_integrity)
         reconstruction = reconstruct_prepared_packet_v3(destination, history=history,
             source_authority=source_authority, selection_authority=selection_authority,
             authenticated_storage=storage)

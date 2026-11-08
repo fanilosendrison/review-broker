@@ -18,6 +18,7 @@ from .github_http_live_v3 import urllib_executor
 from .github_live_runtime_v3 import REPOSITORY, REPOSITORY_ID
 from .packet_retention_v3 import restore_preclaim_bytes_v3
 from .request_v3 import parse_issue_envelope_v3
+from .pre_model_observation_diagnostics_v3 import measured_phase_v3
 
 SOURCE_PERMISSIONS=frozenset({'contents:read','pull_requests:read','metadata:read','issues:read'})
 
@@ -143,6 +144,7 @@ class LiveSourceSessionV3:
             return observation.original_bytes
         return restore_preclaim_bytes_v3(value,self.origin_body,read)
 
+    @measured_phase_v3('SOURCE_B_CAPTURE')
     def capture(self,admission,before_effect,*,failure_observer=None):
         self.require_original_scope(admission.journal_admission())
         reader,capture=self.capture_request(admission.request,before_effect,failure_observer=failure_observer,

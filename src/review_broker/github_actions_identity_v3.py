@@ -179,6 +179,8 @@ class GitHubActionsIdentityReaderV3(GitHubActionsJobsReaderV3):
     def observe(self, claim: GitHubActionsRuntimeClaimV3,
                 expected: GitHubActionsExpectationV3,
                 boundary: TrustedExecutionBoundaryV3) -> GitHubActionsRunObservationV3:
+        diagnostics = getattr(self, 'diagnostics', None)
+        if diagnostics is not None: diagnostics.count('WORKER_IDENTITY_COUNT')
         try:
             boundary_verdict = boundary.authenticates(claim)
         except Exception:

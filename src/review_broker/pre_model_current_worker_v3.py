@@ -43,10 +43,24 @@ class CurrentBoundWorkerAuthorityV3:
                  execution_boundary: WorkerExecutionBoundaryV3,
                  execution_boundary_id: str,
                  dispatch_authority: DispatchAcknowledgmentAuthorityV3,
-                 dispatch_principal_id: int):
+                 dispatch_principal_id: int, local_phases: bool = False):
         self.journal, self.reader, self.expected = journal, actions_reader, expected
         self.boundary, self.boundary_id = execution_boundary, execution_boundary_id
         self.dispatch_authority, self.principal = dispatch_authority, dispatch_principal_id
+        self._local_phases, self._local_phase, self._phase_issuing = local_phases, None, None
+
+    def phase_guard(self, context, snapshot, state, decision_guard):
+        if not self._local_phases:
+            def strict():
+                decision_guard()
+                self.require_current(context, snapshot, state)
+            return strict
+        from .worker_local_phase_v3 import issue_local_phase_v3
+        self._phase_issuing = context
+        try:
+            return issue_local_phase_v3(self, context, snapshot, state, decision_guard)
+        finally:
+            self._phase_issuing = None
 
     def authenticate_context(self, context: WorkerExecutionContextV3) -> None:
         if (not authenticate_worker_context(context, self.boundary, self.boundary_id)
@@ -58,6 +72,8 @@ class CurrentBoundWorkerAuthorityV3:
     def require_current(self, context: WorkerExecutionContextV3,
                         snapshot: VerifiedJournalSnapshotV3,
                         state: AttemptState) -> WorkerIdentityV3:
+        diagnostics = getattr(self.reader, 'diagnostics', None)
+        if diagnostics is not None: diagnostics.count('FULL_CURRENT_AUTH_COUNT')
         self.authenticate_context(context)
         if state not in {AttemptState.REQUESTED, AttemptState.ADMITTED}:
             raise ValueError("CURRENT_WORKER_BOUNDARY_NOT_QUALIFIED")

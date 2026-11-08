@@ -125,7 +125,10 @@ class GitHubActionsRuntimeBoundaryV3:
         self._worker_context = None
         self.path = CONTROLLER_PATH if role == "controller" else WORKER_PATH
         self.check_locals()
-        self.api = LiveGitHubApiV3(token, guard=self.check_locals, executor=executor)
+        from .pre_model_observation_diagnostics_v3 import PreModelObservationDiagnosticsV3
+        self.diagnostics = PreModelObservationDiagnosticsV3()
+        self.api = LiveGitHubApiV3(token, guard=self.check_locals, executor=self.diagnostics.wrap(executor))
+        self.api.diagnostics = self.diagnostics
         workflow = self.api.get("/actions/workflows/" + self.path.rsplit("/", 1)[-1])
         if workflow.get("path") != self.path or type(workflow.get("id")) is not int or workflow["id"] < 1:
             raise ValueError("LIVE_WORKFLOW_IDENTITY_INVALID")
@@ -138,6 +141,7 @@ class GitHubActionsRuntimeBoundaryV3:
             "workflow_dispatch", worker_dispatch=True)
         self.reader = GitHubActionsIdentityReaderV3(token, REPOSITORY, REPOSITORY_ID,
             executor=self.active_execute)
+        self.reader.diagnostics = self.diagnostics
         self.boundary_id = artifact_identity(canonical_bytes({"workflow": self.path,
             "ref": self.env["GITHUB_REF"], "sha": checkout.sha, "role": role}) + b"\n")
 

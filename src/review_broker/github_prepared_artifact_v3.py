@@ -7,6 +7,7 @@ from threading import Lock
 from typing import Protocol
 
 from .identity import canonical_bytes
+from .pre_model_observation_diagnostics_v3 import measured_phase_v3
 from .github_prepared_worker_history_v3 import GitHubPreparedWorkerHistoryV3
 from .prepared_artifact_transport_v3 import (
     BeforeEffectV3, PreparedArtifactBudgetV3, PreparedMetadataReaderV3, PreparedStorageExecutorV3,
@@ -80,11 +81,13 @@ class GitHubPreparedArtifactV3:
         self.storage_executor, self.budget, self.clock = storage_executor, budget, clock
         self.failure_observer = None
 
+    @measured_phase_v3('ARTIFACT_READBACK')
     def observe(self, admitted, before_effect: BeforeEffectV3, *, active_context=None):
         worker = self.worker_history.observe(admitted, before_effect, active_context=active_context)
         name = prepared_artifact_name_v3(admitted.claim_ref, worker.run_id, 1)
         return observe_named_artifact_v3(self, admitted, worker, name, before_effect)
 
+    @measured_phase_v3('ARTIFACT_READBACK')
     def download(self, storage: dict[str, object], before_effect: BeforeEffectV3) -> bytes:
         RemotePreparedReceiptV3(canonical_bytes({"schema_version": 1,
                 "evidence_type": "remote-v3-prepared-packet-binding",

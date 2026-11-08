@@ -13,6 +13,7 @@ from .github_journal_transport_v3 import GraphQLRefUpdateV3, JournalOutcomeV3, O
 from .github_journal_v3 import GitHubJournalV3
 from .journal_record_v3 import encode_journal_v2
 from .pre_model_control_v3 import register_worker
+from .pre_model_observation_diagnostics_v3 import measured_phase_v3
 from .pre_model_dispatch_ack_v3 import (
     DispatchAcknowledgmentAuthorityV3, acknowledgment_from_record,
 )
@@ -44,7 +45,9 @@ class PreModelWorkerV3:
         self.dispatch_principal_id = dispatch_principal_id
         self._lock = Lock()
         self._attempted = False
+        self.diagnostics = getattr(actions_reader, 'diagnostics', None)
 
+    @measured_phase_v3('WORKER_BINDING')
     def run(self, context: WorkerExecutionContextV3) -> WorkerResultV3:
         with self._lock:
             if self._attempted:

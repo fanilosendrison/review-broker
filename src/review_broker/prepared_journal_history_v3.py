@@ -1,7 +1,9 @@
 """Authenticated direct A/P history, reusing the journal's transition and authorities."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+
+from .identity import canonical_bytes
 
 from .github_journal_transport_v3 import (
     GraphQLRefUpdateV3, ReadStatusV3, TransportSnapshotV3, VerifiedJournalSnapshotV3,
@@ -63,9 +65,39 @@ class PreparedJournalHistoryV3:
     dispatch_principal_id: int
 
     def __post_init__(self) -> None:
-        self.verify()
+        self._authenticate()
+        object.__setattr__(self, '_sealed_basis', self._basis())
+        object.__setattr__(self, '_sealed_dependencies', self._dependencies())
+
+    def _dependencies(self):
+        j = self.journal
+        return (j, j.transport, j.admission_authority, j.predecessor_authority,
+                j.mutation_authority, self.dispatch_authority)
+
+    def _basis(self):
+        def snapshot(s):
+            return (s.repository, s.repository_node_id, s.claim_ref, s.commit_sha,
+                s.parent_sha, s.journal_bytes, encode_journal_v2(s.record), s.writer_evidence_id)
+        return (self.journal.repository, self.journal.repository_node_id, self.journal.base_sha,
+                snapshot(self.admitted), snapshot(self.prepared), self.remote_receipt_id,
+                canonical_bytes(asdict(self.expected)), self.dispatch_principal_id)
 
     def verify(self) -> None:
+        """Explicit trust revalidation, including revocable injected authorities."""
+        self.require_local_integrity()
+        self._authenticate()
+
+    def require_local_integrity(self) -> None:
+        """Pure byte integrity after authentication, never current effect authority.
+
+        Provider boundaries use verify(); local file/hash work may reuse the exact
+        authenticated historical binding without reconstructing it per byte operation.
+        """
+        if (self._basis() != self._sealed_basis or any(a is not b for a, b in
+                zip(self._dependencies(), self._sealed_dependencies))):
+            raise ValueError('HISTORICAL_AUTHENTICATED_BINDING_CHANGED')
+
+    def _authenticate(self) -> None:
         from .github_journal_v3 import GitHubJournalV3
         from .github_actions_identity_v3 import GitHubActionsExpectationV3
         if type(self.journal) is not GitHubJournalV3 or type(self.expected) is not GitHubActionsExpectationV3:

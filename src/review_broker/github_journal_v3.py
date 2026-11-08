@@ -13,6 +13,7 @@ from .github_journal_transport_v3 import (
     WorkerAuthorityV3,
 )
 from .identity import canonical_bytes, request_identity
+from .pre_model_observation_diagnostics_v3 import measured_phase_v3
 from .journal_record_v3 import (
     JournalRecordV3, JournalRecordV3Error, WorkerIdentityV3, decode_journal_v2,
     encode_journal_v2, initial_record,
@@ -274,6 +275,7 @@ class GitHubJournalV3:
             ),
         )
 
+    @measured_phase_v3('ADMITTED')
     def record_admission(self, current: VerifiedJournalSnapshotV3, evidence_id: str,
                          reservation_id: str, generation: int,
                          worker: WorkerIdentityV3) -> JournalOutcomeV3:
@@ -281,6 +283,7 @@ class GitHubJournalV3:
             record, AttemptState.ADMITTED, evidence_id, reservation_id, generation, worker
         ))
 
+    @measured_phase_v3('PREPARED_CAS')
     def prepare(self, current: VerifiedJournalSnapshotV3, packet_evidence_id: str,
                 reservation_id: str, generation: int,
                 worker: WorkerIdentityV3,

@@ -67,10 +67,21 @@ class AuthorizedPolicyVerificationV3:
 
     def before_effect(self) -> None:
         require_failure_predecessor_v3(self.snapshot.record)
+        from .worker_local_phase_v3 import WorkerLocalPhaseV3
+        if type(self.effect_guard) is WorkerLocalPhaseV3:
+            self.effect_guard.require_verification(self)
+            return
         if self.effect_guard is not None:
             self.effect_guard()
         if self.journal.read(self.snapshot.record.attempt.request_id) != self.snapshot:
             raise PacketV2CandidateError("AUTHORIZED_POLICY_JOURNAL_STALE")
+
+    def require_current_effect(self) -> None:
+        """Never use local file integrity as mutable provider/effect authority."""
+        self.before_effect()
+        from .worker_local_phase_v3 import WorkerLocalPhaseV3
+        if type(self.effect_guard) is WorkerLocalPhaseV3:
+            self.effect_guard()
 
     def require_admission(self, admission: Mapping[str, object]) -> None:
         self.before_effect()
@@ -104,11 +115,12 @@ class AuthorizedPolicyVerificationV3:
             clone = copy.copy(reader)
             executor = reader._executor
             def execute(request, executor=executor):
-                self.before_effect()
+                self.require_current_effect()
                 return executor(request)
             clone._executor = execute
             guarded[identifier] = clone
         observations = prepare_ordered_remote_observations_v3(admission.request, admission, guarded)
+        self.require_current_effect()
         self.require_references(admission, observations)
         return observations
 

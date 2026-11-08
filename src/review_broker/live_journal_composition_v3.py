@@ -92,5 +92,7 @@ def live_journal_v3(runtime,admission_authority,*,write_guard):
         before_effect=runtime.check_locals,executor=execute)
     node=transport.verify_repository_identity()
     authority=GitHubJournalTransitionAuthorityV3(transport)
-    return GitHubJournalV3(REPOSITORY,node,runtime.checkout.sha,transport,admission_authority,
+    journal=GitHubJournalV3(REPOSITORY,node,runtime.checkout.sha,transport,admission_authority,
         authority,NoRejectionAttributionV3(),authority,operation_guard=begin_operation,operation_ready=operation_ready)
+    journal.diagnostics=getattr(runtime,'diagnostics',None)
+    return journal

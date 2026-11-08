@@ -88,7 +88,7 @@ class FrozenApiCorpusV3:
             raise ValueError('COLD_INDEPENDENT_SELECTION_REJECTED')
 
 
-def collect_api_corpus_v3(*,journal,snapshot,expected,policy,dispatch,packet_root,prepared=False):
+def collect_api_corpus_v3(*,journal,snapshot,expected,policy,dispatch,packet_root,prepared=False,local_guard=None):
     """Authenticate outside the network-denied child, independently of packet assertions."""
     if prepared:
         history=PreparedJournalHistoryV3.read(journal,snapshot.record.attempt.request_id,
@@ -97,7 +97,7 @@ def collect_api_corpus_v3(*,journal,snapshot,expected,policy,dispatch,packet_roo
         verification=HistoricalAuthorizedPolicyVerificationV3(history,policy,policy)
         snapshots=(a,history.prepared)
     else:
-        a=snapshot;verification=AuthorizedPolicyVerificationV3(journal,a,expected,policy,policy)
+        a=snapshot;verification=AuthorizedPolicyVerificationV3(journal,a,expected,policy,policy,local_guard)
         snapshots=(a,)
     _,_,profile,_=load_packet_evidence_v3(packet_root,a.record.attempt.admission,policy_verification=verification)
     ack=acknowledgment_from_record(a.record)

@@ -14,6 +14,7 @@ class GitHubProtectedPolicyAuthorityV3:
         self.api,self.journal,self.expected,self.dispatch=api,journal,expected,dispatch_authority
         self.selection_guard=selection_guard
         self._source=None
+        self._verified_selection=None
 
     def _require_expected(self,expected):
         if expected!=self.expected or expected.repository!=REPOSITORY or expected.repository_id!=REPOSITORY_ID:
@@ -80,5 +81,12 @@ class GitHubProtectedPolicyAuthorityV3:
 
     def verify_selection(self,receipt,source,context,expectation,*,before_effect=None):
         if before_effect is None:raise ValueError('POLICY_OBSERVATION_GUARD_REQUIRED')
+        self._require_expected(expectation);before_effect()
+        # Immutable selection DATA only. Active selection still requires the original
+        # decision; every external effect separately confronts mutable currentness.
+        key=(receipt.canonical_receipt_bytes,source.canonical_receipt_bytes,
+             canonical_bytes(context.basis),expectation)
+        if key==self._verified_selection:return
         if receipt!=self._receipt(source,context,expectation,before_effect):
             raise ValueError('POLICY_SELECTION_UNRECOGNIZED')
+        self._verified_selection=key

@@ -16,6 +16,7 @@ from .packet_v2_technical_policy import (
 )
 from .pre_model_policy_selection_v3 import PolicySelectionReceiptV3
 from .pre_model_policy_source_v3 import PolicySourceObservationV3
+from .pre_model_observation_diagnostics_v3 import measured_phase_v3
 
 POLICY_EVIDENCE_NAMES = frozenset({
     "expected-policy.bin", "policy-source-observation.json", "policy-selection-receipt.json",
@@ -120,11 +121,14 @@ class LocalAuthorizedPacketStagesV3:
 
     def __init__(self, *, candidate_directory: Path, retention_base: Path,
                  verification: Callable[[], AuthorizedPolicyVerificationV3],
-                 cold_verifier: Callable[[Path, VerifiedJournalSnapshotV3, Callable[[], None]], dict[str, object]]):
+                 cold_verifier: Callable[[Path, VerifiedJournalSnapshotV3, Callable[[], None]], dict[str, object]],
+                 diagnostics=None):
         self.candidate_directory, self.retention_base = candidate_directory, retention_base
         self.verification_factory, self.cold_verifier = verification, cold_verifier
         self._inputs = None
+        self.diagnostics = diagnostics
 
+    @measured_phase_v3('PACKET_BUILD_VERIFY')
     def build(self, admission, capture, policy_bytes, source, selection,
               selection_context, readers, before_effect):
         profile = AuthorizedPolicySnapshotV3(policy_bytes, source, selection)
@@ -139,6 +143,7 @@ class LocalAuthorizedPacketStagesV3:
         self._inputs = admission, capture, profile, verification, readers
         return self.candidate_directory
 
+    @measured_phase_v3('PACKET_BUILD_VERIFY')
     def verify(self, candidate, before_effect):
         before_effect()
         admission, capture, profile, verification, _ = self._require_inputs(candidate)
@@ -146,6 +151,7 @@ class LocalAuthorizedPacketStagesV3:
         return verify_packet_v2_candidate(candidate, admission, capture, profile,
                                            policy_verification=verification)
 
+    @measured_phase_v3('LOCAL_RETENTION')
     def persist(self, candidate, snapshot, before_effect):
         from .packet_retention_v3 import persist_packet_evidence_v3, packet_retention_locator_v3
         admission, capture, profile, verification, readers = self._require_inputs(candidate)
@@ -157,6 +163,7 @@ class LocalAuthorizedPacketStagesV3:
                                    candidate_directory=candidate)
         return packet_retention_locator_v3(self.retention_base, snapshot.claim_ref)
 
+    @measured_phase_v3('LOCAL_COLD_VERIFY')
     def cold_verify(self, retained, snapshot, before_effect):
         before_effect()
         return self.cold_verifier(retained, snapshot, before_effect)

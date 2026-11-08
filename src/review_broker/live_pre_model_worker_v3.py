@@ -61,8 +61,9 @@ def run_live_worker_v3(*,runtime,source_token,app_slug,installation_id,private_r
     context=runtime.worker_context()
     observer,dispatch=worker_observer_v3(runtime)
     options={} if sleeper is None else {'sleeper':sleeper}
-    gate=wait_dispatch_ack_v3(journal=observer,runtime=runtime,inputs=context.inputs,
-        dispatch_authority=dispatch,**options)
+    with runtime.diagnostics.phase('ACK_GATE'):
+        gate=wait_dispatch_ack_v3(journal=observer,runtime=runtime,inputs=context.inputs,
+            dispatch_authority=dispatch,**options)
     if not gate.accepted:return LiveWorkerResultV3('REJECTED','UNCONFIRMED',gate.reason)
     if source_token==runtime.api.token:raise ValueError('CONTROL_TOKEN_IS_NOT_SOURCE_AUTHORITY')
     anchor=[observer.read(context.inputs.request_id)]
@@ -77,8 +78,9 @@ def run_live_worker_v3(*,runtime,source_token,app_slug,installation_id,private_r
         if observer.read(context.inputs.request_id)!=anchor[0]:raise ValueError('WORKER_WRITE_PREDECESSOR_MOVED')
     journal=live_journal_v3(runtime,observer.admission_authority,write_guard=write_guard)
     source=LiveSourceSessionV3(source_token,app_slug=app_slug,installation_id=installation_id,
-        root=private_root/'source',guard=runtime.observe,executor=source_executor,
+        root=private_root/'source',guard=runtime.observe,executor=runtime.diagnostics.wrap(source_executor,source=True),
         acquire_repository=acquire_repository,observer=origin)
+    source.diagnostics=runtime.diagnostics
     source.require_original_scope(anchor[0].record.attempt.admission)
     source.origin_body=observer.admission_authority.origin(anchor[0].record.attempt.admission)
     binding=PreModelWorkerV3(journal=journal,actions_reader=runtime.reader,expected=runtime.expected,
@@ -88,12 +90,13 @@ def run_live_worker_v3(*,runtime,source_token,app_slug,installation_id,private_r
     anchor[0]=binding.journal_outcome.snapshot
     current=CurrentBoundWorkerAuthorityV3(journal=journal,actions_reader=runtime.reader,
         expected=runtime.expected,execution_boundary=runtime,execution_boundary_id=runtime.boundary_id,
-        dispatch_authority=observed_dispatch,dispatch_principal_id=gate.principal_id)
+        dispatch_authority=observed_dispatch,dispatch_principal_id=gate.principal_id,local_phases=True)
     envelope=OriginalAdmissionEnvelopeV3(canonical_bytes(anchor[0].record.attempt.admission),source.origin_body)
     budget=runtime.api.metadata.budget
     http=GitHubActionsArtifactHttpV3(before_effect=runtime.check_locals)
     metadata_call=metadata_executor or http.metadata
     def metadata(request,*,max_bytes):
+        runtime.diagnostics.http(request,artifact=True)
         try:response=metadata_call(request,max_bytes=max_bytes)
         except TimeoutError:
             origin.read_timeout(request);raise
@@ -101,6 +104,7 @@ def run_live_worker_v3(*,runtime,source_token,app_slug,installation_id,private_r
         return response
     storage_call=storage_executor or http.storage
     def storage(request,*,max_bytes):
+        runtime.diagnostics.count('ARTIFACT_STORAGE_READS')
         size=0;digest=hashlib.sha256()
         try:
             for chunk in storage_call(request,max_bytes=max_bytes):
@@ -113,9 +117,11 @@ def run_live_worker_v3(*,runtime,source_token,app_slug,installation_id,private_r
     adapter=GitHubPreparedArtifactV3(metadata=reader,
         worker_history=GitHubPreparedWorkerHistoryV3(reader,runtime.expected,observed_dispatch,gate.principal_id),
         storage_executor=storage,budget=budget,clock=runtime.reader._clock)
+    adapter.diagnostics=runtime.diagnostics
     prepared_child=GitHubActionsArtifactChildV3(trusted_root=helper_root,node=node,private_base=private_root,
         environment=artifact_environment,max_bytes=budget.max_archive_bytes,runner=artifact_runner,
         on_started=origin.child_started)
+    prepared_child.diagnostics=runtime.diagnostics
     failure_child=GitHubActionsArtifactChildV3(trusted_root=helper_root,node=node,private_base=private_root,
         environment=artifact_environment,max_bytes=16000,runner=artifact_runner)
     archive=OriginalFailureArchiveRouterV3(child=failure_child,adapter=adapter,context=context)
@@ -132,13 +138,14 @@ def run_live_worker_v3(*,runtime,source_token,app_slug,installation_id,private_r
     def cold(root,snapshot,guard):
         guard()
         corpus=collect_api_corpus_v3(journal=journal,snapshot=snapshot,expected=runtime.expected,
-            policy=policy,dispatch=dispatch,packet_root=root)
+            policy=policy,dispatch=dispatch,packet_root=root,local_guard=guard)
         return run_cold_observer_v3(corpus=corpus,packet_root=root,private_base=private_root,before_effect=guard)
     def references(guard):
         source.guard=guard
         return source.readers(envelope.request)[1]
     stages=LocalAuthorizedPacketStagesV3(candidate_directory=private_root/'candidate',
-        retention_base=private_root/'retained',verification=verification,cold_verifier=cold)
+        retention_base=private_root/'retained',verification=verification,cold_verifier=cold,
+        diagnostics=runtime.diagnostics)
     producer=PreModelPacketContinuationV3(journal=journal,current_worker_authority=current,
         original_admission=envelope,capture_provider=source,reference_readers=references,
         policy_source_authority=policy,policy_selection_authority=policy,packet_stages=stages,
@@ -156,10 +163,11 @@ def run_live_worker_v3(*,runtime,source_token,app_slug,installation_id,private_r
             disposition=getattr(remote,'disposition',None))
     p=journal.read(context.inputs.request_id)
     try:
-        corpus=collect_api_corpus_v3(journal=journal,snapshot=p,expected=runtime.expected,
-            policy=policy,dispatch=dispatch,packet_root=private_root/'remote',prepared=True)
-        reconstructed=run_cold_observer_v3(corpus=corpus,packet_root=private_root/'remote',
-            private_base=private_root,before_effect=lambda:None,storage=remote.remote_receipt.value['storage'])
+        with runtime.diagnostics.phase('FINAL_COLD_RECONSTRUCTION'):
+            corpus=collect_api_corpus_v3(journal=journal,snapshot=p,expected=runtime.expected,
+                policy=policy,dispatch=dispatch,packet_root=private_root/'remote',prepared=True)
+            reconstructed=run_cold_observer_v3(corpus=corpus,packet_root=private_root/'remote',
+                private_base=private_root,before_effect=lambda:None,storage=remote.remote_receipt.value['storage'])
         if reconstructed!={'packet_id':handoff.packet_id,'remote_receipt_id':remote.remote_receipt.evidence_id}:
             raise ValueError('COLD_ORIGINAL_PACKET_RECONSTRUCTION_MISMATCH')
     except Exception:

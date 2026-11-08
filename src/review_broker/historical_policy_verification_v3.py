@@ -40,7 +40,8 @@ class HistoricalAuthorizedPolicyVerificationV3:
         return self.history.expected
 
     def before_effect(self) -> None:
-        self.history.verify()
+        # Local verifier callbacks do not issue provider or mutation authority.
+        self.history.require_local_integrity()
 
     require_admission = AuthorizedPolicyVerificationV3.require_admission
     require_profile = AuthorizedPolicyVerificationV3.require_profile

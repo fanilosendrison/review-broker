@@ -188,9 +188,8 @@ class PreModelPacketContinuationV3:
             self._decision_admitted_outcome, self._decision_issue_gate = outcome, issuer
             decision = _issue_active_decision_v3(self, context, outcome, issuer)
 
-            def before_effect() -> None:
-                decision.require_active(self)
-                self.authority.require_current(context, after, AttemptState.ADMITTED)
+            before_effect = self.authority.phase_guard(context, after, AttemptState.ADMITTED,
+                lambda: decision.require_active(self))
 
             if self.failure_evidence is not None:
                 collector = PreModelFailureCollectorV3(decision=decision, owner=self,
