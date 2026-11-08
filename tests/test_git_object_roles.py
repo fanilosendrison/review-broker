@@ -92,6 +92,24 @@ class GitObjectRoleTests(unittest.TestCase):
         self.assertEqual(git_object_sha(later, 'sample/repo', 'trees', known_roles=roles,
             known_links=links), 'b' * 40)
 
+    def test_flat_recursive_paths_bind_only_explicit_tree_ancestors(self):
+        entries = [dict(path='first', mode='040000', type='tree', sha='b' * 40),
+            dict(path='first/second', mode='040000', type='tree', sha='c' * 40),
+            dict(path='first/second/back', mode='040000', type='tree', sha='b' * 40)]
+        for rows in (entries, list(reversed(entries))):
+            with self.assertRaises(ValueError):
+                git_object_facts(dict(sha='a' * 40, tree=rows), 'sample/repo', 'trees')
+        entries[-1] = dict(path='first/second/file', mode='100644', type='blob', sha='d' * 40)
+        entries.append(dict(path='shared', mode='040000', type='tree', sha='b' * 40))
+        _, _, _, links = git_object_facts(dict(sha='a' * 40, tree=entries), 'sample/repo', 'trees')
+        self.assertEqual(links['b' * 40], frozenset({'c' * 40, 'd' * 40}))
+        self.assertEqual(links['c' * 40], frozenset({'d' * 40}))
+        # A missing prefix has no asserted identity and supplies no invented node.
+        _, _, _, sparse = git_object_facts(dict(sha='a' * 40,
+            tree=[dict(path='unknown/file', mode='100644', type='blob', sha='d' * 40)]),
+            'sample/repo', 'trees')
+        self.assertEqual(sparse, {'a' * 40: frozenset({'d' * 40})})
+
     def test_tree_cycle_ack_preserves_completed_objects_but_stops_before_commit(self):
         with tempfile.TemporaryDirectory() as directory:
             transport = HttpGitTransport(Path(directory) / 'cycle.git')

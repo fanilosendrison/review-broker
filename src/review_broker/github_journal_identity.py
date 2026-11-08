@@ -63,14 +63,23 @@ def object_links(
 
 
 def verify_tree_paths(paths: Mapping[str, str]) -> None:
+    _tree_path_ancestors(paths)
+
+
+def _tree_path_ancestors(paths: Mapping[str, str]) -> list[tuple[str, str]]:
+    ancestors = []
     for path in paths:
         components = path.split('/')
         if any(part in {'', '.', '..'} or '\x00' in part for part in components):
             raise ValueError
         for end in range(1, len(components)):
-            ancestor = paths.get('/'.join(components[:end]))
-            if ancestor is not None and ancestor != 'tree':
-                raise ValueError
+            prefix = '/'.join(components[:end])
+            ancestor = paths.get(prefix)
+            if ancestor is not None:
+                if ancestor != 'tree':
+                    raise ValueError
+                ancestors.append((prefix, path))
+    return ancestors
 
 
 def git_object_sha(
@@ -125,6 +134,7 @@ def _git_object_sha(
             if not isinstance(value['tree'], list):
                 raise ValueError
             paths = {}
+            identities = {}
             modes = {'blob': {'100644', '100755', '120000'}, 'tree': {'040000'}, 'commit': {'160000'}}
             for entry in value['tree']:
                 if (not isinstance(entry, dict) or not isinstance(entry['path'], str)
@@ -135,8 +145,10 @@ def _git_object_sha(
                     raise ValueError
                 if entry['mode'] not in modes[entry['type']]:
                     raise ValueError
-                links.append((sha, _git_object_sha(entry, repository, _GIT_RESOURCES[entry['type']], roles, sizes, links)))
-            verify_tree_paths(paths)
+                identities[entry['path']] = _git_object_sha(entry, repository, _GIT_RESOURCES[entry['type']], roles, sizes, links)
+                links.append((sha, identities[entry['path']]))
+            for ancestor, path in _tree_path_ancestors(paths):
+                links.append((identities[ancestor], identities[path]))
     if resource == 'commits':
         if 'html_url' in value and value['html_url'] != f'https://github.com/{repository}/commit/{sha}':
             raise ValueError
