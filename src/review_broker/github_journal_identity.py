@@ -50,7 +50,15 @@ def git_object_sha(
     value: object, repository: str, resource: str, *, known_roles: Mapping[str, str] | None = None,
 ) -> str:
     """Validate one response's root/child roles and its repository-scoped links."""
-    return _git_object_sha(value, repository, resource, object_roles([], known_roles))
+    return git_object_identity(value, repository, resource, known_roles=known_roles)[0]
+
+
+def git_object_identity(
+    value: object, repository: str, resource: str, *, known_roles: Mapping[str, str] | None = None,
+) -> tuple[str, dict[str, str]]:
+    roles = object_roles([], known_roles)
+    sha = _git_object_sha(value, repository, resource, roles)
+    return sha, roles
 
 
 def _git_object_sha(value: object, repository: str, resource: str, roles: dict[str, str]) -> str:
