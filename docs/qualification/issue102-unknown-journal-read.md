@@ -146,9 +146,9 @@ dispatch or Codespace calls. Manual transition reported nonzero status.
 
 Local qualification on Python 3.11.9 includes:
 
-- 86 targeted tests PASS, including original/extended v1, R2, actual local Git
+- 87 targeted tests PASS, including original/extended v1, R2, actual local Git
   objects/refs, error classification, create/readback faults and controller cuts.
-- Full repository suite: **684 tests PASS** under the normal CI umask, with no
+- Full repository suite: **685 tests PASS** under the normal CI umask, with no
   skips or expected failures. A pre-existing unsafe-mode fixture fails under
   umask 077 on both baseline and candidate; it is separately tracked in
   [Issue #107](https://github.com/fanilosendrison/review-broker/issues/107).
@@ -532,6 +532,42 @@ lossy native compaction remain attestation limits, not fresh-conversation proof.
 The incomplete attempt stays separate from every old verdict and from product
 execution. A new exact-SHA independent verdict and literal CI must qualify the
 projection-compatible correction.
+
+## Flat recursive tree ancestry
+
+Fresh independent falsification on
+`bca462ac1fe402cd1ebfc5906a9746e71323914b` found two RED manifestations
+of one remaining link-consistency gap. A standard flat recursive tree listing
+could explicitly name `first(S)`, `first/to-second(T)` and
+`first/to-second/back(S)`. All prefix paths and identities were supplied, but
+validation recorded only root-to-entry links and missed S-to-T-to-S. Actual-gh/
+native-Git claim and real-controller tests observed post-ACK effects and issuer
+sentinel reachability. Nested, sibling-distributed and retained-link cycle
+controls already refused; the flat representation did not. This does not prove
+consumed replay, live OIDC, model invocation or a remote one-use bypass.
+
+One canonical tree-path routine now validates path syntax/types and derives
+ancestry only between explicitly supplied prefix identities. The shared local
+link validator receives those necessarily implied links as well as root links.
+No missing tree identity is inferred or fetched. The existing path-validation
+None return and three-value identity projection stay compatible. Genuine native
+recursive trees, same-kind sharing and sparse descriptions without an identified
+prefix remain supported. No public wire, dependency or authority change occurs.
+
+The maintained regression was first RED on the old source and now passes for
+both entry orders, explicit ancestor links, valid sharing and no invented prefix
+node. The unchanged expanded independent program replay passes **62 tests**,
+including both previously RED actual-gh manifestations and all older controls.
+Current maintained results: **685 full-suite**, **87 targeted tests PASS** under
+umask022, plus installed-byte, compilation, JSON, whitespace and complete Python
+line-limit checks. Earlier failed fixture attempts, genuine REDs and exact-source
+review results remain separate, immutable receipts.
+
+Classification: `derived-from-existing-authority` for rejecting the explicitly
+supplied cycle; implementation and verification realization only, without a new
+product choice or complete remote-graph attestation. A new exact published SHA
+must receive its own literal CI and independent verdict; the old subject's
+findings and results cannot qualify the corrected bytes.
 
 ## Exact CI commit selection
 
