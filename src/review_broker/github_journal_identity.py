@@ -1,7 +1,7 @@
 """Identity-bearing GitHub Git-data and immutable Contents response validation."""
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from urllib.parse import urlsplit
 
 from .github_contents import decode_github_contents_base64
@@ -11,6 +11,17 @@ from .git_blob_identity import blob_identity, sha1_oid as commit_sha
 def verify_object_links(sha: str, linked: Iterable[str]) -> None:
     if any(sha == target for target in linked):
         raise ValueError  # A Git object cannot be its own ancestor/child.
+
+
+def verify_tree_paths(paths: Mapping[str, str]) -> None:
+    for path in paths:
+        components = path.split('/')
+        if any(part in {'', '.', '..'} or '\x00' in part for part in components):
+            raise ValueError
+        for end in range(1, len(components)):
+            ancestor = paths.get('/'.join(components[:end]))
+            if ancestor is not None and ancestor != 'tree':
+                raise ValueError
 
 
 def git_object_sha(value: object, repository: str, resource: str) -> str:
@@ -30,19 +41,20 @@ def git_object_sha(value: object, repository: str, resource: str) -> str:
         if 'tree' in value:
             if not isinstance(value['tree'], list):
                 raise ValueError
-            paths = set()
+            paths = {}
             kinds = {'blob': 'blobs', 'tree': 'trees', 'commit': 'commits'}
             modes = {'blob': {'100644', '100755', '120000'}, 'tree': {'040000'}, 'commit': {'160000'}}
             for entry in value['tree']:
                 if (not isinstance(entry, dict) or not isinstance(entry['path'], str)
                         or not entry['path'] or entry['path'] in paths):
                     raise ValueError
-                paths.add(entry['path'])
+                paths[entry['path']] = entry['type']
                 if 'size' in entry and (type(entry['size']) is not int or entry['size'] < 0):
                     raise ValueError
                 if entry['mode'] not in modes[entry['type']]:
                     raise ValueError
                 verify_object_links(sha, [git_object_sha(entry, repository, kinds[entry['type']])])
+            verify_tree_paths(paths)
     if resource == 'commits':
         if 'html_url' in value and value['html_url'] != f'https://github.com/{repository}/commit/{sha}':
             raise ValueError

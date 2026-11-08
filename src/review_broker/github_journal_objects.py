@@ -10,7 +10,7 @@ from typing import Any, Callable
 from .github_journal_http import JournalReadUnknown
 from .github_contents import decode_github_contents_base64
 from .git_blob_identity import blob_identity
-from .github_journal_identity import git_object_sha, verify_object_links
+from .github_journal_identity import git_object_sha, verify_object_links, verify_tree_paths
 from .identity import canonical_bytes
 from .queue import AttemptRecord
 
@@ -22,6 +22,9 @@ def _verify_tree_bindings(value: dict[str, Any], payload: dict[str, Any], sizes:
     if 'tree' not in value:
         return
     returned = {entry['path']: entry for entry in value['tree']}
+    described = {path: entry['type'] for path, entry in returned.items()}
+    described.update({entry['path']: entry['type'] for entry in payload['tree']})
+    verify_tree_paths(described)
     roots = {path.split('/', 1)[0] for path in returned}
     for expected in payload['tree']:
         if expected['path'].split('/', 1)[0] not in roots:
