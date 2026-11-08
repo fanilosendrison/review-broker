@@ -146,9 +146,9 @@ dispatch or Codespace calls. Manual transition reported nonzero status.
 
 Local qualification on Python 3.11.9 includes:
 
-- 81 targeted tests PASS, including original/extended v1, R2, actual local Git
+- 82 targeted tests PASS, including original/extended v1, R2, actual local Git
   objects/refs, error classification, create/readback faults and controller cuts.
-- Full repository suite: **679 tests PASS** under the normal CI umask, with no
+- Full repository suite: **680 tests PASS** under the normal CI umask, with no
   skips or expected failures. A pre-existing unsafe-mode fixture fails under
   umask 077 on both baseline and candidate; it is separately tracked in
   [Issue #107](https://github.com/fanilosendrison/review-broker/issues/107).
@@ -395,6 +395,30 @@ commit/blob role collision across ref and supplied Contents identity. Current
 totals are **679 full-suite** and **81 targeted tests PASS** under the normal CI environment. All old reports
 and RED data remain unchanged; only a new exact-SHA independent GO and literal
 CI receipt may qualify this result.
+
+## Retaining checked facts across proposal responses
+
+The review of `549cdeca8ce27d9eea36823af5c306ca4a5a7342` concluded
+**NO_GO** with `R1-549-01` (Medium). Per-response role validation returned only
+the root ID, discarding other checked facts. A standard parent entry could first
+declare the held proposal blob ID to be a commit; later blob hashing did not
+retain that fact. Actual claim/controller tests produced post-observation writes
+and reached the inert issuer. A checked subtree could likewise be forgotten and
+accepted as a later commit ACK root, causing one extra rejected ref request but
+zero new post-ACK objects/refs. Requested and successful mutations stay distinct.
+
+Validated identity now returns both root and all checked role facts. The proposal
+threads the complete local context through parent, blob, tree and commit steps.
+The context is copied/extended explicitly, remains local to the proposal and
+supports same-kind DAG reuse. A conflicting held-byte identity fails before the
+first blob POST; a later contradictory ACK fails before the next request. No
+remote graph fetch, global cache, durable store or execution-policy change is
+introduced. The unchanged **46-test independent matrix PASS** in coordinator
+replay, including all three new RED assertions and truthful-parent control.
+Current totals are **680 full-suite** and **82 targeted tests PASS** under umask
+022. A transport interruption during the old review was preserved and resumed;
+it was never treated as a verdict or product result. Old reports and REDs remain
+unchanged; fresh exact-SHA review and CI must qualify the resulting commit.
 
 ## Exact CI commit selection
 
