@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 import unittest
 
-from review_broker.github_journal_identity import git_object_identity, git_object_sha
+from review_broker.github_journal_identity import git_object_facts, git_object_identity, git_object_sha
 from review_broker.github_journal import GitHubRefJournal
 from review_broker.github_journal_http import JournalReadUnknown
 from review_broker.identity import canonical_bytes
@@ -35,10 +35,12 @@ class GitObjectRoleTests(unittest.TestCase):
     def test_validated_nested_roles_are_returned_for_the_next_response(self):
         known = {'d' * 40: 'blob'}
         value = dict(sha='a' * 40, tree={'sha': 'b' * 40}, parents=[{'sha': 'c' * 40}])
-        sha, roles, sizes, links = git_object_identity(value, 'sample/repo', 'commits', known_roles=known)
+        sha, roles, sizes, links = git_object_facts(value, 'sample/repo', 'commits', known_roles=known)
         self.assertEqual(sha, 'a' * 40)
         self.assertEqual(sizes, {})
         self.assertEqual(links, {'a' * 40: frozenset({'b' * 40, 'c' * 40})})
+        self.assertEqual(git_object_identity(value, 'sample/repo', 'commits', known_roles=known),
+                         (sha, roles, sizes))
         self.assertEqual(roles, {'a' * 40: 'commit', 'b' * 40: 'tree',
                                  'c' * 40: 'commit', 'd' * 40: 'blob'})
         self.assertEqual(known, {'d' * 40: 'blob'})
@@ -50,7 +52,7 @@ class GitObjectRoleTests(unittest.TestCase):
             dict(path='first', mode='100644', type='blob', sha='b' * 40, size=10),
             dict(path='second', mode='100644', type='blob', sha='b' * 40, size=10),
         ])
-        sha, roles, sizes, links = git_object_identity(value, 'sample/repo', 'trees')
+        sha, roles, sizes, links = git_object_facts(value, 'sample/repo', 'trees')
         self.assertEqual(sizes, {'b' * 40: 10})
         with self.assertRaises(ValueError):
             git_object_sha({'sha': 'b' * 40, 'size': 11}, 'sample/repo', 'blobs', known_sizes=sizes)
@@ -79,7 +81,7 @@ class GitObjectRoleTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 git_object_identity(dict(sha='a' * 40, tree=rows), 'sample/repo', 'trees')
         root = dict(sha='a' * 40, tree=[dict(path='child', mode='040000', type='tree', sha='b' * 40)])
-        _, roles, sizes, links = git_object_identity(root, 'sample/repo', 'trees')
+        _, roles, sizes, links = git_object_facts(root, 'sample/repo', 'trees')
         before = copy.deepcopy(links)
         later = dict(sha='b' * 40, tree=[dict(path='back', mode='040000', type='tree', sha='a' * 40)])
         with self.assertRaises(ValueError):
