@@ -6,7 +6,7 @@ from enum import Enum
 import json
 from typing import Callable
 
-from .github_journal_identity import commit_sha, contents_bytes, ref_commit_sha
+from .github_journal_identity import commit_sha, contents_bytes, ref_commit_sha, repository_id
 from .github_journal_http import GitHubJournalResponse, JournalReadUnknown
 from .identity import attempt_identity, canonical_bytes
 from .queue import AttemptRecord, StateTransitionError
@@ -36,6 +36,8 @@ def verified_absence(repository: str, base_branch: str, request: Callable[..., G
     metadata = request('GET', f'repos/{repository}')
     if metadata.status != 200:
         return False
+    meta = metadata.value
+    expected_id = repository_id(meta, repository)
     owner, name = repository.split('/')
     query = ('query($owner:String!,$name:String!) { viewer { login id } '
              'repository(owner:$owner,name:$name) { nameWithOwner databaseId viewerPermission '
@@ -43,7 +45,6 @@ def verified_absence(repository: str, base_branch: str, request: Callable[..., G
     identity = request('POST', 'graphql', {'query': query, 'variables': {'owner': owner, 'name': name}})
     if identity.status != 200 or set(identity.value) != {'data'}:
         return False
-    meta = metadata.value
     data = identity.value['data']
     repo, viewer = data['repository'], data['viewer']
     branch = repo['defaultBranchRef']
@@ -51,9 +52,8 @@ def verified_absence(repository: str, base_branch: str, request: Callable[..., G
             or 'permissions' in meta and (
                 not isinstance(meta['permissions'], dict) or meta['permissions'].get('pull') is not True)):
         return False
-    if (type(meta['id']) is not int or meta['id'] <= 0
-            or meta['full_name'] != repository or repo['nameWithOwner'] != repository
-            or type(repo['databaseId']) is not int or repo['databaseId'] != meta['id']
+    if (repo['nameWithOwner'] != repository
+            or type(repo['databaseId']) is not int or repo['databaseId'] != expected_id
             or not isinstance(viewer['login'], str) or not viewer['login']
             or not isinstance(viewer['id'], str) or not viewer['id']
             or repo['viewerPermission'] not in {'READ', 'TRIAGE', 'WRITE', 'MAINTAIN', 'ADMIN'}

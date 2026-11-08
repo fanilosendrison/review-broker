@@ -1,16 +1,16 @@
 """Identity-bearing GitHub Git-data and immutable Contents response validation."""
 from __future__ import annotations
 
-import re
+from collections.abc import Iterable
 from urllib.parse import urlsplit
 
 from .github_contents import decode_github_contents_base64
+from .git_blob_identity import blob_identity, sha1_oid as commit_sha
 
 
-def commit_sha(value: object) -> str:
-    if not isinstance(value, str) or re.fullmatch('[0-9a-f]{40}', value) is None:
-        raise ValueError
-    return value
+def verify_object_links(sha: str, linked: Iterable[str]) -> None:
+    if any(sha == target for target in linked):
+        raise ValueError  # A Git object cannot be its own ancestor/child.
 
 
 def git_object_sha(value: object, repository: str, resource: str) -> str:
@@ -24,16 +24,37 @@ def git_object_sha(value: object, repository: str, resource: str) -> str:
     sha = commit_sha(value['sha'])
     if 'url' in value and value['url'] != f'https://api.github.com/repos/{repository}/git/{resource}/{sha}':
         raise ValueError
+    if resource == 'trees':
+        if 'truncated' in value and value['truncated'] is not False:
+            raise ValueError
+        if 'tree' in value:
+            if not isinstance(value['tree'], list):
+                raise ValueError
+            paths = set()
+            kinds = {'blob': 'blobs', 'tree': 'trees', 'commit': 'commits'}
+            modes = {'blob': {'100644', '100755', '120000'}, 'tree': {'040000'}, 'commit': {'160000'}}
+            for entry in value['tree']:
+                if (not isinstance(entry, dict) or not isinstance(entry['path'], str)
+                        or not entry['path'] or entry['path'] in paths):
+                    raise ValueError
+                paths.add(entry['path'])
+                if 'size' in entry and (type(entry['size']) is not int or entry['size'] < 0):
+                    raise ValueError
+                if entry['mode'] not in modes[entry['type']]:
+                    raise ValueError
+                verify_object_links(sha, [git_object_sha(entry, repository, kinds[entry['type']])])
     if resource == 'commits':
         if 'html_url' in value and value['html_url'] != f'https://github.com/{repository}/commit/{sha}':
             raise ValueError
+        linked = []
         if 'tree' in value:
-            git_object_sha(value['tree'], repository, 'trees')
+            linked.append(git_object_sha(value['tree'], repository, 'trees'))
         if 'parents' in value:
             if not isinstance(value['parents'], list):
                 raise ValueError
             for parent in value['parents']:
-                git_object_sha(parent, repository, 'commits')
+                linked.append(git_object_sha(parent, repository, 'commits'))
+        verify_object_links(sha, linked)
     return sha
 
 
@@ -47,6 +68,47 @@ def ref_commit_sha(
     if (require_url or 'url' in value) and value.get('url') != f'https://api.github.com/repos/{repository}/git/{ref}':
         raise ValueError
     return git_object_sha(value['object'], repository, 'commits')
+
+
+def verify_ref_update_ack(value: object, repository: str, ref: str, sha: str) -> None:
+    # V1 permits an empty JSON ACK when exact unique-proposal readback follows.
+    # Supplied identity, unlike absent redundant metadata, must never disagree.
+    if isinstance(value, dict) and not value:
+        return
+    if ref_commit_sha(value, repository, ref, require_url=False) != commit_sha(sha):
+        raise ValueError
+
+
+def repository_id(value: object, repository: str) -> int:
+    if not isinstance(value, dict) or value['full_name'] != repository:
+        raise ValueError
+    identity = value['id']
+    if type(identity) is not int or identity <= 0:
+        raise ValueError
+    owner, name = repository.split('/')
+    api_url = f'https://api.github.com/repos/{repository}'
+    expected = {
+        'name': name, 'url': api_url, 'html_url': f'https://github.com/{repository}',
+        'clone_url': f'https://github.com/{repository}.git',
+        'ssh_url': f'git@github.com:{repository}.git', 'git_url': f'git://github.com/{repository}.git',
+        'svn_url': f'https://github.com/{repository}',
+        'git_refs_url': api_url + '/git/refs{/sha}',
+        'git_commits_url': api_url + '/git/commits{/sha}',
+        'blobs_url': api_url + '/git/blobs{/sha}', 'trees_url': api_url + '/git/trees{/sha}',
+        'contents_url': api_url + '/contents/{+path}',
+    }
+    for key, target in expected.items():
+        if key in value and value[key] != target:
+            raise ValueError
+    if 'owner' in value:
+        metadata = value['owner']
+        if not isinstance(metadata, dict) or metadata['login'] != owner:
+            raise ValueError
+        for key, target in {'url': f'https://api.github.com/users/{owner}',
+                            'html_url': f'https://github.com/{owner}'}.items():
+            if key in metadata and metadata[key] != target:
+                raise ValueError
+    return identity
 
 
 def contents_bytes(value: object, repository: str, state_path: str, sha: str) -> bytes:
@@ -71,6 +133,8 @@ def contents_bytes(value: object, repository: str, state_path: str, sha: str) ->
     if 'html_url' in value and value['html_url'] != html_url:
         raise ValueError
     blob = commit_sha(value['sha']) if 'sha' in value else None
+    if blob is not None and blob_identity(raw) != blob:
+        raise ValueError
     git_url = f'https://api.github.com/repos/{repository}/git/blobs/{blob}' if blob is not None else None
     if 'git_url' in value and (git_url is None or value['git_url'] != git_url):
         raise ValueError
