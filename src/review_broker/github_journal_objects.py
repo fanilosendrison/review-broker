@@ -10,7 +10,7 @@ from typing import Any, Callable
 from .github_journal_http import JournalReadUnknown
 from .github_contents import decode_github_contents_base64
 from .git_blob_identity import blob_identity
-from .github_journal_identity import blob_sizes, git_object_identity, git_object_sha, object_roles, verify_object_links, verify_tree_paths
+from .github_journal_identity import blob_sizes, git_object_identity, git_object_sha, object_links, object_roles, verify_tree_paths
 from .identity import canonical_bytes
 from .queue import AttemptRecord
 
@@ -46,10 +46,12 @@ def _create_object(
     api: Api, repository: str, resource: str, payload: dict[str, Any],
     *, known_blob_sizes: dict[str, int] | None = None,
     known_object_types: dict[str, str] | None = None,
-) -> tuple[str, dict[str, str], dict[str, int]]:
+    known_links: dict[str, frozenset[str]] | None = None,
+) -> tuple[str, dict[str, str], dict[str, int], dict[str, frozenset[str]]]:
     try:
         roles = object_roles([], known_object_types)
         sizes = blob_sizes([], known_blob_sizes)
+        links = object_links([], known_links)
         expected_blob = None
         raw = b''
         if resource == 'blobs':
@@ -65,7 +67,8 @@ def _create_object(
             roles = object_roles([(payload['tree'], 'tree'), *[(p, 'commit') for p in payload['parents']]], roles)
         result = api('POST', f'repos/{repository}/git/{resource}', payload)
         value = json.loads(result.stdout)
-        sha, roles, sizes = git_object_identity(value, repository, resource, known_roles=roles, known_sizes=sizes)
+        sha, roles, sizes, links = git_object_identity(value, repository, resource,
+            known_roles=roles, known_sizes=sizes, known_links=links)
         if resource == 'blobs':
             if sha != expected_blob:
                 raise ValueError
@@ -74,9 +77,10 @@ def _create_object(
                         or decode_github_contents_base64(value['content']) != raw):
                     raise ValueError
         if resource == 'trees':
+            links = object_links([(sha, entry['sha']) for entry in payload['tree']], links)
             _verify_tree_bindings(value, payload)
         if resource == 'commits':
-            verify_object_links(sha, [payload['tree'], *payload['parents']])
+            links = object_links([(sha, child) for child in [payload['tree'], *payload['parents']]], links)
             if 'message' in value and value['message'] not in (payload['message'], payload['message'] + '\n'):
                 raise ValueError
             if 'tree' in value and git_object_sha(value['tree'], repository, 'trees') != payload['tree']:
@@ -85,7 +89,7 @@ def _create_object(
                 parents = [git_object_sha(p, repository, 'commits') for p in value['parents']]
                 if parents != payload['parents']:
                     raise ValueError
-        return sha, roles, sizes
+        return sha, roles, sizes, links
     except (KeyError, TypeError, ValueError, RecursionError):
         raise JournalReadUnknown('JOURNAL_OBJECT_RESPONSE_UNKNOWN') from None
 
@@ -96,7 +100,7 @@ def state_commit(
     result = api('GET', f'repos/{repository}/git/commits/{parent_sha}')
     try:
         parent = json.loads(result.stdout)
-        observed_parent, roles, sizes = git_object_identity(parent, repository, 'commits')
+        observed_parent, roles, sizes, links = git_object_identity(parent, repository, 'commits')
         if observed_parent != parent_sha:
             raise ValueError
         parent_tree = git_object_sha(parent['tree'], repository, 'trees')
@@ -104,14 +108,14 @@ def state_commit(
         raise JournalReadUnknown('JOURNAL_PARENT_TREE_UNKNOWN') from None
     raw = canonical_bytes(record.as_dict()) + b'\n'
     encoded = base64.b64encode(raw).decode('ascii')
-    blob, roles, sizes = _create_object(api, repository, 'blobs', {'content': encoded, 'encoding': 'base64'},
-        known_object_types=roles, known_blob_sizes=sizes)
-    tree, roles, sizes = _create_object(api, repository, 'trees', {
+    blob, roles, sizes, links = _create_object(api, repository, 'blobs', {'content': encoded, 'encoding': 'base64'},
+        known_object_types=roles, known_blob_sizes=sizes, known_links=links)
+    tree, roles, sizes, links = _create_object(api, repository, 'trees', {
         'base_tree': parent_tree,
         'tree': [{'path': state_path, 'mode': '100644', 'type': 'blob', 'sha': blob}],
-    }, known_blob_sizes=sizes, known_object_types=roles)
-    commit, roles, sizes = _create_object(api, repository, 'commits', {
+    }, known_blob_sizes=sizes, known_object_types=roles, known_links=links)
+    commit, roles, sizes, links = _create_object(api, repository, 'commits', {
         'message': f'state: {record.state.value} {record.attempt_id}\n\ntransaction: {secrets.token_hex(32)}',
         'tree': tree, 'parents': [parent_sha],
-    }, known_object_types=roles, known_blob_sizes=sizes)
+    }, known_object_types=roles, known_blob_sizes=sizes, known_links=links)
     return commit

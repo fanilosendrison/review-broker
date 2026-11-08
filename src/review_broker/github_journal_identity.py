@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from graphlib import TopologicalSorter
 from urllib.parse import urlsplit
 
 from .github_contents import decode_github_contents_base64
@@ -48,9 +49,17 @@ def blob_sizes(
     return sizes
 
 
-def verify_object_links(sha: str, linked: Iterable[str]) -> None:
-    if any(sha == target for target in linked):
-        raise ValueError  # A Git object cannot be its own ancestor/child.
+def object_links(
+    assertions: Iterable[tuple[str, str]], known: Mapping[str, frozenset[str]] | None = None,
+) -> dict[str, frozenset[str]]:
+    """Check only already-supplied ancestor links; never fetch a remote graph."""
+    links: dict[str, set[str]] = {}
+    for source, targets in (known or {}).items():
+        links[commit_sha(source)] = {commit_sha(target) for target in targets}
+    for source, target in assertions:
+        links.setdefault(commit_sha(source), set()).add(commit_sha(target))
+    TopologicalSorter(links).prepare()  # CycleError is a ValueError; DAG sharing is valid.
+    return {source: frozenset(targets) for source, targets in links.items()}
 
 
 def verify_tree_paths(paths: Mapping[str, str]) -> None:
@@ -67,23 +76,28 @@ def verify_tree_paths(paths: Mapping[str, str]) -> None:
 def git_object_sha(
     value: object, repository: str, resource: str, *, known_roles: Mapping[str, str] | None = None,
     known_sizes: Mapping[str, int] | None = None,
+    known_links: Mapping[str, frozenset[str]] | None = None,
 ) -> str:
-    """Validate one response's roles, blob sizes and repository-scoped links."""
-    return git_object_identity(value, repository, resource, known_roles=known_roles, known_sizes=known_sizes)[0]
+    """Validate one response's roles, sizes, scope and supplied ancestry links."""
+    return git_object_identity(value, repository, resource, known_roles=known_roles,
+        known_sizes=known_sizes, known_links=known_links)[0]
 
 
 def git_object_identity(
     value: object, repository: str, resource: str, *, known_roles: Mapping[str, str] | None = None,
     known_sizes: Mapping[str, int] | None = None,
-) -> tuple[str, dict[str, str], dict[str, int]]:
+    known_links: Mapping[str, frozenset[str]] | None = None,
+) -> tuple[str, dict[str, str], dict[str, int], dict[str, frozenset[str]]]:
     roles = object_roles([], known_roles)
     sizes = blob_sizes([], known_sizes)
-    sha = _git_object_sha(value, repository, resource, roles, sizes)
-    return sha, roles, sizes
+    links: list[tuple[str, str]] = []
+    sha = _git_object_sha(value, repository, resource, roles, sizes, links)
+    return sha, roles, sizes, object_links(links, known_links)
 
 
 def _git_object_sha(
     value: object, repository: str, resource: str, roles: dict[str, str], sizes: dict[str, int],
+    links: list[tuple[str, str]],
 ) -> str:
     if not isinstance(value, dict):
         raise ValueError
@@ -110,20 +124,18 @@ def _git_object_sha(
                     raise ValueError
                 if entry['mode'] not in modes[entry['type']]:
                     raise ValueError
-                verify_object_links(sha, [_git_object_sha(entry, repository, _GIT_RESOURCES[entry['type']], roles, sizes)])
+                links.append((sha, _git_object_sha(entry, repository, _GIT_RESOURCES[entry['type']], roles, sizes, links)))
             verify_tree_paths(paths)
     if resource == 'commits':
         if 'html_url' in value and value['html_url'] != f'https://github.com/{repository}/commit/{sha}':
             raise ValueError
-        linked = []
         if 'tree' in value:
-            linked.append(_git_object_sha(value['tree'], repository, 'trees', roles, sizes))
+            links.append((sha, _git_object_sha(value['tree'], repository, 'trees', roles, sizes, links)))
         if 'parents' in value:
             if not isinstance(value['parents'], list):
                 raise ValueError
             for parent in value['parents']:
-                linked.append(_git_object_sha(parent, repository, 'commits', roles, sizes))
-        verify_object_links(sha, linked)
+                links.append((sha, _git_object_sha(parent, repository, 'commits', roles, sizes, links)))
     return sha
 
 

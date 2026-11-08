@@ -146,9 +146,9 @@ dispatch or Codespace calls. Manual transition reported nonzero status.
 
 Local qualification on Python 3.11.9 includes:
 
-- 83 targeted tests PASS, including original/extended v1, R2, actual local Git
+- 86 targeted tests PASS, including original/extended v1, R2, actual local Git
   objects/refs, error classification, create/readback faults and controller cuts.
-- Full repository suite: **681 tests PASS** under the normal CI umask, with no
+- Full repository suite: **684 tests PASS** under the normal CI umask, with no
   skips or expected failures. A pre-existing unsafe-mode fixture fails under
   umask 077 on both baseline and candidate; it is separately tracked in
   [Issue #107](https://github.com/fanilosendrison/review-broker/issues/107).
@@ -459,6 +459,49 @@ verification layers; the existing fail-closed and immutable-snapshot obligations
 remain authority. It does not demand unknown-object size fetching or complete
 remote graph authentication. Fresh independent exact-SHA review and literal
 runner checkout CI must qualify the resulting published revision.
+
+## Explicit supplied-link cycle refinement
+
+Further producer falsification on published
+`136c40a5dc61df1b802d376d7108ea145cf5c034` exposed a distinct local
+contradiction: nested tree metadata could explicitly describe root R containing
+subtree S containing R. The existing self-link check rejected a direct self-link
+but not that cycle. Actual-gh/native-Git claim and real controller probes, also
+reproduced with a byte-verified isolated installation of that exact SHA, were
+RED. After the contradictory ACK, claim made two mutation requests, one new
+commit and a ref; controller made ten requests, nine new objects, ref updates
+and one inert issuer call. Legitimate earlier objects were preserved. No live
+OIDC, actual model invocation, consumed replay or remote one-use bypass occurred.
+This is producer evidence, not a finding attributed to an independent reviewer.
+The old exact-source review remains separate evidence on its own subject.
+
+The shared validator now uses Python's maintained `graphlib.TopologicalSorter`
+to reject cycles in the finite links already supplied or necessarily established
+by submitted proposals. Checked links, roles and sizes remain explicit local
+facts across parent/blob/tree/commit responses. A cycle cannot hide between
+sibling descriptions or successive responses. Valid repeated subtrees and DAG
+sharing remain compatible. No remote graph is fetched or reconstructed, and
+missing links are not invented. This is not authentication of a complete remote
+commit graph, malicious-service resistance or a new durable authority/cache.
+No public journal/request ABI, dependency, privileged workflow or execution
+semantics changes.
+
+The original two-method RED regression and both actual-gh RED manifestations
+remain retained. The corrected maintained suite passes **684 full-suite** and
+**86 targeted tests**, and the unchanged 50-program independent replay passes in
+a fresh producer run. Actual-gh claim/controller cycle controls now refuse with
+zero later mutation requests, object/ref changes or issuer calls. Maintained
+regressions also cover tree/commit cycles, sibling order, retained links and
+valid sharing. Installed-package bytes, compilation, JSON, whitespace and all
+handwritten Python line limits pass on the corrected source.
+
+Discovery: accepting explicitly cyclic supplied Git ancestry as permission to
+advance contradicts the existing immutable-proposal and fail-closed boundary.
+Disposition: `derived-from-existing-authority`; affected layers: implementation,
+integration/conformance and verification/qualification. The standard-library
+finite-link mechanism is replaceable and introduces no product choice. Required
+next action: publish and independently qualify a new exact SHA, never reuse the
+old SHA's verdict or CI as acceptance of this correction.
 
 ## Exact CI commit selection
 
