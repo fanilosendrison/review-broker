@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 import unittest
 
-from review_broker.github_journal_identity import git_object_sha
+from review_broker.github_journal_identity import git_object_identity, git_object_sha
 from review_broker.github_journal import GitHubRefJournal
 from review_broker.identity import canonical_bytes
 from review_broker.queue import AttemptState
@@ -29,6 +29,17 @@ class GitObjectRoleTests(unittest.TestCase):
         value = dict(sha='a' * 40, tree={'sha': 'b' * 40}, parents=[{'sha': 'b' * 40}])
         with self.assertRaises(ValueError):
             git_object_sha(value, 'sample/repo', 'commits')
+
+    def test_validated_nested_roles_are_returned_for_the_next_response(self):
+        known = {'d' * 40: 'blob'}
+        value = dict(sha='a' * 40, tree={'sha': 'b' * 40}, parents=[{'sha': 'c' * 40}])
+        sha, roles = git_object_identity(value, 'sample/repo', 'commits', known_roles=known)
+        self.assertEqual(sha, 'a' * 40)
+        self.assertEqual(roles, {'a' * 40: 'commit', 'b' * 40: 'tree',
+                                 'c' * 40: 'commit', 'd' * 40: 'blob'})
+        self.assertEqual(known, {'d' * 40: 'blob'})
+        with self.assertRaises(ValueError):
+            git_object_sha({'sha': 'c' * 40}, 'sample/repo', 'blobs', known_roles=roles)
 
     def test_snapshot_commit_and_supplied_blob_cannot_share_one_id(self):
         with tempfile.TemporaryDirectory() as directory:
