@@ -146,9 +146,9 @@ dispatch or Codespace calls. Manual transition reported nonzero status.
 
 Local qualification on Python 3.11.9 includes:
 
-- 70 targeted tests PASS, including original/extended v1, R2, actual local Git
+- 77 targeted tests PASS, including original/extended v1, R2, actual local Git
   objects/refs, error classification, create/readback faults and controller cuts.
-- Full repository suite: **668 tests PASS** under the normal CI umask, with no
+- Full repository suite: **675 tests PASS** under the normal CI umask, with no
   skips or expected failures. A pre-existing unsafe-mode fixture fails under
   umask 077 on both baseline and candidate; it is separately tracked in
   [Issue #107](https://github.com/fanilosendrison/review-broker/issues/107).
@@ -181,8 +181,8 @@ mutation; no execution permission was observed. The prior receipt is retained
 as RED classification evidence, not a mutation or replay counterexample.
 Both HTTP JSON parsing and decoded journal parsing now classify this resource
 limit as UNKNOWN, with a positive existing-record oracle retained by the
-unchanged v1 tests. The new two-boundary regression passes in the 668-test
-suite. The earlier independent review remains a separate exact-SHA result;
+unchanged v1 tests. The new two-boundary regression passes in the current
+675-test suite. The earlier independent review remains a separate exact-SHA result;
 only a new exact-SHA review can qualify the refined candidate.
 
 The independent review of that first SHA concluded **NO_GO**, with one Medium
@@ -258,12 +258,67 @@ the programs' `temporary-files` fixture directory and failed setup; that output
 is retained separately from the correctly prepared passing run. New maintained
 regressions independently cover zero mutation/mint on stale consumed contents,
 parent/tree scope, completed-object ACK boundaries and each supplied content
-identity operand, with positive complete-metadata controls. The 70 targeted and
-668-test full-suite results above include these regressions.
+identity operand, with positive complete-metadata controls. At that stage,
+70 targeted and 668 full-suite tests passed; the current totals are listed above.
 
 This remediation follows existing immutable-snapshot and fail-closed authority,
 not a new product or consumption decision. A fresh independent exact-SHA verdict
 is required; no historical NO_GO is relabeled GO.
+
+## Blob-byte and remaining acknowledgement binding
+
+The independent rereview of `d476f157cc38a7a2fa6bde999c30870f192700bb`
+concluded **NO_GO** with `R1-D476-01` (High) and `R1-D476-02` (Medium).
+Its immutable report and two new RED assertions remain separate historical facts.
+A supplied current blob SHA could contradict older PREPARED inline bytes while
+all supplied URLs matched. The actual local controller again produced 12
+mutation requests/objects and reached an inert issuer sentinel once; no live
+OIDC or model call occurred. A blob POST ACK naming another existing blob also
+allowed three subsequent mutations before final readback refused.
+
+Supplied Contents blob SHA is now compared with the Git blob identity of the
+exact decoded bytes. Blob POST ACK identity is compared with the known submitted
+bytes before another mutation. The implementation uses the official
+`git hash-object -t blob --stdin --no-filters` primitive, not a second hand-written
+Git encoder. A private empty SHA-1 context isolates caller SHA-256 repositories,
+Git configuration, templates, filters and environment overrides. It stores no
+claim or consumption authority and does not initialize protected ARM state.
+The hash operation has no `-w`; journal bytes remain on stdin, not in command
+arguments or temporary data files. Git subprocesses receive no inherited GitHub
+credentials. Primitive failure, timeout or malformed output remains UNKNOWN.
+Git remains an existing runtime dependency; no Python dependency is added.
+
+`github_journal_objects.py` separately owns immutable proposal construction,
+preserving the original canonical bytes, LF, parent and fresh transaction nonce.
+It never creates or updates a claim ref. The existing journal still owns atomic
+reference operations and all execution-state orchestration. Supplied tree entry,
+mode, size and parent/message bindings are checked against the request; duplicate
+or explicitly truncated tree metadata and impossible self/child identities
+refuse. Root-only and expanded-entry responses and ordinary Git terminal-LF
+message representation have positive compatibility controls.
+
+A coordinator audit also reproduced contradictory repository URLs and PATCH ACK
+scope reaching claim progress or an inert issuer sentinel. These now refuse at
+their own boundaries. ACK faults at capacity, ARM and count-one preserve already
+completed legitimate updates but grant no mint or additional write. The legacy
+empty JSON PATCH ACK remains compatible only with the existing exact unique-
+proposal readback rule; supplied contradictory identity is never ignored.
+Separate RED/after-correction receipts distinguish requests, objects and refs.
+
+All 20 unchanged independent tests, including the five previously RED assertions
+across the last two reviews, now pass in a separate coordinator replay. The
+current 77 targeted and 675 full-suite tests also cover hash unavailability,
+caller Git/environment isolation, byte mismatches and all newly checked ACK
+operands. A first new complete-history fixture lacked a required shutdown-context
+field and failed before its intended fault; its log is retained, and only that
+fixture was corrected. The final isolated installed package was byte-compared
+with all six current modules before validation, preventing old-package fallback.
+
+These checks derive from existing exact-byte snapshot and fail-closed obligations.
+They do not independently authenticate the complete remote commit graph, detect
+fully self-consistent lies by a malicious GitHub authority, or change v1 states,
+consumption, retry policy or historical serialization. A new independent GO and
+literal exact-commit CI receipt are still required for the newly published SHA.
 
 ## Exact CI commit selection
 
