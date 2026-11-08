@@ -59,7 +59,9 @@ provides the per-case observation above.
 ## Transport and classification
 
 `github_journal_http.py` owns bounded status-bearing transport and sanitized
-errors. `github_journal_read.py` owns the three-way observation. The existing
+errors. `github_journal_identity.py` validates identity-bearing response
+metadata shared by reads and writes. `github_journal_read.py` owns the three-way
+observation. The existing
 journal owns claims and state changes; no wire schema or attempt identity changes.
 
 An actual installed `gh` 2.37.0 was exercised against an injected loopback HTTP
@@ -144,9 +146,13 @@ dispatch or Codespace calls. Manual transition reported nonzero status.
 
 Local qualification on Python 3.11.9 includes:
 
-- 65 targeted tests PASS, including original/extended v1, R2, actual local Git
+- 70 targeted tests PASS, including original/extended v1, R2, actual local Git
   objects/refs, error classification, create/readback faults and controller cuts.
-- Full repository suite: **663 tests PASS**, no skips or expected failures.
+- Full repository suite: **668 tests PASS** under the normal CI umask, with no
+  skips or expected failures. A pre-existing unsafe-mode fixture fails under
+  umask 077 on both baseline and candidate; it is separately tracked in
+  [Issue #107](https://github.com/fanilosendrison/review-broker/issues/107).
+  This environment-specific failure is not represented as a passing run.
 - Package compilation, JSON artifact parsing, whitespace checks and the
   400-line hand-written-source guard PASS.
 - Seven original reviewer inputs/runner rerun: UNKNOWN before any mutation.
@@ -175,7 +181,7 @@ mutation; no execution permission was observed. The prior receipt is retained
 as RED classification evidence, not a mutation or replay counterexample.
 Both HTTP JSON parsing and decoded journal parsing now classify this resource
 limit as UNKNOWN, with a positive existing-record oracle retained by the
-unchanged v1 tests. The new two-boundary regression passes in the 663-test
+unchanged v1 tests. The new two-boundary regression passes in the 668-test
 suite. The earlier independent review remains a separate exact-SHA result;
 only a new exact-SHA review can qualify the refined candidate.
 
@@ -213,6 +219,51 @@ Neither setup/oracle adjustment changed the reviewer's archived code or verdict.
 These are implementation/verification refinements of the already selected
 three-way classification, not a new product decision or authority model.
 A new independent exact-SHA verdict is required for the remediated candidate.
+
+## Returned immutable-content and object identity remediation
+
+The independent review of `d61539d572e4652675565e87653175c1d322652e` concluded
+**NO_GO**, reporting `R1-D615-01` (High) and `R1-D615-02` (Medium). Its original
+report, three RED safety assertions and complete local receipts remain unchanged.
+The earlier bounded GO on `e0378c5...` is not reused as current acceptance.
+
+A real-gh loopback test returned an old PREPARED response, explicitly naming the
+old commit in its Contents URL, for a current STOPPED/count1 ref. The snapshot
+incorrectly paired that old record with the current SHA. The actual controller
+then produced 12 mutation requests and 12 new Git objects, advanced the current
+journal through capacity/ARM/count-one, called an inert issuer sentinel once and
+wrote authorization output. No live OIDC or model invocation occurred, and the
+remote one-use defense was not tested or bypassed. Original parent objects
+remained immutable; this was a new erroneous descendant, not ref deletion or
+administrator action. Wrong-repository parent and blob-ACK URLs separately
+permitted subsequent speculative writes.
+
+The shared identity module now requires the returned Contents API URL to bind
+the exact repository/path/requested commit, not merely the outbound request.
+Supplied HTML, blob, self and download links must agree; supplied name, size and
+blob identity metadata must be coherent. Private raw download URLs are never
+followed or retained in diagnostics. Object URLs, commit HTML/tree/parent links
+and supplied commit-ACK tree/parents are checked against scope and submitted
+bindings before another mutation. Optional redundant links are not invented as
+execution authority, but an explicit contradiction is never ignored.
+
+The reader still trusts authenticated GitHub endpoint semantics; these checks do
+not independently reconstruct and hash-authenticate complete remote Git commits.
+No stronger malicious-service or anti-administrator guarantee is asserted.
+
+The unchanged third review programs were replayed on the corrected bytes:
+**16/16 controls PASS**, including all three formerly RED assertions, the real
+controller stale-content refusal and actual loopback gh. The first replay lacked
+the programs' `temporary-files` fixture directory and failed setup; that output
+is retained separately from the correctly prepared passing run. New maintained
+regressions independently cover zero mutation/mint on stale consumed contents,
+parent/tree scope, completed-object ACK boundaries and each supplied content
+identity operand, with positive complete-metadata controls. The 70 targeted and
+668-test full-suite results above include these regressions.
+
+This remediation follows existing immutable-snapshot and fail-closed authority,
+not a new product or consumption decision. A fresh independent exact-SHA verdict
+is required; no historical NO_GO is relabeled GO.
 
 ## Exact CI commit selection
 
