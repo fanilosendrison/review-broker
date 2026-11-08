@@ -320,6 +320,32 @@ fully self-consistent lies by a malicious GitHub authority, or change v1 states,
 consumption, retry policy or historical serialization. A new independent GO and
 literal exact-commit CI receipt are still required for the newly published SHA.
 
+## Tree-ancestor consistency refinement
+
+The rereview of `31f07ad3a45e04afd435429611e3149867b7afdf` concluded
+**NO_GO** with `R1-31F-01` (Medium). A supplied root-only tree ACK could name
+`.review-broker` as a blob while the request writes
+`.review-broker/attempt.json`. Its standalone mode/type/SHA were valid, but that
+ancestor cannot contain the requested file. In real-gh/local-Git reproductions,
+claim creation made two further requests, one commit and a new ref after the
+contradiction. The actual controller made ten further mutation requests and
+reached the inert issuer sentinel once. Earlier legitimate objects were counted
+separately; no live OIDC or model was invoked.
+
+One shared path-consistency check now verifies both supplied tree descriptions
+and their combination with requested entries. Every described ancestor of a
+nested path must be a tree. A requested blob cannot simultaneously have a
+reported descendant. Blob, symlink and gitlink ancestors refuse before further
+mutation, while correct root-only trees and expanded leaves retain their
+positive controls. This is standard Git path consistency, not a new journal or
+execution rule. The original report and its two RED manifestations stay intact.
+
+The unchanged expanded independent matrix now passes **28/28 tests** in a fresh
+coordinator replay, including both new assertions, all prior controls, actual gh
+loopback and Git-environment tests. The complete current suite remains **675
+PASS** under the normal CI umask. A new exact-SHA independent verdict and CI
+receipt, rather than the previous NO_GO, must qualify the resulting commit.
+
 ## Exact CI commit selection
 
 The initial PR CI runs were successful but checked out GitHub's synthetic merge
