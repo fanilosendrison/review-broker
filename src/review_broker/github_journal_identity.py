@@ -30,6 +30,24 @@ def object_roles(
     return roles
 
 
+def _add_blob_size(sizes: dict[str, int], sha: str, size: int) -> None:
+    commit_sha(sha)
+    if type(size) is not int or size < 0 or (sha in sizes and sizes[sha] != size):
+        raise ValueError
+    sizes[sha] = size
+
+
+def blob_sizes(
+    assertions: Iterable[tuple[str, int]], known: Mapping[str, int] | None = None,
+) -> dict[str, int]:
+    sizes: dict[str, int] = {}
+    for sha, size in (known or {}).items():
+        _add_blob_size(sizes, sha, size)
+    for sha, size in assertions:
+        _add_blob_size(sizes, sha, size)
+    return sizes
+
+
 def verify_object_links(sha: str, linked: Iterable[str]) -> None:
     if any(sha == target for target in linked):
         raise ValueError  # A Git object cannot be its own ancestor/child.
@@ -48,24 +66,31 @@ def verify_tree_paths(paths: Mapping[str, str]) -> None:
 
 def git_object_sha(
     value: object, repository: str, resource: str, *, known_roles: Mapping[str, str] | None = None,
+    known_sizes: Mapping[str, int] | None = None,
 ) -> str:
-    """Validate one response's root/child roles and its repository-scoped links."""
-    return git_object_identity(value, repository, resource, known_roles=known_roles)[0]
+    """Validate one response's roles, blob sizes and repository-scoped links."""
+    return git_object_identity(value, repository, resource, known_roles=known_roles, known_sizes=known_sizes)[0]
 
 
 def git_object_identity(
     value: object, repository: str, resource: str, *, known_roles: Mapping[str, str] | None = None,
-) -> tuple[str, dict[str, str]]:
+    known_sizes: Mapping[str, int] | None = None,
+) -> tuple[str, dict[str, str], dict[str, int]]:
     roles = object_roles([], known_roles)
-    sha = _git_object_sha(value, repository, resource, roles)
-    return sha, roles
+    sizes = blob_sizes([], known_sizes)
+    sha = _git_object_sha(value, repository, resource, roles, sizes)
+    return sha, roles, sizes
 
 
-def _git_object_sha(value: object, repository: str, resource: str, roles: dict[str, str]) -> str:
+def _git_object_sha(
+    value: object, repository: str, resource: str, roles: dict[str, str], sizes: dict[str, int],
+) -> str:
     if not isinstance(value, dict):
         raise ValueError
     sha = commit_sha(value['sha'])
     _add_object_role(roles, sha, _GIT_KINDS[resource])
+    if resource == 'blobs' and 'size' in value:
+        _add_blob_size(sizes, sha, value['size'])
     if 'url' in value and value['url'] != f'https://api.github.com/repos/{repository}/git/{resource}/{sha}':
         raise ValueError
     if resource == 'trees':
@@ -85,19 +110,19 @@ def _git_object_sha(value: object, repository: str, resource: str, roles: dict[s
                     raise ValueError
                 if entry['mode'] not in modes[entry['type']]:
                     raise ValueError
-                verify_object_links(sha, [_git_object_sha(entry, repository, _GIT_RESOURCES[entry['type']], roles)])
+                verify_object_links(sha, [_git_object_sha(entry, repository, _GIT_RESOURCES[entry['type']], roles, sizes)])
             verify_tree_paths(paths)
     if resource == 'commits':
         if 'html_url' in value and value['html_url'] != f'https://github.com/{repository}/commit/{sha}':
             raise ValueError
         linked = []
         if 'tree' in value:
-            linked.append(_git_object_sha(value['tree'], repository, 'trees', roles))
+            linked.append(_git_object_sha(value['tree'], repository, 'trees', roles, sizes))
         if 'parents' in value:
             if not isinstance(value['parents'], list):
                 raise ValueError
             for parent in value['parents']:
-                linked.append(_git_object_sha(parent, repository, 'commits', roles))
+                linked.append(_git_object_sha(parent, repository, 'commits', roles, sizes))
         verify_object_links(sha, linked)
     return sha
 

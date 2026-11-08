@@ -33,13 +33,31 @@ class GitObjectRoleTests(unittest.TestCase):
     def test_validated_nested_roles_are_returned_for_the_next_response(self):
         known = {'d' * 40: 'blob'}
         value = dict(sha='a' * 40, tree={'sha': 'b' * 40}, parents=[{'sha': 'c' * 40}])
-        sha, roles = git_object_identity(value, 'sample/repo', 'commits', known_roles=known)
+        sha, roles, sizes = git_object_identity(value, 'sample/repo', 'commits', known_roles=known)
         self.assertEqual(sha, 'a' * 40)
+        self.assertEqual(sizes, {})
         self.assertEqual(roles, {'a' * 40: 'commit', 'b' * 40: 'tree',
                                  'c' * 40: 'commit', 'd' * 40: 'blob'})
         self.assertEqual(known, {'d' * 40: 'blob'})
         with self.assertRaises(ValueError):
             git_object_sha({'sha': 'c' * 40}, 'sample/repo', 'blobs', known_roles=roles)
+
+    def test_known_and_new_blob_sizes_apply_to_every_alias_and_are_retained(self):
+        value = dict(sha='a' * 40, tree=[
+            dict(path='first', mode='100644', type='blob', sha='b' * 40, size=10),
+            dict(path='second', mode='100644', type='blob', sha='b' * 40, size=10),
+        ])
+        sha, roles, sizes = git_object_identity(value, 'sample/repo', 'trees')
+        self.assertEqual(sizes, {'b' * 40: 10})
+        with self.assertRaises(ValueError):
+            git_object_sha({'sha': 'b' * 40, 'size': 11}, 'sample/repo', 'blobs', known_sizes=sizes)
+        for rows in (value['tree'], list(reversed(value['tree']))):
+            bad = copy.deepcopy(value)
+            bad['tree'] = copy.deepcopy(rows)
+            bad['tree'][1]['size'] = 11
+            with self.assertRaises(ValueError):
+                git_object_sha(bad, 'sample/repo', 'trees')
+        self.assertEqual(sizes, {'b' * 40: 10})
 
     def test_snapshot_commit_and_supplied_blob_cannot_share_one_id(self):
         with tempfile.TemporaryDirectory() as directory:

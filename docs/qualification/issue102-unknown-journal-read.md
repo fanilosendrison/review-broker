@@ -146,9 +146,9 @@ dispatch or Codespace calls. Manual transition reported nonzero status.
 
 Local qualification on Python 3.11.9 includes:
 
-- 82 targeted tests PASS, including original/extended v1, R2, actual local Git
+- 83 targeted tests PASS, including original/extended v1, R2, actual local Git
   objects/refs, error classification, create/readback faults and controller cuts.
-- Full repository suite: **680 tests PASS** under the normal CI umask, with no
+- Full repository suite: **681 tests PASS** under the normal CI umask, with no
   skips or expected failures. A pre-existing unsafe-mode fixture fails under
   umask 077 on both baseline and candidate; it is separately tracked in
   [Issue #107](https://github.com/fanilosendrison/review-broker/issues/107).
@@ -419,6 +419,46 @@ Current totals are **680 full-suite** and **82 targeted tests PASS** under umask
 022. A transport interruption during the old review was preserved and resumed;
 it was never treated as a verdict or product result. Old reports and REDs remain
 unchanged; fresh exact-SHA review and CI must qualify the resulting commit.
+
+## Retaining held-blob sizes independently of reference paths
+
+The review of `c64c6dedf1aa2470172c77894c812d03fffc844b` concluded
+**NO_GO** with `R1-C64-01` (Medium). A supplied alias could name the same
+already-held blob but report a different byte length. The exact requested leaf
+was checked, while the alias was not. Actual-gh/local-Git cases observed two
+post-contradiction claim requests, one new commit and a ref; the controller case
+observed ten later requests, nine new objects, ref updates and one inert issuer
+call. Legitimate earlier objects and the pre-existing alias were preserved and
+counted separately. No consumed replay, live OIDC, model invocation or remote
+one-use bypass was established. The original report, two RED assertions and
+all earlier evidence remain unchanged.
+
+Shared identity validation now returns checked blob-size facts alongside object
+roles and rejects inconsistent sizes for every recognized reference to the same
+blob, irrespective of path, order or root/leaf representation. The proposal
+explicitly retains those local facts through parent, blob, tree and commit
+responses. Held bytes bind their length before blob POST. Redundant root and
+exact-leaf size comparisons were removed; the shared validator owns the rule.
+Caller maps remain copied, and truthful aliases remain supported. No global or
+durable cache, remote size fetch, new wire field or authority is introduced.
+
+The unchanged **50-test independent program matrix PASS** in a new producer
+replay, including both latest RED manifestations. Three additional producer
+actual-gh/native-Git tests PASS: a contradictory parent fact stops before blob
+POST, checked size survives into nested commit metadata, and truthful parent/
+commit aliases remain valid. These are producer results, not an independent GO.
+Current maintained totals are **681 full-suite** and **83 targeted tests PASS**
+under umask 022. The original seven inputs again stop at UNKNOWN; 68 freshly
+recorded scenarios independently assert zero mutation requests, new objects,
+ref changes and authorization calls. Installed-package byte comparison,
+compilation, tracked JSON, whitespace and the complete Python line guard PASS.
+Issue #107 remains independently tracked and outside this repair.
+
+The local fact-table mechanism is `no-normative-impact` in implementation and
+verification layers; the existing fail-closed and immutable-snapshot obligations
+remain authority. It does not demand unknown-object size fetching or complete
+remote graph authentication. Fresh independent exact-SHA review and literal
+runner checkout CI must qualify the resulting published revision.
 
 ## Exact CI commit selection
 
