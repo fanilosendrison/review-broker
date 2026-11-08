@@ -18,10 +18,20 @@ from .queue import AttemptRecord
 Api = Callable[..., subprocess.CompletedProcess[str]]
 
 
-def _verify_tree_bindings(value: dict[str, Any], payload: dict[str, Any], sizes: dict[str, int]) -> None:
+def _verify_tree_bindings(
+    value: dict[str, Any], payload: dict[str, Any], sizes: dict[str, int], known_types: dict[str, str],
+) -> None:
     if 'tree' not in value:
         return
     returned = {entry['path']: entry for entry in value['tree']}
+    types = dict(known_types)
+    for expected in payload['tree']:
+        if expected['sha'] in types and types[expected['sha']] != expected['type']:
+            raise ValueError
+        types[expected['sha']] = expected['type']
+    for entry in returned.values():
+        if entry['sha'] in types and entry['type'] != types[entry['sha']]:
+            raise ValueError
     described = {path: entry['type'] for path, entry in returned.items()}
     described.update({entry['path']: entry['type'] for entry in payload['tree']})
     verify_tree_paths(described)
@@ -31,7 +41,11 @@ def _verify_tree_bindings(value: dict[str, Any], payload: dict[str, Any], sizes:
             raise ValueError
         observed = returned.get(expected['path'])
         if observed is None:
-            continue  # A root-only response can describe the containing subtree.
+            components = expected['path'].split('/')
+            ancestors = ['/'.join(components[:end]) for end in range(1, len(components))]
+            if not any(path in returned and returned[path]['type'] == 'tree' for path in ancestors):
+                raise ValueError
+            continue  # An explicit compatible ancestor may represent the subtree.
         if any(observed[key] != expected[key] for key in ('mode', 'type', 'sha')):
             raise ValueError
         if 'size' in observed and expected['sha'] in sizes:
@@ -42,6 +56,7 @@ def _verify_tree_bindings(value: dict[str, Any], payload: dict[str, Any], sizes:
 def _create_object(
     api: Api, repository: str, resource: str, payload: dict[str, Any],
     *, known_blob_sizes: dict[str, int] | None = None,
+    known_object_types: dict[str, str] | None = None,
 ) -> str:
     try:
         expected_blob = None
@@ -65,7 +80,7 @@ def _create_object(
                     raise ValueError
         if resource == 'trees':
             verify_object_links(sha, known_blob_sizes or {})
-            _verify_tree_bindings(value, payload, known_blob_sizes or {})
+            _verify_tree_bindings(value, payload, known_blob_sizes or {}, known_object_types or {})
         if resource == 'commits':
             verify_object_links(sha, [payload['tree'], *payload['parents']])
             if 'message' in value and value['message'] not in (payload['message'], payload['message'] + '\n'):
@@ -98,7 +113,8 @@ def state_commit(
     tree = _create_object(api, repository, 'trees', {
         'base_tree': parent_tree,
         'tree': [{'path': state_path, 'mode': '100644', 'type': 'blob', 'sha': blob}],
-    }, known_blob_sizes={blob: len(raw)})
+    }, known_blob_sizes={blob: len(raw)},
+        known_object_types={parent_sha: 'commit', parent_tree: 'tree', blob: 'blob'})
     return _create_object(api, repository, 'commits', {
         'message': f'state: {record.state.value} {record.attempt_id}\n\ntransaction: {secrets.token_hex(32)}',
         'tree': tree, 'parents': [parent_sha],

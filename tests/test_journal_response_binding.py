@@ -145,7 +145,7 @@ class ResponseBindingTests(unittest.TestCase):
     def test_wrong_scope_object_ack_preserves_completed_effect_but_never_advances(self):
         cases = [(resource, 'url') for resource in ('blobs', 'trees', 'commits')]
         cases += [('commits', field) for field in ('html_url', 'tree', 'parents', 'tree-url', 'parent-url', 'message', 'self-parent', 'tree-as-commit')]
-        cases += [('trees', field) for field in ('entry', 'duplicate', 'truncated', 'root-is-blob', 'ancestor-blob', 'ancestor-symlink', 'ancestor-commit', 'descendant')]
+        cases += [('trees', field) for field in ('entry', 'duplicate', 'truncated', 'root-is-blob', 'ancestor-blob', 'ancestor-symlink', 'ancestor-commit', 'descendant', 'known-blob-tree', 'known-commit-tree', 'sibling')]
         cases += [('blobs', field) for field in ('size', 'content')]
         for resource, field in cases:
             with self.subTest(resource=resource, field=field), tempfile.TemporaryDirectory() as temp:
@@ -164,6 +164,15 @@ class ResponseBindingTests(unittest.TestCase):
                             value['sha'] = (payload['parents'][0] if field == 'self-parent' else
                                 payload['tree'] if field == 'tree-as-commit' else payload['tree'][0]['sha'])
                             value['url'] = 'https://api.github.com/repos/sample/repo/git/' + resource + '/' + value['sha']
+                        elif field in ('known-blob-tree', 'known-commit-tree', 'sibling'):
+                            expected = payload['tree'][0]
+                            if field == 'sibling':
+                                entry = dict(expected, path=expected['path'].rsplit('/', 1)[0] + '/sibling.json')
+                            else:
+                                target = expected['sha'] if field == 'known-blob-tree' else t.git('rev-parse', 'refs/heads/dev').decode().strip()
+                                entry = dict(path=expected['path'].rsplit('/', 1)[0], mode='040000', type='tree', sha=target,
+                                    url='https://api.github.com/repos/sample/repo/git/trees/' + target)
+                            value.update(tree=[entry], truncated=False)
                         elif field.startswith('ancestor-') or field == 'descendant':
                             expected = payload['tree'][0]
                             entry = dict(path=expected['path'].rsplit('/', 1)[0], mode='100644', type='blob', sha=expected['sha'])
