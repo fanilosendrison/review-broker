@@ -144,9 +144,9 @@ dispatch or Codespace calls. Manual transition reported nonzero status.
 
 Local qualification on Python 3.11.9 includes:
 
-- 64 targeted tests PASS, including original/extended v1, R2, actual local Git
+- 65 targeted tests PASS, including original/extended v1, R2, actual local Git
   objects/refs, error classification, create/readback faults and controller cuts.
-- Full repository suite: **662 tests PASS**, no skips or expected failures.
+- Full repository suite: **663 tests PASS**, no skips or expected failures.
 - Package compilation, JSON artifact parsing, whitespace checks and the
   400-line hand-written-source guard PASS.
 - Seven original reviewer inputs/runner rerun: UNKNOWN before any mutation.
@@ -175,7 +175,7 @@ mutation; no execution permission was observed. The prior receipt is retained
 as RED classification evidence, not a mutation or replay counterexample.
 Both HTTP JSON parsing and decoded journal parsing now classify this resource
 limit as UNKNOWN, with a positive existing-record oracle retained by the
-unchanged v1 tests. The new two-boundary regression passes in the 662-test
+unchanged v1 tests. The new two-boundary regression passes in the 663-test
 suite. The earlier independent review remains a separate exact-SHA result;
 only a new exact-SHA review can qualify the refined candidate.
 
@@ -213,6 +213,23 @@ Neither setup/oracle adjustment changed the reviewer's archived code or verdict.
 These are implementation/verification refinements of the already selected
 three-way classification, not a new product decision or authority model.
 A new independent exact-SHA verdict is required for the remediated candidate.
+
+## Exact CI commit selection
+
+The initial PR CI runs were successful but checked out GitHub's synthetic merge
+commit, despite their run metadata identifying the published head. Those runs
+remain passing observations on their actual checkouts, not literal exact-commit
+qualification receipts. The read-only CI now selects
+`github.event.pull_request.head.sha || github.sha` through the pinned official
+checkout action. A regression oracle checks that selection and unchanged
+read-only permissions. No privileged review workflow, admission, secret,
+production authority or result is changed. Fresh runner checkout logs and run
+metadata must both identify the final published commit; earlier CI is not reused
+as proof of this stronger execution-identity check.
+
+This is a `no-normative-impact` verification mechanism realizing the mandate's
+exact-SHA CI gate, not a change to product or execution authorization semantics.
+The final independent review must include this workflow change.
 
 ## Discovery classification and remaining gates
 
