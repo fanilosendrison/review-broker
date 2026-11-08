@@ -146,9 +146,9 @@ dispatch or Codespace calls. Manual transition reported nonzero status.
 
 Local qualification on Python 3.11.9 includes:
 
-- 77 targeted tests PASS, including original/extended v1, R2, actual local Git
+- 81 targeted tests PASS, including original/extended v1, R2, actual local Git
   objects/refs, error classification, create/readback faults and controller cuts.
-- Full repository suite: **675 tests PASS** under the normal CI umask, with no
+- Full repository suite: **679 tests PASS** under the normal CI umask, with no
   skips or expected failures. A pre-existing unsafe-mode fixture fails under
   umask 077 on both baseline and candidate; it is separately tracked in
   [Issue #107](https://github.com/fanilosendrison/review-broker/issues/107).
@@ -370,6 +370,31 @@ known blob/commit subtree aliases and sibling-only descriptions. The source
 suite remains **675 PASS** under umask 022, with **77 targeted tests PASS**.
 The earlier reports and RED data remain immutable; a new independent exact-SHA
 verdict and CI receipt must qualify this refinement.
+
+## Joint root and descriptor role consistency
+
+The rereview of `e522bf5114581cad47424c4655943414a52efd2d` concluded
+**NO_GO** with `R1-E522-01` (Medium). One ACK could assign both tree and blob
+roles to a newly described ID, in either order. Its root could also name an
+already-known parent commit as a tree. The mixed-role controller reached the
+inert issuer boundary. The invalid root case emitted one extra commit request,
+but native Git rejected it: zero new post-contradiction objects/refs or returned
+grant were observed in that case. Attempted and completed effects are not merged.
+
+A single local role table now covers prior context, request facts, the response
+root and recursively supplied object references. Contradictory kinds refuse
+order-independently; repetitions with the same kind remain valid. This table is
+per observation/proposal, not global mutable state or a new durable authority.
+A native repeated-subtree Git DAG remains a passing positive control.
+
+The unchanged **42-test independent matrix PASS** in a separate coordinator
+replay, including all five formerly RED manifestations. Three maintained role
+unit tests independently check both orders, root/nested conflicts and same-kind
+sharing without mutating caller context. A further snapshot control rejects a
+commit/blob role collision across ref and supplied Contents identity. Current
+totals are **679 full-suite** and **81 targeted tests PASS** under the normal CI environment. All old reports
+and RED data remain unchanged; only a new exact-SHA independent GO and literal
+CI receipt may qualify this result.
 
 ## Exact CI commit selection
 
