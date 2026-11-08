@@ -144,9 +144,9 @@ dispatch or Codespace calls. Manual transition reported nonzero status.
 
 Local qualification on Python 3.11.9 includes:
 
-- 61 targeted tests PASS, including original/extended v1, R2, actual local Git
+- 64 targeted tests PASS, including original/extended v1, R2, actual local Git
   objects/refs, error classification, create/readback faults and controller cuts.
-- Full repository suite: **659 tests PASS**, no skips or expected failures.
+- Full repository suite: **662 tests PASS**, no skips or expected failures.
 - Package compilation, JSON artifact parsing, whitespace checks and the
   400-line hand-written-source guard PASS.
 - Seven original reviewer inputs/runner rerun: UNKNOWN before any mutation.
@@ -164,6 +164,55 @@ Two early targeted runs remain nonpassing receipts: one exposed a new HTTP
 fixture incorrectly reporting 200 instead of 201 for object creation; another
 used the wrong position for a global CLI option. Only the fixture/test invocation
 was corrected. Neither failure is represented as a passing run.
+
+## Additional classification refinement
+
+After the first Draft candidate `5ef92a98d1cdd1ce203277f41470f214612383c4`
+was published, a coordinator adversarial control supplied 2,000 nested JSON
+arrays. Python raised `RecursionError` rather than returning the explicit
+UNKNOWN observation. The call remained fail-closed with one GET and zero
+mutation; no execution permission was observed. The prior receipt is retained
+as RED classification evidence, not a mutation or replay counterexample.
+Both HTTP JSON parsing and decoded journal parsing now classify this resource
+limit as UNKNOWN, with a positive existing-record oracle retained by the
+unchanged v1 tests. The new two-boundary regression passes in the 662-test
+suite. The earlier independent review remains a separate exact-SHA result;
+only a new exact-SHA review can qualify the refined candidate.
+
+The independent review of that first SHA concluded **NO_GO**, with one Medium
+blocking finding, `R1-REVIEW-01`: a capability response explicitly naming the
+wrong repository/ref was accepted because its commit SHA matched. The same
+wrong-scope response passed the later creation-base lookup. Independent real-gh
+loopback tests observed four real new Git objects and a new claim on an absent
+request; an existing consumed request instead retained its ref but acquired
+four orphan objects. Neither observation establishes model invocation or
+historical replay. The original independent report and both failing safety
+assertions remain unchanged.
+
+A single shared ref validator now checks exact ref, repository URL, target type
+and SHA in present reads, effective-capability reads and creation-base lookup.
+A supplied target URL must also agree. Creation acknowledgements validate their
+known target and any supplied scope before the separate authoritative readback.
+Parent commits must identify the requested SHA; content must identify the exact
+journal path and file type. Explicit default-branch/read-permission contradictions
+in repository metadata refuse rather than being ignored. These are transport
+identity checks, not changes to stored v1 data.
+
+New negative scope/partial-response tests cover capability and subsequent
+creation-base reads independently, asserting UNKNOWN or refusal, zero Git
+mutation requests and unchanged real object/ref inventories. The coordinator
+replayed the independent scripts: ten R1 and four consumer/concurrency tests
+pass; four loopback remediation controls pass. One original consumed-state
+observation expected a successful claim return before asserting no writes;
+fixed code refuses earlier. Its replay error is retained, and a separately named
+derived oracle requires typed UNKNOWN, unchanged objects/refs and permanent
+count-one refusal. A separate initial consumer replay omitted the repository
+root from PYTHONPATH; its three import errors and corrected run are retained.
+Neither setup/oracle adjustment changed the reviewer's archived code or verdict.
+
+These are implementation/verification refinements of the already selected
+three-way classification, not a new product decision or authority model.
+A new independent exact-SHA verdict is required for the remediated candidate.
 
 ## Discovery classification and remaining gates
 

@@ -68,6 +68,6 @@ def journal_request(
         if status < 200 or 300 <= status < 400:
             raise ValueError
         value = json.loads(body, object_pairs_hook=_unique_members, parse_constant=_reject_nonfinite)
-    except (AttributeError, TypeError, ValueError):
+    except (AttributeError, TypeError, ValueError, RecursionError):
         raise JournalReadUnknown('GITHUB_JOURNAL_HTTP_UNKNOWN') from None
     return GitHubJournalResponse(status, value)

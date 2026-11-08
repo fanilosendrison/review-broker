@@ -99,6 +99,39 @@ class UnknownReadTests(unittest.TestCase):
                         return http_response(command, {}, status)
                 self.assert_unknown('content-' + str(status), fault)
 
+    def test_excessive_json_nesting_is_classified_unknown_without_mutation(self):
+        import base64
+        nested = '[' * 2000 + '0' + ']' * 2000
+        for boundary in ('http', 'content'):
+            with self.subTest(boundary=boundary):
+                def fault(command, kwargs):
+                    if boundary == 'http' and '/git/refs/heads/' in command[4]:
+                        return subprocess.CompletedProcess(command, 0, 'HTTP/2.0 200 OK\n\n' + nested, '')
+                    if boundary == 'content' and '/contents/' in command[4]:
+                        return http_response(command, {'encoding': 'base64', 'type': 'file',
+                            'path': '.review-broker/attempt.json',
+                            'content': base64.b64encode(nested.encode()).decode()})
+                self.transport.fault = fault
+                self.assertEqual(self.journal._observe(REQUEST_ID).kind.value, 'UNKNOWN')
+                self.assert_unknown('excessive-nesting-' + boundary, fault)
+
+    def test_content_path_type_and_partial_identity_are_unknown(self):
+        import base64
+        from review_broker.identity import canonical_bytes
+        valid = dict(encoding='base64', type='file', path='.review-broker/attempt.json',
+                     content=base64.b64encode(canonical_bytes(self.original.as_dict()) + b'\n').decode())
+        cases = [dict(valid, path='other.json'), dict(valid, type='symlink'),
+                 {k: v for k, v in valid.items() if k != 'path'},
+                 {k: v for k, v in valid.items() if k != 'type'}]
+        for index, value in enumerate(cases):
+            with self.subTest(index=index):
+                def fault(command, kwargs):
+                    if '/contents/' in command[4]:
+                        return http_response(command, value)
+                self.transport.fault = fault
+                self.assertEqual(self.journal._observe(REQUEST_ID).kind.value, 'UNKNOWN')
+                self.assert_unknown('content-identity-' + str(index), fault)
+
     def test_ambiguous_404_without_repository_or_credential_proof(self):
         for failed_endpoint in ('repos/sample/repo', 'graphql'):
             with self.subTest(endpoint=failed_endpoint):

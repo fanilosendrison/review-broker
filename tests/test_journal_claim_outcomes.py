@@ -106,10 +106,24 @@ class ClaimOutcomesTests(unittest.TestCase):
         self.assertEqual(json.loads(raw)['invocation_count'], 0)
 
     def test_contradictory_creation_acknowledgement_is_not_permission(self):
-        self.transport.after_create = lambda command, kwargs: http_response(command, {'ref': self.ref, 'object': {'type': 'commit', 'sha': 'f' * 40}}, 201)
-        with self.assertRaisesRegex(JournalReadUnknown, 'ATOMIC_CLAIM_OUTCOME_UNKNOWN'):
-            self.first.claim(REQUEST_ID)
-        self.assertEqual(len(self.transport.mutations), 4)
+        for field in ('sha', 'url', 'target-url'):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as temp:
+                transport = HttpGitTransport(Path(temp) / 'contradictory-ack.git')
+                journal = GitHubRefJournal('sample/repo', runner=transport)
+                def ack(command, kwargs):
+                    payload = json.loads(kwargs['input'])
+                    value = {'ref': payload['ref'], 'object': {'type': 'commit', 'sha': payload['sha']}}
+                    if field == 'sha':
+                        value['object']['sha'] = 'f' * 40
+                    elif field == 'url':
+                        value['url'] = 'https://api.github.com/repos/wrong/repo/git/' + payload['ref']
+                    else:
+                        value['object']['url'] = 'https://api.github.com/repos/wrong/repo/git/commits/' + payload['sha']
+                    return http_response(command, value, 201)
+                transport.after_create = ack
+                with self.assertRaisesRegex(JournalReadUnknown, 'ATOMIC_CLAIM_OUTCOME_UNKNOWN'):
+                    journal.claim(REQUEST_ID)
+                self.assertEqual(len(transport.mutations), 4)
 
     def test_readback_of_different_consumed_winner_is_not_a_fresh_attempt(self):
         from dataclasses import replace
@@ -135,6 +149,8 @@ class ClaimOutcomesTests(unittest.TestCase):
         cases = [
             ('metadata-name', 'repos/sample/repo', {'id': 123, 'full_name': 'wrong/repo'}),
             ('metadata-id', 'repos/sample/repo', {'id': True, 'full_name': 'sample/repo'}),
+            ('metadata-branch-conflict', 'repos/sample/repo', {'id': 123, 'full_name': 'sample/repo', 'default_branch': 'other'}),
+            ('metadata-permission-conflict', 'repos/sample/repo', {'id': 123, 'full_name': 'sample/repo', 'permissions': {'pull': False}}),
             ('graphql-errors', 'graphql', {'data': {}, 'errors': []}),
             ('missing-viewer', 'graphql', {'data': {'repository': {}}}),
             ('partial-json', 'graphql', []),
@@ -152,16 +168,20 @@ class ClaimOutcomesTests(unittest.TestCase):
                 self.assertEqual(self.transport.objects(), before)
                 self.assertEqual(self.transport.mutations, [])
 
-    def test_creation_response_allows_non_authoritative_github_url_metadata(self):
+    def test_creation_response_allows_consistent_extra_github_metadata(self):
         def ack(command, kwargs):
             payload = json.loads(kwargs['input'])
-            return http_response(command, {'ref': payload['ref'], 'url': 'https://api.github.com/synthetic',
-                'object': {'sha': payload['sha'], 'type': 'commit', 'url': 'https://api.github.com/synthetic'}}, 201)
+            return http_response(command, {'ref': payload['ref'], 'node_id': 'synthetic-extra',
+                'url': 'https://api.github.com/repos/sample/repo/git/' + payload['ref'],
+                'object': {'sha': payload['sha'], 'type': 'commit',
+                    'url': 'https://api.github.com/repos/sample/repo/git/commits/' + payload['sha']}}, 201)
         self.transport.after_create = ack
         self.assertEqual(self.first.claim(REQUEST_ID).state, AttemptState.REQUESTED)
 
     def test_parent_commit_response_is_validated_before_any_git_object_write(self):
-        for value in ({}, {'tree': {'sha': 'short'}}, [], None):
+        parent = self.transport.git('rev-parse', 'refs/heads/dev').decode().strip()
+        for value in ({}, {'sha': parent, 'tree': {'sha': 'short'}},
+                      {'sha': 'f' * 40, 'tree': {'sha': self.transport.base_tree}}, [], None):
             with self.subTest(value=value):
                 def fault(command, kwargs):
                     if command[3] == 'GET' and '/git/commits/' in command[4]:
@@ -186,6 +206,44 @@ class ClaimOutcomesTests(unittest.TestCase):
                     journal.claim(REQUEST_ID)
                 self.assertTrue(t.mutations[-1]['endpoint'].endswith('/git/' + resource))
                 self.assertFalse(any(c['endpoint'].endswith('/git/refs') for c in t.mutations))
+
+    def test_capability_and_creation_base_scope_contradictions_never_create_claim(self):
+        for boundary in (1, 2):
+            for invalid in ('ref', 'url', 'target-url', 'type', 'missing'):
+                with self.subTest(boundary=boundary, invalid=invalid), tempfile.TemporaryDirectory() as temp:
+                    t = HttpGitTransport(Path(temp) / 'wrong-scope.git')
+                    journal = GitHubRefJournal('sample/repo', runner=t)
+                    sha = t.git('rev-parse', 'refs/heads/dev').decode().strip()
+                    value = dict(ref='refs/heads/dev', url='https://api.github.com/repos/sample/repo/git/refs/heads/dev',
+                                 object={'sha': sha, 'type': 'commit'})
+                    if invalid == 'ref':
+                        value['ref'] = 'refs/heads/other'
+                    elif invalid == 'url':
+                        value['url'] = 'https://api.github.com/repos/wrong/repo/git/refs/heads/dev'
+                    elif invalid == 'target-url':
+                        value['object']['url'] = 'https://api.github.com/repos/wrong/repo/git/commits/' + sha
+                    elif invalid == 'type':
+                        value['object']['type'] = 'tag'
+                    else:
+                        value = {'object': {'sha': sha, 'type': 'commit'}}
+                    reads = 0
+                    def fault(command, kwargs):
+                        nonlocal reads
+                        if command[3] == 'GET' and '/git/ref/heads/' in command[4]:
+                            reads += 1
+                            if reads == boundary:
+                                return http_response(command, value)
+                    t.fault = fault
+                    before_objects, before_refs = t.objects(), t.refs()
+                    expected = JournalReadKind.UNKNOWN if boundary == 1 else JournalReadKind.ABSENT_AUTHENTICATED
+                    self.assertEqual(journal._observe(REQUEST_ID).kind, expected)
+                    reads = 0
+                    with self.assertRaises(JournalReadUnknown):
+                        journal.claim(REQUEST_ID)
+                    self.assertEqual(t.mutations, [])
+                    self.assertEqual(t.objects(), before_objects)
+                    self.assertEqual(t.refs(), before_refs)
+                    self.assertEqual(reads, boundary)
 
     def test_new_claim_base_ref_failure_precedes_object_creation(self):
         def fault(command, kwargs):

@@ -14,7 +14,9 @@ from .artifact_locator import (
 )
 from .identity import attempt_identity, canonical_bytes
 from .github_journal_http import GitHubJournalResponse, JournalReadUnknown, journal_request
-from .github_journal_read import JournalObservation, JournalReadKind, commit_sha, observe_journal
+from .github_journal_read import (
+    JournalObservation, JournalReadKind, commit_sha, observe_journal, ref_commit_sha,
+)
 from .publication import validate_publication_intent, validate_publication_receipt
 from .queue import (
     AttemptRecord,
@@ -64,15 +66,17 @@ class GitHubRefJournal:
         # can supply the existing deterministic claim, under the v1 duplicate rule.
         if response.status not in {201, 422}:
             raise JournalReadUnknown("ATOMIC_CLAIM_OUTCOME_UNKNOWN")
-        created = response.value if isinstance(response.value, dict) else {}
-        created_object = created.get("object")
-        if response.status == 201 and (
-            created.get("ref") != self._claim_ref(request_id)
-            or not isinstance(created_object, dict)
-            or created_object.get("sha") != commit_sha
-            or created_object.get("type") != "commit"
-        ):
-            raise JournalReadUnknown("ATOMIC_CLAIM_OUTCOME_UNKNOWN")
+        if response.status == 201:
+            try:
+                # ACK metadata cannot supply read authority, but any supplied
+                # scope must agree; exact authoritative readback is still owed.
+                acknowledged = ref_commit_sha(
+                    response.value, self.repository, self._claim_ref(request_id), require_url=False,
+                )
+                if acknowledged != commit_sha:
+                    raise ValueError
+            except (KeyError, TypeError, ValueError):
+                raise JournalReadUnknown("ATOMIC_CLAIM_OUTCOME_UNKNOWN") from None
         winner = self._read(request_id)
         if winner is None:
             raise JournalReadUnknown("ATOMIC_CLAIM_NOT_OBSERVED")
@@ -332,6 +336,8 @@ class GitHubRefJournal:
     def _state_commit(self, parent_sha: str, record: AttemptRecord) -> str:
         parent = json.loads(self._api("GET", f"repos/{self.repository}/git/commits/{parent_sha}").stdout)
         try:
+            if parent["sha"] != parent_sha:
+                raise ValueError
             parent_tree = commit_sha(parent["tree"]["sha"])
         except (KeyError, TypeError, ValueError):
             raise JournalReadUnknown("JOURNAL_PARENT_TREE_UNKNOWN") from None
@@ -356,7 +362,7 @@ class GitHubRefJournal:
     def _ref_sha(self, ref: str) -> str:
         result = self._api("GET", f"repos/{self.repository}/git/ref/{ref}")
         try:
-            return commit_sha(json.loads(result.stdout)["object"]["sha"])
+            return ref_commit_sha(json.loads(result.stdout), self.repository, f"refs/{ref}")
         except (KeyError, TypeError, ValueError):
             raise JournalReadUnknown("JOURNAL_BASE_REF_UNKNOWN") from None
 

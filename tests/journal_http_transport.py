@@ -41,7 +41,7 @@ class HttpGitTransport(JournalGitTransport):
             return http_response(command, {'id': 123, 'full_name': 'sample/repo', 'private': True})
         if '/git/ref/heads/' in endpoint:
             sha = self.git('rev-parse', 'refs/heads/' + endpoint.split('/git/ref/heads/')[1]).decode().strip()
-            return http_response(command, {'object': {'sha': sha, 'type': 'commit'}})
+            return scoped_response(command, {'object': {'sha': sha, 'type': 'commit'}})
         if method == 'GET' and '/git/refs/heads/' in endpoint:
             ref = 'refs/heads/' + endpoint.split('/git/refs/heads/')[1]
             found = self.git('show-ref', '--verify', '--hash', ref, check=False)
@@ -59,7 +59,7 @@ class HttpGitTransport(JournalGitTransport):
             return http_response(command, {'ref': payload['ref'], 'object': {'sha': payload['sha'], 'type': 'commit'}}, 201)
         result = super().__call__([part for part in command if part != '--include'], **kwargs)
         value = json.loads(result.stdout)
-        if '/git/refs/heads/' in endpoint:
+        if method == 'GET' or '/git/refs/heads/' in endpoint:
             return scoped_response(command, value, result.returncode)
         status = 201 if method == 'POST' else 200
         if result.returncode:

@@ -32,6 +32,22 @@ def commit_sha(value: object) -> str:
     return value
 
 
+def ref_commit_sha(
+    value: object, repository: str, ref: str, *, require_url: bool = True,
+) -> str:
+    if not isinstance(value, dict):
+        raise ValueError
+    if value['ref'] != ref or value['object']['type'] != 'commit':
+        raise ValueError
+    if (require_url or 'url' in value) and value.get('url') != f'https://api.github.com/repos/{repository}/git/{ref}':
+        raise ValueError
+    sha = commit_sha(value['object']['sha'])
+    target = value['object']
+    if 'url' in target and target['url'] != f'https://api.github.com/repos/{repository}/git/commits/{sha}':
+        raise ValueError
+    return sha
+
+
 def verified_absence(repository: str, base_branch: str, request: Callable[..., GitHubJournalResponse]) -> bool:
     """A ref 404 alone says nothing about repository or credential readability.
 
@@ -54,6 +70,10 @@ def verified_absence(repository: str, base_branch: str, request: Callable[..., G
     data = identity.value['data']
     repo, viewer = data['repository'], data['viewer']
     branch = repo['defaultBranchRef']
+    if ('default_branch' in meta and meta['default_branch'] != base_branch
+            or 'permissions' in meta and (
+                not isinstance(meta['permissions'], dict) or meta['permissions'].get('pull') is not True)):
+        return False
     if (type(meta['id']) is not int or meta['id'] <= 0
             or meta['full_name'] != repository or repo['nameWithOwner'] != repository
             or type(repo['databaseId']) is not int or repo['databaseId'] != meta['id']
@@ -64,8 +84,8 @@ def verified_absence(repository: str, base_branch: str, request: Callable[..., G
         return False
     expected = commit_sha(branch['target']['oid'])
     base = request('GET', f'repos/{repository}/git/ref/heads/{base_branch}')
-    return (base.status == 200 and base.value['object']['type'] == 'commit'
-            and commit_sha(base.value['object']['sha']) == expected)
+    return (base.status == 200
+            and ref_commit_sha(base.value, repository, f'refs/heads/{base_branch}') == expected)
 
 
 def observe_journal(
@@ -81,15 +101,12 @@ def observe_journal(
             return JournalObservation(JournalReadKind.UNKNOWN, reason='JOURNAL_ABSENCE_UNVERIFIED')
         if ref.status != 200:
             return JournalObservation(JournalReadKind.UNKNOWN, reason='JOURNAL_REF_READ_UNKNOWN')
-        value = ref.value
-        if (value['ref'] != claim_ref or value['url'] != f'https://api.github.com/repos/{repository}/git/{claim_ref}'
-                or value['object']['type'] != 'commit'):
-            raise ValueError
-        sha = commit_sha(value['object']['sha'])
+        sha = ref_commit_sha(ref.value, repository, claim_ref)
         reason = 'JOURNAL_CONTENT_RESPONSE_INVALID'
         content = request('GET', f'repos/{repository}/contents/{state_path}?ref={sha}')
         value = content.value
-        if content.status != 200 or value['encoding'] != 'base64' or not isinstance(value['content'], str):
+        if (content.status != 200 or value['path'] != state_path or value['type'] != 'file'
+                or value['encoding'] != 'base64' or not isinstance(value['content'], str)):
             raise ValueError
         raw = decode_github_contents_base64(value['content'])
         decoded = json.loads(raw.decode('utf-8'))
@@ -101,5 +118,5 @@ def observe_journal(
         return JournalObservation(JournalReadKind.PRESENT_VERIFIED, (sha, record))
     except JournalReadUnknown as exc:
         return JournalObservation(JournalReadKind.UNKNOWN, reason=str(exc))
-    except (KeyError, TypeError, ValueError, AttributeError, StateTransitionError):
+    except (KeyError, TypeError, ValueError, AttributeError, RecursionError, StateTransitionError):
         return JournalObservation(JournalReadKind.UNKNOWN, reason=reason)
