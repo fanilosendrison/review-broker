@@ -9,5 +9,6 @@ dist/
 build/
 artifacts/
 evidence/
+qualification-evidence/
 .env
 .DS_Store
