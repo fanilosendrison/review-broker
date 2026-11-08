@@ -346,6 +346,31 @@ loopback and Git-environment tests. The complete current suite remains **675
 PASS** under the normal CI umask. A new exact-SHA independent verdict and CI
 receipt, rather than the previous NO_GO, must qualify the resulting commit.
 
+## Known object roles and explicit path witnesses
+
+The rereview of `4b09f9cd08185c3d4ddaf43444ad8f858e741649` concluded
+**NO_GO**, with `R1-4B09-01` and `R1-4B09-02` (both Medium). The ACK could
+label a held, verified blob or parent commit ID as a containing tree. An expanded
+sibling sharing the first path component could also pass without the requested
+leaf or an explicit containing ancestor. Actual-gh/local-Git tests observed
+post-ACK commit/ref writes and inert issuer-boundary reachability. No real OIDC,
+model invocation or consumed-attempt replay was established by these cases.
+
+The immutable proposal now carries the already-established object roles into
+ACK validation. A supplied child entry cannot contradict a known blob, tree or
+commit identity. When the exact requested leaf is absent, the descriptor must
+contain an explicit compatible tree ancestor, not merely an unrelated sibling
+with the same first component. No new remote graph fetch, history field or
+authority service is introduced. Minimal legacy ACK metadata and valid root,
+leaf and combined descriptions keep their positive controls.
+
+All **36 unchanged independent controls PASS** in a separate coordinator replay,
+including the six previously RED manifestations. Maintained regressions cover
+known blob/commit subtree aliases and sibling-only descriptions. The source
+suite remains **675 PASS** under umask 022, with **77 targeted tests PASS**.
+The earlier reports and RED data remain immutable; a new independent exact-SHA
+verdict and CI receipt must qualify this refinement.
+
 ## Exact CI commit selection
 
 The initial PR CI runs were successful but checked out GitHub's synthetic merge
