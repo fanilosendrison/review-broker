@@ -503,6 +503,36 @@ finite-link mechanism is replaceable and introduces no product choice. Required
 next action: publish and independently qualify a new exact SHA, never reuse the
 old SHA's verdict or CI as acceptance of this correction.
 
+## Identity projection compatibility and reviewer continuation
+
+The independent review of `136c40a5dc61df1b802d376d7108ea145cf5c034`
+concluded **GO** in its bounded tested scope: 50 prior controls plus four fresh
+joint-fact probes passed. That old GO is preserved separately from the producer
+cycle counterexample and is not acceptance of either later revision.
+
+The finite-link correction in
+`4c38e4545c372b8fa5f7be9d3f4173be93e80a6f` changed the existing
+`git_object_identity` return shape. The unchanged independent positive caller
+control then failed with too many values to unpack. That producer replay RED is
+retained. The established three-value identity/role/size projection is now
+preserved by a wrapper over the single canonical `git_object_facts` validator;
+the immutable proposal uses that complete-fact entry point and retains links.
+No validator or production rule is duplicated, and the old oracle is unchanged.
+All **54 unchanged independent controls PASS** in a new producer replay, with
+**684 full-suite** and **86 targeted tests PASS**. Five additional actual-gh/
+native-Git size/cycle controls pass. Installed-byte matching and static gates
+also pass. This is a `no-normative-impact` implementation/verification repair.
+
+The native reviewer launch for 4c38e45 failed before review with a context-window
+error, producing no verdict. Pi's documented native same-session compaction
+succeeded on that reviewer's own history, preserving the complete historical
+file prefix. No producer-authored summary, new conversation, model substitution,
+credential inspection or harness patch was used. Intentional continuation and
+lossy native compaction remain attestation limits, not fresh-conversation proof.
+The incomplete attempt stays separate from every old verdict and from product
+execution. A new exact-SHA independent verdict and literal CI must qualify the
+projection-compatible correction.
+
 ## Exact CI commit selection
 
 The initial PR CI runs were successful but checked out GitHub's synthetic merge
