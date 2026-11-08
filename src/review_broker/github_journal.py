@@ -1,10 +1,8 @@
 """Git-ref-backed durable attempt journal."""
 from __future__ import annotations
 
-import base64
 from dataclasses import replace
 import json
-import secrets
 import subprocess
 from typing import Any, Callable, Mapping
 
@@ -12,9 +10,10 @@ from .artifact_locator import (
     validate_evidence_artifact_locator,
     validate_evidence_artifact_plan,
 )
-from .identity import attempt_identity, canonical_bytes
+from .identity import attempt_identity
 from .github_journal_http import GitHubJournalResponse, JournalReadUnknown, journal_request
-from .github_journal_identity import git_object_sha, ref_commit_sha
+from .github_journal_identity import ref_commit_sha, verify_ref_update_ack
+from .github_journal_objects import state_commit
 from .github_journal_read import JournalObservation, JournalReadKind, observe_journal
 from .publication import validate_publication_intent, validate_publication_receipt
 from .queue import (
@@ -333,37 +332,9 @@ class GitHubRefJournal:
         return journal_request(self.runner, method, endpoint, payload)
 
     def _state_commit(self, parent_sha: str, record: AttemptRecord) -> str:
-        parent = json.loads(self._api("GET", f"repos/{self.repository}/git/commits/{parent_sha}").stdout)
-        try:
-            if git_object_sha(parent, self.repository, "commits") != parent_sha:
-                raise ValueError
-            parent_tree = git_object_sha(parent["tree"], self.repository, "trees")
-        except (KeyError, TypeError, ValueError, RecursionError):
-            raise JournalReadUnknown("JOURNAL_PARENT_TREE_UNKNOWN") from None
-        encoded = base64.b64encode(canonical_bytes(record.as_dict()) + b"\n").decode("ascii")
-        blob = self._create_object("blobs", {"content": encoded, "encoding": "base64"})
-        tree = self._create_object("trees", {
-            "base_tree": parent_tree,
-            "tree": [{"path": self.STATE_PATH, "mode": "100644", "type": "blob", "sha": blob}],
-        })
-        return self._create_object("commits", {
-            "message": f"state: {record.state.value} {record.attempt_id}\n\ntransaction: {secrets.token_hex(32)}",
-            "tree": tree, "parents": [parent_sha],
-        })
-
-    def _create_object(self, resource: str, payload: dict[str, Any]) -> str:
-        result = self._api("POST", f"repos/{self.repository}/git/{resource}", payload)
-        try:
-            value = json.loads(result.stdout)
-            sha = git_object_sha(value, self.repository, resource)
-            if resource == "commits":
-                if "tree" in value and git_object_sha(value["tree"], self.repository, "trees") != payload["tree"]:
-                    raise ValueError
-                if "parents" in value and [git_object_sha(p, self.repository, "commits") for p in value["parents"]] != payload["parents"]:
-                    raise ValueError
-            return sha
-        except (KeyError, TypeError, ValueError, RecursionError):
-            raise JournalReadUnknown("JOURNAL_OBJECT_RESPONSE_UNKNOWN") from None
+        return state_commit(
+            self._api, self.repository, self.STATE_PATH, parent_sha, record,
+        )
 
     def _ref_sha(self, ref: str) -> str:
         result = self._api("GET", f"repos/{self.repository}/git/ref/{ref}")
@@ -389,6 +360,16 @@ class GitHubRefJournal:
         response = self._request(method, endpoint, payload)
         expected = 201 if method == "POST" else 200
         code = 0 if response.status == expected else 1
+        if method == "PATCH" and not code:
+            try:
+                prefix = f"repos/{self.repository}/git/"
+                if not endpoint.startswith(prefix) or payload is None:
+                    raise ValueError
+                verify_ref_update_ack(
+                    response.value, self.repository, endpoint[len(prefix):], payload["sha"],
+                )
+            except (KeyError, TypeError, ValueError, RecursionError):
+                raise JournalReadUnknown("JOURNAL_UPDATE_ACK_UNKNOWN") from None
         if check and code:
             raise JournalReadUnknown("GITHUB_JOURNAL_API_FAILED")
         return subprocess.CompletedProcess([], code, json.dumps(response.value), "")
