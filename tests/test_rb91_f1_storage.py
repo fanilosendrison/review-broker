@@ -11,6 +11,7 @@ from review_broker.github_oidc import GitHubOIDCError, verify_github_identity
 from rb91_full_abi_model import validate, validate_transition, validate_result_bytes
 from rb91_result_reference_model import REFERENCE_SCHEMA
 from rb91_storage_fixtures import StorageCase
+from rb91_publication_recovery_model import PublicationStore
 from rb91_storage_provenance_model import verify_storage, authorization_receipt
 from rb91_jch_contract_model import artifact, fixture_armed
 
@@ -232,6 +233,38 @@ class F1StorageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'RESULT_STORAGE_UNVERIFIED'):
             verify_storage(c.record,c.policy,token=c.token(),issuer_reader=c.issuer,runner=changing,destination=c.root/'verified')
         self.assertEqual(len(c.calls),7);self.assertEqual(len(reads),2)
+
+    def test_late_artifact_observation_drift_cannot_create_publication_ownership(self):
+        for field in ('created_at','size_in_bytes','expires_at','name'):
+            c=self.case();endpoint='repos/'+c.repository+'/actions/artifacts/12';reads=[]
+            def changing(command,**kwargs):
+                if command[2]==endpoint:
+                    reads.append(True)
+                    if len(reads)==2:
+                        values=dict(created_at='2001-01-01T00:00:00Z',size_in_bytes=c.responses[endpoint]['size_in_bytes']+1,
+                            expires_at='2099-01-01T00:00:00Z',name='contradictory-name')
+                        c.responses[endpoint][field]=values[field]
+                return c.runner(command,**kwargs)
+            store=PublicationStore(c.policy.execution_snapshot)
+            with self.subTest(field=field),self.assertRaisesRegex(ValueError,'RESULT_STORAGE_UNVERIFIED'):
+                store.reserve(c.record,c.policy,token=c.token(),issuer_reader=c.issuer,runner=changing,destination=c.root/'verified')
+            self.assertEqual(len(c.calls),7);self.assertIsNone(store.record['publication_intent'])
+            self.assertEqual(store.permissions,set());self.assertEqual(store.record['invocation_count'],1)
+
+    def test_original_branch_and_immutable_metadata_are_confronted_with_context(self):
+        for field, wrong in [('head_branch','other-branch'),('created_at','2001-01-01T00:00:00Z'),
+                             ('size_in_bytes',1),('url','https://api.github.com/repos/other/repo/actions/artifacts/99')]:
+            c=self.case();value=c.responses['repos/'+c.repository+'/actions/artifacts/11']
+            if field=='head_branch':value['workflow_run'][field]=wrong
+            else:value[field]=wrong
+            with self.subTest(field=field):self.refused(c);self.assertEqual(len(c.calls),5)
+        c=self.case()
+        for identifier in (11,12):
+            value=c.responses[f'repos/{c.repository}/actions/artifacts/{identifier}']
+            value['workflow_run'].update(head_branch='dev',repository_id=int(c.policy.repository_id),head_repository_id=int(c.policy.repository_id))
+            value['url']=f'https://api.github.com/repos/{c.repository}/actions/artifacts/{identifier}'
+            value['archive_download_url']=value['url']+'/zip';value['node_id']='synthetic-artifact-'+str(identifier)
+        self.verify(c);self.assertEqual(len(c.calls),8)
 
     def test_malformed_policy_actor_cannot_authorize_integer_identity_through_bool_alias(self):
         c=self.case();s=c.record['publication_intent']['result_artifact']['storage']

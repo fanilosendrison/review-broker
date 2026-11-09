@@ -53,10 +53,13 @@ def instant(text):
 
 class ScopedArtifactStore(GitHubActionsArtifactStore):
     """Confront source/run metadata on EVERY read, including inherited download reads."""
-    def __init__(self, repository, runner, bindings, repository_id):
+    def __init__(self, repository, runner, bindings, repository_id, branch, original_locator):
         super().__init__(repository,runner=runner)
         self.bindings = bindings
         self.repository_id = repository_id
+        self.branch = branch
+        self.original_locator = original_locator
+        self.observed_metadata = {}
 
     def _json(self, endpoint):
         value = super()._json(endpoint)
@@ -70,6 +73,27 @@ class ScopedArtifactStore(GitHubActionsArtifactStore):
                     if field in observed:
                         require(type(observed[field]) is int and str(observed[field]) == self.repository_id,
                                 'ARTIFACT_REPOSITORY_CONTEXT')
+                if 'head_branch' in observed:
+                    require(observed['head_branch'] == self.branch, 'ARTIFACT_BRANCH_CONTEXT')
+                for field, suffix in (('url',''),('archive_download_url','/zip')):
+                    if field in value:
+                        require(value[field] == f'https://api.github.com/repos/{self.repository}/actions/artifacts/{identifier}{suffix}',
+                                'ARTIFACT_URL_CONTEXT')
+                require(value.get('expired') is False, 'ARTIFACT_EXPIRED')
+                original = self.original_locator
+                if identifier == original['artifact_id']:
+                    expected = dict(name=original['artifact_name'],digest=original['artifact_digest'],
+                        size_in_bytes=original['artifact_size_in_bytes'],created_at=original['created_at'],
+                        expires_at=original['expires_at'])
+                    require(canonical_bytes({k:value[k] for k in expected}) == canonical_bytes(expected),
+                            'ORIGINAL_ARTIFACT_METADATA')
+                # Provider extensions remain possible, but recognized immutable
+                # assertions (including presence) cannot drift between reads.
+                fields = ('id','node_id','name','size_in_bytes','url','archive_download_url',
+                          'created_at','updated_at','expires_at','digest','workflow_run')
+                current = canonical_bytes({k:value[k] for k in fields if k in value})
+                previous = self.observed_metadata.setdefault(identifier,current)
+                require(current == previous, 'ARTIFACT_OBSERVATION_DRIFT')
         return value
 
 
@@ -159,7 +183,8 @@ def verify_storage(record, policy, *, token, issuer_reader, runner, destination)
         require(original_artifact != result_artifact, 'ARTIFACT_ROLE_ALIAS')
         store = ScopedArtifactStore(policy.repository,runner,{
             original_artifact:(execution['controller_run_id'],execution['controller_workflow_sha']),
-            result_artifact:(storage['run_id'],policy.workflows[storage['mode']]['workflow_sha'])},policy.repository_id)
+            result_artifact:(storage['run_id'],policy.workflows[storage['mode']]['workflow_sha'])},
+            policy.repository_id,policy.ref.removeprefix('refs/heads/'),snapshot['evidence_locator'])
         metadata = _verify_job(pointer,policy,store)
         terminal = Path(destination) / 'terminal'
         store.download(snapshot['evidence_locator'],terminal)
