@@ -1,0 +1,30 @@
+profile_version: "0.1.0"
+status: proposed
+activation: separate-owner-normative-integration-mandate
+shared_profile:
+  version: "0.1.0"
+  repository: "https://github.com/fanilosendrison/dotagents"
+  commit: "aa84e816385f082ea353b6254e490d85fe17bceb"
+  path: "conventions/architecture-decision-record.schema.json"
+  id: "urn:fanilosendrison:okf:architecture-decision-record:0.1.0"
+  sha256: "55c9ff189e686cb1d545d0cbcfc9527a72dd1e1185c5ba595a3a1da7f3aa8c57"
+  vendored_path: "schemas/okf-architecture-decision-record-0.1.0.schema.json"
+local_schema: "schemas/review-broker-adr.schema.json"
+domain: independent-review
+id_pattern: "^ADR-[0-9]{3}$"
+filename_pattern: "^adr-[0-9]{3}-[a-z0-9]+(?:-[a-z0-9]+)*[.]md$"
+h1_separator: " — "
+records: "adr-*.md"
+index: "README.md"
+legacy_without_frontmatter: []
+legacy_null_dates: []
+retention: never-reuse-allocated-identities
+accepted_integrity: identity-date-relations-governs-and-context-body-immutable
+lifecycle:
+  proposed: [accepted, rejected]
+  accepted: [deprecated, superseded]
+  rejected: []
+  deprecated: []
+  superseded: []
+validation: "python -m unittest discover -s tests -p test_adr_profile.py -v"
+rendering: "python scripts/render-adr-index.py --check"
