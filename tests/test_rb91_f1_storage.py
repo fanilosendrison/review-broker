@@ -1,5 +1,6 @@
 """F1 positive/negative admission through real JWT, ZIP and evidence validators."""
 from copy import deepcopy
+from dataclasses import replace
 import json
 from pathlib import Path
 import tempfile
@@ -169,6 +170,78 @@ class F1StorageTests(unittest.TestCase):
                 self.assertEqual(len(c.calls),8,'must reach result validator after both verified archives')
         c=self.case();result=json.loads(c.raw);result['validation']['semantic_correctness_validated']=True
         c.rebind_result(result);self.refused(c);self.assertEqual(len(c.calls),8)
+
+    def test_canonical_admission_identity_rejects_bool_integer_aliases(self):
+        for field in ('schema_version','policy_version'):
+            c=self.case();result=json.loads(c.raw)
+            if field=='schema_version':result['resolved_request']['schema_version']=True
+            else:result['resolved_request']['request']['policy']['version']=True
+            c.rebind_result(result)
+            with self.subTest(field=field):
+                self.refused(c)
+                self.assertEqual(len(c.calls),8,'must reach the exact resolved-admission comparison')
+
+    def test_observed_actor_identity_does_not_coerce_boolean_to_integer(self):
+        c=self.case();s=c.record['publication_intent']['result_artifact']['storage']
+        s['actor']=dict(login='operator',id=1);s['triggering_actor']=dict(login='operator',id=1)
+        c.policy=replace(c.policy,actors=frozenset({1}));c.resign_reference()
+        key=next(k for k in c.responses if '/attempts/' in k and '/jobs?' not in k)
+        c.responses[key]['actor']=dict(login='operator',id=True)
+        c.responses[key]['triggering_actor']=dict(login='operator',id=True)
+        self.refused(c);self.assertEqual(len(c.calls),2)
+        c.responses[key]['actor']=dict(login='operator',id=1)
+        c.responses[key]['triggering_actor']=dict(login='operator',id=1)
+        self.verify(c,suffix='typed-actor-valid')
+        self.assertEqual(len(c.calls),10)
+
+    def test_faithful_result_projection_cannot_turn_no_go_into_go(self):
+        c=self.case(verdict='NO_GO');honest=json.loads(c.raw)
+        self.assertEqual(honest['validation']['review_verdict'],'NO_GO')
+        self.verify(c,suffix='honest');c.calls.clear()
+        forged=deepcopy(honest);forged['review_verdict']='GO';c.rebind_result(forged)
+        self.refused(c,suffix='forged');self.assertEqual(len(c.calls),8)
+
+    def test_coherent_signed_result_cannot_erase_or_fabricate_original_review(self):
+        for field, value in [('findings',[]),('sources_examined',[]),('remaining_uncertainties',[]),
+                             ('execution_status','FAILED'),('evidence_status','INVALID')]:
+            c=self.case();result=json.loads(c.raw)
+            self.assertNotEqual(result[field],value,'negative must actually change an evidence-derived field')
+            result[field]=value;c.rebind_result(result)
+            with self.subTest(field=field):self.refused(c);self.assertEqual(len(c.calls),8)
+        for key, value in [('effective_model_identity_verified',True),('effective_reasoning_effort_verified',True),
+                           ('model_requested','fabricated-model'),('reasoning_effort_requested','fabricated-effort')]:
+            c=self.case();result=json.loads(c.raw);result['reviewer'][key]=value;c.rebind_result(result)
+            with self.subTest(key=key):self.refused(c);self.assertEqual(len(c.calls),8)
+
+    def test_public_v1_reviewer_extensions_are_preserved_without_changing_core_fields(self):
+        c=self.case();result=json.loads(c.raw)
+        result['reviewer']['extension_note']='Synthetic non-authoritative runtime note'
+        c.rebind_result(result);self.verify(c)
+        self.assertEqual(json.loads(c.raw)['reviewer']['extension_note'],result['reviewer']['extension_note'])
+
+    def test_original_terminal_source_metadata_is_checked_before_zip_and_on_every_read(self):
+        for field, value in [('head_sha','0'*40),('id',99),('repository_id',99)]:
+            c=self.case();c.responses['repos/'+c.repository+'/actions/artifacts/11']['workflow_run'][field]=value
+            with self.subTest(field=field):self.refused(c);self.assertEqual(len(c.calls),5)
+        c=self.case();endpoint='repos/'+c.repository+'/actions/artifacts/12';reads=[]
+        def changing(command,**kwargs):
+            if command[2]==endpoint:
+                reads.append(True)
+                if len(reads)==2:c.responses[endpoint]['workflow_run']['head_sha']='0'*40
+            return c.runner(command,**kwargs)
+        with self.assertRaisesRegex(ValueError,'RESULT_STORAGE_UNVERIFIED'):
+            verify_storage(c.record,c.policy,token=c.token(),issuer_reader=c.issuer,runner=changing,destination=c.root/'verified')
+        self.assertEqual(len(c.calls),7);self.assertEqual(len(reads),2)
+
+    def test_malformed_policy_actor_cannot_authorize_integer_identity_through_bool_alias(self):
+        c=self.case();s=c.record['publication_intent']['result_artifact']['storage']
+        s['actor']=dict(login='operator',id=1);s['triggering_actor']=dict(login='operator',id=1)
+        key=next(k for k in c.responses if '/attempts/' in k and '/jobs?' not in k)
+        c.responses[key]['actor']=dict(login='operator',id=1);c.responses[key]['triggering_actor']=dict(login='operator',id=1)
+        c.policy=replace(c.policy,actors=frozenset({True}));c.resign_reference()
+        self.refused(c);self.assertEqual(c.calls,[])
+        c.policy=replace(c.policy,actors=frozenset({1}));c.resign_reference()
+        self.verify(c,suffix='valid-policy');self.assertEqual(len(c.calls),8)
 
     def test_provider_incidental_actor_fields_are_not_journal_fields(self):
         c=self.case();key=next(k for k in c.responses if '/attempts/' in k and '/jobs?' not in k)

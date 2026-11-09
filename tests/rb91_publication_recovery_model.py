@@ -8,8 +8,9 @@ import hashlib
 import json
 import threading
 
+from review_broker.identity import canonical_bytes
 from review_broker.publication import GitHubPublisher, render_result_comment
-from rb91_full_abi_model import validate, validate_transition
+from rb91_full_abi_model import validate_transition
 from rb91_jch_contract_model import artifact, fixture_transition
 from rb91_storage_provenance_model import verify_storage
 
@@ -68,8 +69,14 @@ class PublicationStore:
         body = render_result_comment(json.loads(raw),publication_id=intent['publication_id'])
         if hashlib.sha256(body.encode()).hexdigest() != intent['comment_body_sha256']:
             raise ValueError('PUBLICATION_BYTES')
-        matches = [c for c in publisher.comments(intent['issue_number'])
-                   if c.get('body') == body and c.get('user') == intent['publisher']]
+        matches = []
+        for comment in publisher.comments(intent['issue_number']):
+            actor = comment.get('user')
+            if not isinstance(actor,dict):
+                continue
+            observed = {key:actor.get(key) for key in ('login','id')}
+            if comment.get('body') == body and canonical_bytes(observed) == canonical_bytes(intent['publisher']):
+                matches.append(comment)
         if len(matches) > 1:
             raise ValueError('DUPLICATE_PUBLICATION_INCIDENT')
         if not matches:

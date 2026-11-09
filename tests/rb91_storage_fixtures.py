@@ -42,7 +42,7 @@ def replace_last_evidence(record, value):
 
 
 class StorageCase:
-    def __init__(self, root, *, recovery=True, attempt='1', same_run=False):
+    def __init__(self, root, *, recovery=True, attempt='1', same_run=False, verdict='GO'):
         self.root = Path(root)
         self.repository = 'sample/broker'
         source = self.root/'source'
@@ -60,8 +60,13 @@ class StorageCase:
         broker = json.loads((source/'broker-metadata.json').read_bytes())
         broker.update(attempt_id=ready['attempt_id'],executing_broker_sha='e'*40)
         (source/'broker-metadata.json').write_bytes(canonical_bytes(broker)+b'\n')
-        events = (source/'codex-events.jsonl').read_text() + '{"type":"turn.completed"}\n'
-        (source/'codex-events.jsonl').write_text(events)
+        events = [json.loads(line) for line in (source/'codex-events.jsonl').read_text().splitlines()]
+        if verdict != 'GO':
+            final = json.loads((source/'codex-final.json').read_text());final['verdict'] = verdict
+            final_text = json.dumps(final,separators=(',',':'))
+            (source/'codex-final.json').write_text(final_text);events[1]['item']['text'] = final_text
+        events.append(dict(type='turn.completed'))
+        (source/'codex-events.jsonl').write_text('\n'.join(json.dumps(event) for event in events)+'\n')
         raw_input = (source/'input.txt').read_bytes();text = raw_input.decode()
         cap = ready['input_capacity']
         cap.update(packet_id=manifest['packet_id'],input_sha256=hashlib.sha256(raw_input).hexdigest(),

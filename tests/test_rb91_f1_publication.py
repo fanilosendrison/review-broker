@@ -26,7 +26,9 @@ class CommentTransport:
         self.posts+=1
         if not self.drop:
             self.comments.append(dict(id=8,node_id='synthetic-node',html_url='https://github.com/sample/broker/issues/7#issuecomment-8',
-                created_at='2026-11-09T00:00:00Z',user=dict(login='broker',id=9),body=json.loads(kwargs['input'])['body']))
+                created_at='2026-11-09T00:00:00Z',
+                user=dict(login='broker',id=9,type='Bot',node_id='synthetic-user',html_url='https://github.com/broker'),
+                body=json.loads(kwargs['input'])['body']))
         return subprocess.CompletedProcess(command,1 if self.lost_ack or self.drop else 0,'{}','')
 
 
@@ -105,6 +107,14 @@ class F1PublicationTests(unittest.TestCase):
         c,store=self.case();permission=self.reserve(c,store);api=CommentTransport()
         store.post(permission,c.raw,api);api.comments.append(deepcopy(api.comments[0]))
         with self.assertRaisesRegex(ValueError,'DUPLICATE_PUBLICATION_INCIDENT'):store.observe(c.raw,api)
+        self.assertEqual(api.posts,1)
+
+    def test_realistic_actor_metadata_retains_existing_publication_without_repost(self):
+        c,store=self.case();permission=self.reserve(c,store);api=CommentTransport()
+        self.assertTrue(store.post(permission,c.raw,api));self.assertEqual(api.posts,1)
+        api.comments[0]['user']['avatar_url']='https://example.invalid/image'
+        restarted=PublicationStore(deepcopy(store.record))
+        self.assertTrue(restarted.observe(c.raw,api));self.assertIsNone(self.reserve(c,restarted))
         self.assertEqual(api.posts,1)
 
     def test_unknown_comment_read_cannot_post_or_create_an_observation(self):
