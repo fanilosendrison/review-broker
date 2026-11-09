@@ -1,0 +1,118 @@
+[
+  {
+    "mode": "stop_first",
+    "states": 98,
+    "edges": 172,
+    "double_start": null,
+    "late_start": null,
+    "launch_reachable": true,
+    "stopped_reachable": true,
+    "lost_ack_start": false,
+    "stop_without_shutdown": false,
+    "start_during_cancel": true
+  },
+  {
+    "mode": "mark_first",
+    "states": 138,
+    "edges": 288,
+    "double_start": null,
+    "late_start": [
+      "clean-ACK-and-exact-readback",
+      "proof-in-transit",
+      "controller-dies",
+      "original-launcher-receives-proof",
+      "one-shot-claim",
+      "reconciler-begins",
+      "commit-INDETERMINATE",
+      "first-child-start"
+    ],
+    "launch_reachable": true,
+    "stopped_reachable": true,
+    "lost_ack_start": false,
+    "stop_without_shutdown": false,
+    "start_during_cancel": true
+  },
+  {
+    "mode": "cancel_only",
+    "states": 112,
+    "edges": 220,
+    "double_start": null,
+    "late_start": [
+      "clean-ACK-and-exact-readback",
+      "proof-in-transit",
+      "controller-dies",
+      "original-launcher-receives-proof",
+      "one-shot-claim",
+      "reconciler-begins",
+      "cancel-in-transit",
+      "commit-INDETERMINATE",
+      "first-child-start"
+    ],
+    "launch_reachable": true,
+    "stopped_reachable": true,
+    "lost_ack_start": false,
+    "stop_without_shutdown": false,
+    "start_during_cancel": true
+  },
+  {
+    "mode": "read_before_start",
+    "states": 161,
+    "edges": 339,
+    "double_start": null,
+    "late_start": [
+      "clean-ACK-and-exact-readback",
+      "proof-in-transit",
+      "controller-dies",
+      "original-launcher-receives-proof",
+      "one-shot-claim",
+      "reconciler-begins",
+      "fresh-head-check",
+      "commit-INDETERMINATE",
+      "first-child-start"
+    ],
+    "launch_reachable": true,
+    "stopped_reachable": true,
+    "lost_ack_start": false,
+    "stop_without_shutdown": false,
+    "start_during_cancel": true
+  },
+  {
+    "mode": "clone",
+    "states": 155,
+    "edges": 319,
+    "double_start": [
+      "clean-ACK-and-exact-readback",
+      "proof-in-transit",
+      "original-launcher-receives-proof",
+      "one-shot-claim",
+      "FAULT-copy-authorized-process",
+      "first-child-start",
+      "copied-process-start"
+    ],
+    "late_start": null,
+    "launch_reachable": true,
+    "stopped_reachable": true,
+    "lost_ack_start": false,
+    "stop_without_shutdown": false,
+    "start_during_cancel": true
+  },
+  {
+    "mode": "reenter",
+    "states": 116,
+    "edges": 202,
+    "double_start": [
+      "clean-ACK-and-exact-readback",
+      "proof-in-transit",
+      "original-launcher-receives-proof",
+      "one-shot-claim",
+      "first-child-start",
+      "FAULT-reenter-start-call"
+    ],
+    "late_start": null,
+    "launch_reachable": true,
+    "stopped_reachable": true,
+    "lost_ack_start": false,
+    "stop_without_shutdown": false,
+    "start_during_cancel": true
+  }
+]
