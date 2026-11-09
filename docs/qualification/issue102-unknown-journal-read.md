@@ -569,6 +569,78 @@ product choice or complete remote-graph attestation. A new exact published SHA
 must receive its own literal CI and independent verdict; the old subject's
 findings and results cannot qualify the corrected bytes.
 
+## Same immutable tree child bindings (R1-9F7-01)
+
+A completed independent correctness examination of
+`9f7326563ef496c4a62d9b235f8afbbb45fef987` concluded **NO_GO** with
+`R1-9F7-01` (Medium). This completed report is separate from the earlier
+provider-refused incomplete attempt on that SHA. Both remain immutable.
+The full private report SHA-256 is
+`b1983ee2dd575dd2c0f06073971e1c1fdb293201dcae21f9a06d4f3b237f72fc`;
+its sanitary finding and exact additional programs are preserved in
+[the historical review comment](https://github.com/fanilosendrison/review-broker/pull/106#issuecomment-6729001852).
+
+Two aliases could explicitly identify the same immutable tree S, yet describe
+`S/alpha.txt` as different blobs. Flat and nested responses passed individual
+role, size and finite-link checks. The unchanged independent matrix had
+**66 PASS / three safety FAIL**; maintained **685 full / 87 targeted PASS** did
+not waive the defect. Actual-gh/native-Git flat and nested claims each made two
+later mutation requests, one commit and a new ref. The controller made ten later
+requests, nine new objects, ref updates and one inert issuer call, reaching
+ARMED/count1. Legitimate earlier effects remain separately counted. No actual
+model, live OIDC, consumed replay or remote one-use bypass was demonstrated.
+
+Before repair, all sixteen frozen transport/test/recorder programs were copied
+to a new producer scratch root, with their hashes verified. An exact disposable
+clone of the rejected SHA reproduced all three original required-refusal REDs
+unchanged (exit 1); four positive methods passed. Original receipts and the
+reviewer worktree were not modified.
+
+The narrow tree-binding module now reconciles explicit
+`(tree identity, relative Git path)` assertions including mode, kind and child
+identity. It retains sparse rooted paths and rebases suffixes only when an
+explicitly identified prefix permits it, including a prefix supplied in a later
+ACK. Compatible partial lists do not assert missing children are absent. Exact
+Git path strings are not normalized through OS paths, case folding or Unicode
+normalization. No absent identity is inferred and no graph is fetched.
+
+The identity module remains the single provider-fact validator. A separate typed
+complete context carries bindings, roles, sizes and links through one immutable
+proposal, including submitted paths. Existing three-value `git_object_identity`
+and four-value `git_object_facts` projections delegate to it without changing
+shape. The proposal owns object construction; the journal still owns refs and
+business authority. No global cache, durable state, schema, dependency, workflow,
+attempt, nonce, CAS, retry or admission change is introduced.
+
+Producer qualification on the repaired bytes passes **69 unchanged independent
+methods**, including the three formerly RED assertions, **103 maintained targeted
+methods** and **701 full-suite tests** under umask022 with exact fixtures.
+Sixteen new maintained methods cover alias orders, modes/types, exact path
+names, mixed flat/nested and compatible partial descriptions, deferred-prefix
+retention, and native-Git successive-ACK refusal before any further request.
+All previous role, size and cycle controls remain passing. Seven original R1
+inputs still refuse at UNKNOWN; fresh scenario receipts separately record
+requests, objects, refs and authorization effects.
+
+A first producer full-suite run incorrectly supplied a symlink as the strict
+PR72 fixture path and failed fixture validation; its complete nonpassing output
+is retained. The corrected run uses the original exact non-symlink fixtures,
+without an oracle change. A packaging attempt disabling build isolation failed
+because that private environment lacked `bdist_wheel`; the normal pinned
+isolated build then installed successfully. Neither setup failure is represented
+as a passing run or confused with the original three product REDs or the
+independent, still-open umask077 fixture defect in Issue #107.
+
+Discovery: contradictory child bindings cannot establish a valid immutable
+proposal or permission to advance. Existing authority is the accepted immutable
+snapshot and fail-closed execution boundary. Disposition:
+`derived-from-existing-authority`; affected layers are implementation,
+integration/conformance and verification/qualification. The binding table is a
+replaceable `no-normative-impact` mechanism, not a new product choice or stronger
+malicious-service/full-graph guarantee. Required next action: publish and obtain
+new literal exact-SHA CI and independent review, preserving all old verdicts.
+Those gates are separate public receipts, never inferred from producer tests.
+
 ## Exact CI commit selection
 
 The initial PR CI runs were successful but checked out GitHub's synthetic merge
