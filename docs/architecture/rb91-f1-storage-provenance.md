@@ -5,7 +5,7 @@ asset_type: "candidate-contract"
 domain: "independent-review"
 severity: "draft"
 name: "RB91 F1 Execution and Storage Provenance Separation"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # RB91-F1 — Execution is not storage
@@ -110,10 +110,15 @@ In addition, fresh authenticated official GitHub observations must agree:
    within that step's observed start/completion interval. Independent artifact
    metadata identifies exact numeric ID, name, digest, unexpired state and actual
    storage run/source SHA. Unknown/missing/expired/contradictory data refuses.
-5. Applicable source/run/repository assertions in EVERY artifact metadata read
-   are confronted with the respective immutable original execution or authenticated
-   storage context. Reusing an older download adapter cannot discard an explicit
-   source contradiction or overlook drift on a later read.
+5. Applicable source/run/repository/branch and URI assertions in EVERY artifact
+   metadata read are confronted with the respective original execution or
+   authenticated storage context. Original name/digest/size/creation/expiry facts
+   must also match the immutable original locator. Recognized immutable metadata
+   and presence are retained as canonical observation facts; later changes to
+   creation, size, expiry, workflow context or other retained assertions refuse
+   before reservation. Initial upload-window checks cannot be invalidated by a
+   later observation. This table never suppresses a fresh provider read or acts
+   as another durable authority. Reusing an older adapter cannot drop a contradiction.
 6. The retained ZIP's actual digest/size, safe extraction, exact path and complete
    file inventory establish the exact result bytes, not merely desired metadata.
 
@@ -208,7 +213,12 @@ new storage proof or expired artifact resets the reservation or grants another
 POST. Before POST, a complete exact actor/body/publication-ID comment scan may
 observe an existing publication. Actor attribution compares the canonical
 login/numeric-ID projection, not the entire extensible GitHub user object;
-ordinary provider metadata cannot erase an otherwise exact observation. POST is attempted at most once by its live
+ordinary provider metadata cannot erase an otherwise exact observation. Explicit
+Issue/API/HTML URLs must match the reserved repository/Issue and actual comment ID
+before REPORTED. Historical observation must confront its exact retained comment
+ID, node ID, URL, actor, body and creation time; a replacement cannot satisfy an
+old receipt. The old receipt is never overwritten and a contradiction creates no
+repost permission. POST is attempted at most once by its live
 creator; the attempt flag precedes transport. Any uncertain reply thereafter
 allows observation only. Zero matches remains ambiguous, multiple matches is an
 incident, one independently observed exact match permits REPORTED. Interrupted

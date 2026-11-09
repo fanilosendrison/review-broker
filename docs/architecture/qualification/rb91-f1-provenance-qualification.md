@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "RB91 F1 Candidate Provenance Qualification"
-version: "0.1.1"
+version: "0.1.2"
 ---
 
 # RB91-F1 — Offline candidate qualification
@@ -62,9 +62,9 @@ upload, publication, Codespace or broker-model invocation is performed.
 | Publication already reserved/reported | NO new POST capability; receipt, nonce, mode or matching bytes do not reconstruct creator ownership |
 | Correct recovery after original job interruption | PASS through evidence download, validation, new storage admission, one reservation and one synthetic POST |
 
-The F1 set adds **34 tests**, preserving the earlier739-test selection and
-all38 earlier candidate tests. Current candidate selection: **72 PASS**.
-Current full suite: **773 PASS**, zero failures/errors/skips/expected failures.
+The F1 set adds **39 tests**, preserving the earlier739-test selection and
+all38 earlier candidate tests. Current candidate selection: **77 PASS**.
+Current full suite: **778 PASS**, zero failures/errors/skips/expected failures.
 Explicit normal umask022; no claim that the independently tracked Issue107
 umask077 fixture defect is repaired or qualified.
 
@@ -96,8 +96,9 @@ python -m unittest discover -s tests -p 'test*.py' -v
 python -m compileall -q src tests
 ```
 
-Current local results:72 candidate tests in23.247s and773 full tests in217.339s,
-process exits0. Earlier60/62/63/64/66 selections and764/765/767 full runs remain distinct
+Current local results:77 candidate tests in27.533s and778 full tests in216.543s,
+process exits0, with the final complete suite's temporary root confined to the
+private task worktree. Earlier60/62/63/64/66/72 selections and764/765/767/773 full runs remain distinct
 passing receipts, not substituted for current qualification. Initial F1 SHA
 5426d3c2aac30ce6c92eabfcbb69e3f7f2eb97eb had CI42560133595/full765 PASS;
 that result does NOT cover the later discovered negative case described below.
@@ -175,6 +176,44 @@ Classification: model/evidence/conformance realization corrections of existing
 accepted result semantics and F1 provenance rules. No new normative architecture
 choice is selected. The NEW corrected SHA still requires an independent rereview;
 all old verdicts, REDs and CI observations remain exact-SHA historical facts.
+
+## Residual observation NO_GO and stronger consistency gates
+
+A second [independent NO_GO](https://github.com/fanilosendrison/review-broker/pull/112#issuecomment-6732917984)
+on402de887b554874f0bc42258555b078cfbcde2cf confirms the preceding corrections
+but identifies two remaining conformance claims not established by those bytes:
+
+- N1: a later artifact read could contradict earlier creation/size observations,
+  and explicit original branch assertions could be ignored. Original locator
+  metadata and applicable source/run/repository/branch/URI assertions now match
+  their trusted contexts. Canonical recognized immutable observations are retained
+  and confronted on every fresh read; a later contradiction cannot grant a
+  reservation. This is an observation-fact table, not a response cache or new
+  durable authority. Concordant complete metadata remains accepted.
+- N2: matching actor/body could still accept wrong Issue/HTML attribution or a
+  replacement for a historical receipt comment. Explicit API/Issue/HTML URLs
+  now match repository/Issue/comment ID; historical observation confronts the
+  exact retained comment/node/URL/creation identity before returning success.
+  Contradictions leave receipt/history unchanged and never grant another POST.
+
+Both independent programs were copied/hash-frozen before producer replay.
+Exact rejected-source replay reproduces14 tests with5 FAIL/1 ERROR, plus the
+supplement's19 tests with1 FAIL. Corrected-source unchanged replay has14 tests
+with4 ERRORs and19 with1 ERROR: four unsafe-path methods now stop at the
+required earlier contradiction refusal, while one pre-existing top-level-boolean
+fixture/schema error remains a setup/oracle boundary. These nonpassing logs are
+retained, NOT relabeled as passing independent suites.
+
+Separately named derived oracles require the precise early refusal, unchanged
+intent/receipt/snapshot and zero extra effects. They inherit all other methods
+unchanged and pass33/33 (including the supplement's12 imported existing
+publication controls). The renderer/schema boolean refusal is explicitly checked
+at its actual owning boundary. Maintained regressions independently cover late
+metadata drift, original branch/locator mismatches, correct provider extensions,
+wrong Issue/API/HTML URLs, replacement IDs/node IDs/times and unchanged one-POST
+ownership. The corrections restore existing exact-observation obligations; no
+owner direction or public schema is changed. A NEW exact-SHA review remains
+required and no old GO or NO_GO is reused for these amended bytes.
 
 ## Exact whitespace correction
 
