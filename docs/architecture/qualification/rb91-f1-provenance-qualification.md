@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "RB91 F1 Candidate Provenance Qualification"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # RB91-F1 — Offline candidate qualification
@@ -62,9 +62,9 @@ upload, publication, Codespace or broker-model invocation is performed.
 | Publication already reserved/reported | NO new POST capability; receipt, nonce, mode or matching bytes do not reconstruct creator ownership |
 | Correct recovery after original job interruption | PASS through evidence download, validation, new storage admission, one reservation and one synthetic POST |
 
-The F1 set adds **26 tests**, preserving the earlier739-test selection and
-all38 earlier candidate tests. Current candidate selection: **64 PASS**.
-Current full suite: **765 PASS**, zero failures/errors/skips/expected failures.
+The F1 set adds **34 tests**, preserving the earlier739-test selection and
+all38 earlier candidate tests. Current candidate selection: **72 PASS**.
+Current full suite: **773 PASS**, zero failures/errors/skips/expected failures.
 Explicit normal umask022; no claim that the independently tracked Issue107
 umask077 fixture defect is repaired or qualified.
 
@@ -96,15 +96,85 @@ python -m unittest discover -s tests -p 'test*.py' -v
 python -m compileall -q src tests
 ```
 
-Final local results:64 tests in17.856s,765 tests in215.740s, process exits0;
-compilation PASS. Earlier narrower60/62/63 candidate runs and764 full tests also
-passed and remain distinct receipts, not substituted for the final selection.
-Historical RED exits1 remains a RED on the old baseline only.
+Current local results:72 candidate tests in23.247s and773 full tests in217.339s,
+process exits0. Earlier60/62/63/64/66 selections and764/765/767 full runs remain distinct
+passing receipts, not substituted for current qualification. Initial F1 SHA
+5426d3c2aac30ce6c92eabfcbb69e3f7f2eb97eb had CI42560133595/full765 PASS;
+that result does NOT cover the later discovered negative case described below.
+Historical baseline RED exits1 remains a RED on its old source only.
 
 Full logs, synthetic source/ZIP/transport examples and command/exit/timing
 receipts remain private. Exact published SHA, runner checkout, CI outcome and
 NEW independent verdict must be verified separately at publication; none follows
 merely from these local results.
+
+## Additional typed-admission counterexample — preserved RED/GREEN
+
+A fresh producer probe on first published F1 SHA
+5426d3c2aac30ce6c92eabfcbb69e3f7f2eb97eb reached all eight authenticated
+read/ZIP/validation boundaries but accepted a result whose embedded resolved
+admission changed integer policy.version1 into boolean true. The issuer proof,
+reference/ZIP hashes and other identities were internally consistent. Python
+mapping equality treated True as1; it did not establish exact JSON identity.
+
+One required-refusal test then genuinely FAILED on5426d3c, exit1. Its unchanged
+source passes after replacing resolved-admission equality with canonical-byte
+comparison. A separate projected provider-actor comparison receives the same
+strict guard. Added tests reject boolean/integer aliases at the intended eighth
+or second read boundary and retain valid original admission and integer actor1
+controls. No schema, authority, expected identity or refusal oracle is weakened.
+
+Classification: no-normative-impact realization/verification correction of the
+already-required exact admission/provenance rule; no new owner choice. The
+counterexample does not create another model start or mutate consumed history,
+but it blocks qualification of the first F1 bytes as exact provenance. Old CI
+PASS and any independent result on those bytes remain bounded historical facts;
+neither is reused as the final amended-SHA review. Inputs, RED and GREEN are
+retained separately in private evidence.
+
+## Independent NO_GO on first F1 bytes and required remediation
+
+The [complete independent report](https://github.com/fanilosendrison/review-broker/pull/112#issuecomment-6732304834)
+on5426d3c2aac30ce6c92eabfcbb69e3f7f2eb97eb is **NO_GO for normative adoption**.
+Its R1/R2/R3 identifiers are local to F1, not reopened integrated Issues102/97.
+The old report and source remain immutable. Three findings were corrected:
+
+- R1 HIGH: a freshly signed result could turn a valid NO_GO into GO, erase
+  anchored findings, invent reviewer attestations or contradict execution status
+  while retaining an honest embedded validation. The gate now reuses accepted
+  result construction to confront the complete faithful projection from actual
+  terminal/validation/attempt data. Public v1 reviewer extensions remain allowed
+  as non-authoritative data; accepted schemas are not tightened or rewritten.
+- R2 MEDIUM: whole-object comment-user comparison erased exact publication
+  observations when normal GitHub user metadata appeared. Canonical login/ID
+  projection now preserves real provider responses and no-repost ownership.
+- R3 MEDIUM: the original-terminal download path inherited an incomplete source
+  metadata comparison. Every original and result artifact read now confronts
+  applicable ID/run/source/repository assertions against its respective trusted
+  context, including contradictions appearing only on a later metadata read.
+
+The producer copied and hash-froze both independent programs BEFORE replay.
+An exact rejected-SHA clone reproduced the isolated21-method outcome:
+15 PASS/6 genuine safety FAIL, exit1. On corrected source the unchanged21-method
+program has20 PASS/1 ERROR: the manufactured-GO method now raises the REQUIRED
+RESULT_STORAGE_UNVERIFIED before its old unsafe-path observations/late
+assertion. This is retained as a nonpassing historical-oracle replay, NOT
+called21 PASS. Its input, signature, prior structural checks and eight read
+boundaries remain reached; the error is the desired earlier refusal, not a new
+unsafe permission or hidden transport failure.
+
+A separately named derived oracle changes ONLY that method to explicitly require
+the early refusal, no reserved intent, zero POST and unchanged original snapshot;
+the other20 methods are inherited unchanged. This derived selection passes21/21.
+The oracle adjustment follows the already-required fail-closed-before-reservation
+contract, not a new product choice or a weakened assertion. Maintained tests add
+honest NO_GO controls, forged coherent negatives, faithful v1 extension positives,
+realistic publication actors, original-source contradictions and later-read drift.
+
+Classification: model/evidence/conformance realization corrections of existing
+accepted result semantics and F1 provenance rules. No new normative architecture
+choice is selected. The NEW corrected SHA still requires an independent rereview;
+all old verdicts, REDs and CI observations remain exact-SHA historical facts.
 
 ## Exact whitespace correction
 

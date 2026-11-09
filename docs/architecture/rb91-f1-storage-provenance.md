@@ -5,7 +5,7 @@ asset_type: "candidate-contract"
 domain: "independent-review"
 severity: "draft"
 name: "RB91 F1 Execution and Storage Provenance Separation"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # RB91-F1 — Execution is not storage
@@ -67,7 +67,8 @@ and numeric ID/owner ID/default ref, approved ORIGINAL and RECOVERY workflow
 refs/source SHAs, fixed job/upload-step names, event types and authorized actor
 IDs. Source pins authorize only their explicit storage role. No ambient default,
 caller-provided workflow allowlist or arbitrary same-repository job suffices.
-The storage caller must also be independently authorized to recover this exact
+Actor IDs in the protected policy are strict positive integers, not booleans
+or coerced numbers. The storage caller must also be independently authorized to recover this exact
 request/attempt under the broker's existing requester/admission scope; the
 trusted snapshot fixes that scope, it cannot be selected by an untrusted input.
 
@@ -109,7 +110,11 @@ In addition, fresh authenticated official GitHub observations must agree:
    within that step's observed start/completion interval. Independent artifact
    metadata identifies exact numeric ID, name, digest, unexpired state and actual
    storage run/source SHA. Unknown/missing/expired/contradictory data refuses.
-5. The retained ZIP's actual digest/size, safe extraction, exact path and complete
+5. Applicable source/run/repository assertions in EVERY artifact metadata read
+   are confronted with the respective immutable original execution or authenticated
+   storage context. Reusing an older download adapter cannot discard an explicit
+   source contradiction or overlook drift on a later read.
+6. The retained ZIP's actual digest/size, safe extraction, exact path and complete
    file inventory establish the exact result bytes, not merely desired metadata.
 
 GitHub artifact REST metadata has a run ID, NOT independent job/run-attempt
@@ -166,8 +171,24 @@ and `execution.validation_id`. No precomputed success boolean can replace it.
 Download result bytes through the STORAGE location. Require exact content
 identity/length, canonical bytes, public result schema, request/attempt, subject,
 policy, packet, complete resolved admission and exact recomputed validation.
-The ordinary credential veto remains mandatory. Missing or invalid terminal
-proof, changed/cross-attempt content, expired artifacts or contradictory provider
+
+Matching an EMBEDDED validation object is not enough: the result's execution/
+evidence dimensions, verdict, examined sources, anchored findings and
+uncertainties must faithfully project that reconstructed validation. Requested
+reviewer identity comes from the exact retained attempt; effective identity flags
+cannot be fabricated from a storage proof. The accepted result constructor is
+reused as the projection oracle; all its normative fields are confronted, while
+additional non-authoritative reviewer metadata permitted by public v1 remains
+preserved. No result field is silently dropped or rewritten to make it pass.
+Applicability is checked for consistency with its checked-head observation;
+fresh source applicability remains the separate authenticated publication gate
+under the accepted source-credential contract, not a claim made by storage alone.
+
+Structured identity comparisons use exact canonical JSON bytes, including the
+complete resolved admission and the projected provider actor identity. Language
+coercion/equality such as Python `True == 1` cannot establish identity. The
+ordinary credential veto remains mandatory. Missing or invalid terminal proof,
+changed/cross-attempt content, expired artifacts or contradictory provider
 observations blocks validation/publication, NEVER historical consumption.
 
 ## Publication ownership and interruption
@@ -185,7 +206,9 @@ A later attempt may repeat evidence-only work if no intent exists. Once reserved
 intent/reference/nonce/publisher/result identity are immutable. No relocation,
 new storage proof or expired artifact resets the reservation or grants another
 POST. Before POST, a complete exact actor/body/publication-ID comment scan may
-observe an existing publication. POST is attempted at most once by its live
+observe an existing publication. Actor attribution compares the canonical
+login/numeric-ID projection, not the entire extensible GitHub user object;
+ordinary provider metadata cannot erase an otherwise exact observation. POST is attempted at most once by its live
 creator; the attempt flag precedes transport. Any uncertain reply thereafter
 allows observation only. Zero matches remains ambiguous, multiple matches is an
 incident, one independently observed exact match permits REPORTED. Interrupted
