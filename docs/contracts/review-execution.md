@@ -5,10 +5,27 @@ asset_type: "contract"
 domain: "independent-review"
 severity: "strict"
 name: "Review Execution v1 Contract"
-version: "0.3.0"
+version: "0.4.0"
+adoption_status: "proposed-amendment"
 ---
 
 # Review Execution v1 Contract
+
+## Protocol applicability — proposed scoped amendment
+
+The legacy journal1 execution/claim/recovery clauses below continue to govern
+requests using that protocol, including implemented request1/request2 construction.
+Request version is not journal or workload version. This Draft does not change
+legacy ARM's two writes, protected local consumption, state map or histories.
+
+New journal2/j-ch-v1 uses the separate proposed
+[journal](jch-journal-v2.md), [execution authority](jch-execution-authority.md),
+[workload](jch-workload-authority.md), [retention/publication](jch-result-retention.md)
+and [S2 recovery](jch-recovery-s2.md) contracts. One AtomicArm records count1;
+unknown outcomes forfeit new permission; original launcher and versioned S2
+fencing are mandatory. No generic ARM or legacy reservation primitive applies
+to journal2. J20 and exact operational admission precede any future claim2.
+[Formal adoption remains separate](../adoption/jch-normative-adoption.md).
 
 ## Durable states
 
@@ -109,8 +126,11 @@ indeterminate attempt requires a separately authorized `repeat_same_head`
 request. Every predecessor request, attempt, journal, artifact, publication
 record, and result remains immutable.
 
-These v2 rules are normative but unimplemented. Existing executable journal and
-recovery behavior remains v1-only until separately implemented and qualified.
+These ReviewRequest v2 rules are normative and construction was integrated in
+version0.4.17/PR41. Operational request2 admission remains default-disabled and
+requires separate authorization. Existing executable journal/recovery is
+journal1, independent of request1/request2. Journal2/J-CH remains a proposed
+separate authority, not an implemented or qualified execution path.
 
 ## Recovery
 

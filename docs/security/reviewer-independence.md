@@ -5,10 +5,31 @@ asset_type: "security-contract"
 domain: "independent-review"
 severity: "strict"
 name: "Reviewer Independence Contract"
-version: "0.3.0"
+version: "0.4.0"
+adoption_status: "proposed-jch-amendment"
 ---
 
 # Reviewer Independence Contract
+
+## Proposed J-CH custody supplement
+
+Future journal2/j-ch-v1 retains every legacy reviewer-independence and credential
+boundary below. The original protected launcher/control descriptors, challenge,
+proof/envelope and one-shot state are outside model/tool reach. Ordinary fork,
+reentry, relaunch, imported continuation and alternate invocation paths remain
+implementation defects, not exclusions under privileged-host trust.
+
+The separate [storage proof](../contracts/jch-result-retention.md) authenticates
+retention only and cannot become ARM/POST permission or reviewer input. A later
+recovery job uses its own authenticated storage identity without changing original
+execution/evidence or faithful public result. No raw JWT enters packet/evidence/
+result/argv/environment/logs. Actual FD/proc/child/source-job credential custody
+must be independently qualified; flags or a schema are not effective isolation.
+
+The [adoption proposal](../adoption/jch-normative-adoption.md) preserves the
+proportionate assurance policy and historical findings. Formal integration,
+construction, J20 and exact operational admission remain separate; no execution
+or comprehensive security qualification follows from publication or design GO.
 
 ## Required independence
 

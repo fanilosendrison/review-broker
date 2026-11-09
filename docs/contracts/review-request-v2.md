@@ -5,7 +5,8 @@ asset_type: "contract"
 domain: "independent-review"
 severity: "strict"
 name: "ReviewRequest v2 Contract"
-version: "0.1.1"
+version: "0.1.2"
+adoption_status: "proposed-status-correction"
 ---
 
 # ReviewRequest v2 Contract
@@ -17,6 +18,12 @@ This document is the accepted normative contract for ReviewRequest v2. Version
 execution, recovery, publication, and retrieval integration described here.
 Operational v2 admission remains explicitly default-disabled and requires
 separate authorization. ReviewRequest v1 remains supported unchanged.
+
+The proposed [ED04 status reconciliation](../adoption/jch-normative-adoption.md#ed04--governed-status-reconciliation)
+corrects stale implementation-status prose in the primary specification and
+execution contract without changing these request semantics or wire bytes.
+Request2 is independent of proposed journal2/J-CH; neither implementation status
+nor document publication activates that new authority.
 
 ## Stable Review Intent
 
@@ -54,8 +61,8 @@ A v2 request preserves the v1 top-level `subject`, `mission`, `policy`, and
 `reviewer` objects, sets `schema_version` to `2`, and adds the required
 `review_operation` object. The `subject` adds required
 `expected_head_commit`, which is exactly 40 lowercase hexadecimal characters.
-The complete request permits no unknown fields. The future executable contract
-must be a JSON Schema Draft 2020-12 resource at
+The complete request permits no unknown fields. The implemented executable
+contract is a JSON Schema Draft 2020-12 resource at
 `schemas/review-request-v2.schema.json`. It must preserve the exact v1 schemas
 for `mission`, `policy`, and `reviewer`; require exactly `kind`, `repository`,
 `pull_request`, and `expected_head_commit` in `subject`; and encode
@@ -74,7 +81,7 @@ The Review Intent is derived from the complete `mission`, `policy`, and
 `review-intent:sha256:` identity; the request does not carry a caller-supplied
 intent identity.
 
-A future GitHub envelope must use exactly one v2 marker pair:
+The implemented GitHub envelope uses exactly one v2 marker pair:
 
 ```text
 <!-- review-broker-request:v2 -->

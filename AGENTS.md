@@ -5,7 +5,8 @@ asset_type: "agent-instructions"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Agent Instructions"
-version: "0.5.0"
+version: "0.6.0"
+adoption_status: "proposed-jch-amendment"
 ---
 
 # Review Broker Agent Instructions
@@ -73,6 +74,27 @@ reservation. Require protected trust bootstrap and durable one-use consumption;
 never automatically initialize, repair or clear missing state. Preserve consumed
 ARMED attempts after every authorization failure. Do not infer live OIDC,
 Codespace durability or production qualification from offline tests.
+
+## Proposed J-CH adoption boundary
+
+Treat `docs/adoption/jch-normative-adoption.md`, the proposed ADR/profile set,
+and new `schemas/jch-*` resources as a Draft normative-integration proposal,
+NOT accepted authority or a runtime activation. Preserve the existing technical
+authority order. Do not promote a proposed record merely because its severity
+is strict or a schema/model/reviewer passes.
+
+Keep request1/request2 status independent of journal1/journal2 and workload
+protocol. Apply the legacy OIDC/local consumption/recovery path to legacy
+records unchanged; never migrate historical claims or reinterpret tokens.
+For future admitted journal2, preserve one AtomicArm/original continuation,
+separate authenticated storage/content, S2 and J20 according to their adopted
+versioned contracts. Unknown state never grants an effect or new attempt.
+
+Obtain separate owner authority for final normative integration, construction,
+actual job/issuer/isolation/lifecycle qualification, J20 and operational admission.
+This preparation permits no accepted lifecycle transition, merge, Codespace/SSH,
+live proof mint, historical mutation, v2 claim or production review. Keep PR94,
+PR112 and their exact historical verdict/evidence scope intact.
 
 ## Engineering Project profile
 
