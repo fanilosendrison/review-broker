@@ -16,6 +16,7 @@ from rb91_storage_fixtures import StorageCase
 class CommentTransport:
     def __init__(self):
         self.comments=[];self.posts=0;self.lost_ack=False;self.drop=False;self.fail_read=False
+        self.attribution_override={}
 
     def __call__(self,command,**kwargs):
         method,endpoint=command[3:5]
@@ -25,10 +26,12 @@ class CommentTransport:
         if method!='POST' or not endpoint.endswith('/comments'):raise AssertionError('publication boundary only')
         self.posts+=1
         if not self.drop:
-            self.comments.append(dict(id=8,node_id='synthetic-node',html_url='https://github.com/sample/broker/issues/7#issuecomment-8',
+            comment=dict(id=8,node_id='synthetic-node',html_url='https://github.com/sample/broker/issues/7#issuecomment-8',
+                issue_url='https://api.github.com/repos/sample/broker/issues/7',
                 created_at='2026-11-09T00:00:00Z',
                 user=dict(login='broker',id=9,type='Bot',node_id='synthetic-user',html_url='https://github.com/broker'),
-                body=json.loads(kwargs['input'])['body']))
+                body=json.loads(kwargs['input'])['body'])
+            comment.update(self.attribution_override);self.comments.append(comment)
         return subprocess.CompletedProcess(command,1 if self.lost_ack or self.drop else 0,'{}','')
 
 
@@ -115,6 +118,39 @@ class F1PublicationTests(unittest.TestCase):
         api.comments[0]['user']['avatar_url']='https://example.invalid/image'
         restarted=PublicationStore(deepcopy(store.record))
         self.assertTrue(restarted.observe(c.raw,api));self.assertIsNone(self.reserve(c,restarted))
+        self.assertEqual(api.posts,1)
+
+    def test_explicit_issue_or_html_contradiction_cannot_establish_reported(self):
+        for field, wrong in [('issue_url','https://api.github.com/repos/other/repository/issues/99'),
+                             ('html_url','https://github.com/other/repository/issues/99#issuecomment-8'),
+                             ('url','https://api.github.com/repos/other/repository/issues/comments/99')]:
+            c,store=self.case();permission=self.reserve(c,store);api=CommentTransport()
+            api.attribution_override[field]=wrong
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(ValueError,'PUBLICATION_ATTRIBUTION_CONTRADICTION'):
+                    store.post(permission,c.raw,api)
+                self.assertEqual(api.posts,1);self.assertEqual(store.record['state'],'VALIDATED')
+                self.assertIsNone(store.record['publication_receipt'])
+                with self.assertRaises(ValueError):store.post(permission,c.raw,api)
+                self.assertEqual(api.posts,1)
+
+    def test_historical_comment_receipt_cannot_be_satisfied_by_replacement_identity(self):
+        for field in ('id','node_id','created_at'):
+            c,store=self.case();permission=self.reserve(c,store);api=CommentTransport()
+            self.assertTrue(store.post(permission,c.raw,api));prior=deepcopy(store.record)
+            restarted=PublicationStore(deepcopy(prior))
+            if field=='id':
+                api.comments[0]['id']=18
+                api.comments[0]['html_url']='https://github.com/sample/broker/issues/7#issuecomment-18'
+            elif field=='node_id':api.comments[0]['node_id']='replacement-node'
+            else:api.comments[0]['created_at']='2026-11-09T00:01:00Z'
+            with self.subTest(field=field),self.assertRaisesRegex(ValueError,'PUBLICATION_RECEIPT_CHANGED'):
+                restarted.observe(c.raw,api)
+            self.assertEqual(restarted.record,prior);self.assertEqual(api.posts,1)
+
+    def test_concordant_realistic_issue_attribution_remains_observable(self):
+        c,store=self.case();permission=self.reserve(c,store);api=CommentTransport()
+        self.assertTrue(store.post(permission,c.raw,api));self.assertTrue(store.observe(c.raw,api))
         self.assertEqual(api.posts,1)
 
     def test_unknown_comment_read_cannot_post_or_create_an_observation(self):
