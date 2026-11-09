@@ -11,6 +11,7 @@ from rb91_jch_contract_model import (
     fixture_prepared, fixture_capacity, fixture_armed, fixture_transition, artifact,
 )
 from rb91_full_abi_model import publication_identity
+from rb91_result_reference_model import execution_projection, storage_receipt
 
 
 TIME = '2026-11-09T00:00:00Z'
@@ -83,13 +84,23 @@ def publication_chain():
         created_at=TIME, expires_at='2026-12-09T00:00:00Z')
     located = metadata(planned, 'evidence_locator', locator, 'EVIDENCE_LOCATOR_RECORDED')
     validated = fixture_transition(located, 'VALIDATED')
+    validated['history'][-1]['evidence_ids'] = [artifact(result['validation'])]
+    validated['evidence_ids'][-1] = artifact(result['validation'])
+    execution = execution_projection(validated, 'a'*40)
+    binding = validated['arm_binding']
+    storage = dict(mode='original',workflow_ref=binding['workflow_ref'],workflow_sha=binding['workflow_sha'],
+        run_id=binding['controller_run_id'],run_attempt=binding['controller_run_attempt'],
+        job_id=10,job_name='retain-result',actor=dict(login='operator',id=21),
+        triggering_actor=dict(login='operator',id=21),authorization_receipt_id='artifact:sha256:'+'6'*64,authorization=None)
     intent = dict(schema_version=2, evidence_type='jch-result-publication-intent-v2',
         issue_number=7, request_id=terminal['request_id'], attempt_id=terminal['attempt_id'],
         result_id=result_identity(result), result_artifact=dict(entry,media_type='application/json',contract='review-result-v1',
-            location=dict(broker_repository='sample/broker',workflow_run_id='42372558711',
+            execution=execution,storage=storage,location=dict(broker_repository='sample/broker',workflow_run_id='42372558711',
                 workflow_run_attempt='1',actions_artifact_id=12,artifact_name='synthetic-result',
                 archive_digest='sha256:'+'7'*64,path='review-result.json')),
         publisher=dict(login='broker', id=9), nonce='f'*64, reserved_at=TIME)
+    storage['authorization'] = storage_receipt(intent['result_artifact'],'artifact:sha256:'+'6'*64)
+    storage['authorization_receipt_id'] = artifact(storage['authorization'])
     intent['publication_id'] = publication_identity(intent)
     intent['comment_body_sha256'] = hashlib.sha256(render_result_comment(result,
         publication_id=intent['publication_id']).encode()).hexdigest()

@@ -22,11 +22,12 @@ from rb91_jch_contract_model import (
     artifact, validate as validate_core, validate_transition as transition_core,
     parse_strict,
 )
+from rb91_result_reference_model import REGISTRY, validate_reference_links
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = json.loads((ROOT / 'docs/architecture/qualification/rb91-journal-v2-candidate.schema.json').read_text())
 Draft202012Validator.check_schema(SCHEMA)
-VALIDATOR = Draft202012Validator(SCHEMA, format_checker=FormatChecker())
+VALIDATOR = Draft202012Validator(SCHEMA, registry=REGISTRY, format_checker=FormatChecker())
 METADATA = ('evidence_locator_plan', 'evidence_locator', 'publication_intent', 'publication_receipt')
 EVENTS = dict(evidence_locator_plan='EVIDENCE_LOCATOR_PLANNED',
               evidence_locator='EVIDENCE_LOCATOR_RECORDED',
@@ -118,11 +119,7 @@ def validate(record):
         for key in ('request_id', 'attempt_id'):
             require(intent[key] == record[key], 'PUBLICATION_RECORD_LINK')
         require(intent['publication_id'] == publication_identity(intent), 'PUBLICATION_ID')
-        location = intent['result_artifact']['location']
-        require(location['broker_repository'] == locator['broker_repository'], 'RESULT_REPOSITORY')
-        if binding:
-            require(location['workflow_run_id'] == binding['controller_run_id'] and
-                    location['workflow_run_attempt'] == binding['controller_run_attempt'], 'RESULT_RUN')
+        validate_reference_links(record)
     if receipt:
         require(intent is not None, 'RECEIPT_WITHOUT_INTENT')
         for key in ('publication_id', 'result_id', 'issue_number', 'publisher'):
@@ -148,6 +145,7 @@ def validate_result_bytes(record, raw):
     require(result['subject_id'] == record['admission']['subject_id'], 'RESULT_SUBJECT')
     require(result['policy_id'] == record['admission']['policy_id'], 'RESULT_POLICY')
     require(result['packet_id'] == record['input_capacity']['packet_id'], 'RESULT_PACKET')
+    require(artifact(result['validation']) == pointer['execution']['validation_id'], 'RESULT_VALIDATION')
     rendered = render_result_comment(result, publication_id=intent['publication_id'])
     require(hashlib.sha256(rendered.encode()).hexdigest() == intent['comment_body_sha256'], 'RESULT_BODY')
     return result
