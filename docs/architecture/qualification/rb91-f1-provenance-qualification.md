@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "RB91 F1 Candidate Provenance Qualification"
-version: "0.1.2"
+version: "0.1.3"
 ---
 
 # RB91-F1 — Offline candidate qualification
@@ -62,9 +62,9 @@ upload, publication, Codespace or broker-model invocation is performed.
 | Publication already reserved/reported | NO new POST capability; receipt, nonce, mode or matching bytes do not reconstruct creator ownership |
 | Correct recovery after original job interruption | PASS through evidence download, validation, new storage admission, one reservation and one synthetic POST |
 
-The F1 set adds **39 tests**, preserving the earlier739-test selection and
-all38 earlier candidate tests. Current candidate selection: **77 PASS**.
-Current full suite: **778 PASS**, zero failures/errors/skips/expected failures.
+The F1 set adds **41 tests**, preserving the earlier739-test selection and
+all38 earlier candidate tests. Current candidate selection: **79 PASS**.
+Current full suite: **780 PASS**, zero failures/errors/skips/expected failures.
 Explicit normal umask022; no claim that the independently tracked Issue107
 umask077 fixture defect is repaired or qualified.
 
@@ -96,9 +96,9 @@ python -m unittest discover -s tests -p 'test*.py' -v
 python -m compileall -q src tests
 ```
 
-Current local results:77 candidate tests in27.533s and778 full tests in216.543s,
+Current local results:79 candidate tests in28.388s and780 full tests in214.922s,
 process exits0, with the final complete suite's temporary root confined to the
-private task worktree. Earlier60/62/63/64/66/72 selections and764/765/767/773 full runs remain distinct
+private task worktree. Earlier60/62/63/64/66/72/77 selections and764/765/767/773/778 full runs remain distinct
 passing receipts, not substituted for current qualification. Initial F1 SHA
 5426d3c2aac30ce6c92eabfcbb69e3f7f2eb97eb had CI42560133595/full765 PASS;
 that result does NOT cover the later discovered negative case described below.
@@ -214,6 +214,37 @@ wrong Issue/API/HTML URLs, replacement IDs/node IDs/times and unchanged one-POST
 ownership. The corrections restore existing exact-observation obligations; no
 owner direction or public schema is changed. A NEW exact-SHA review remains
 required and no old GO or NO_GO is reused for these amended bytes.
+
+## Exact provider identifiers and initial chronology — next correction
+
+The third [independent NO_GO](https://github.com/fanilosendrison/review-broker/pull/112#issuecomment-6733727108)
+onc7b3116ba55253275d2ad8ec1599c4f8537a31f7 confirms previous corrections but
+finds two further admission-model defects: nested run repository true could equal
+protected integer1, and two mutually concordant observations could still declare
+expiry before creation. Both contradict existing exact-identity/locator rules.
+
+The correction uses one strict positive-integer provider-ID predicate across
+repository/run/attempt/job/artifact comparisons, and applies creation-before-
+expiry to every original/result artifact observation. It does not select a new
+clock-skew policy or change owner directions. Added controls retain the valid
+integer-repository and concordant-time paths while requiring no reservation or
+posting capability for the negatives.
+
+The three independent programs were copied and hash-frozen before execution.
+An exact rejected-SHA clone reproduces the repository-type1-test FAIL and the
+admission3-test1-FAIL results, with valid controls passing. All unchanged programs
+pass on corrected source: repository1/1, admission/concurrency3/3 and safety10/10.
+Their source/oracles are NOT edited. Earlier ERROR classifications and historical
+NoGo reports remain preserved, not converted retrospectively into PASS.
+
+One first maintained79-test run failed its boundary-count assertion because two
+fixture endpoints shared the same repository dictionary: changing the nested
+run repository also changed the initial repository response. The safety refusal
+already occurred, but at read1 instead of the intended read2. The fixture now
+uses a distinct repository copy for the separate JSON response. The assertions
+and production/model guards are unchanged; the original nonpassing log remains.
+The corrected79/780 selections above pass. A NEW exact-SHA independent verdict
+still must qualify these amended bytes; none is inferred from old CI/GO results.
 
 ## Exact whitespace correction
 

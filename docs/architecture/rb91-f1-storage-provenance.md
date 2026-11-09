@@ -5,7 +5,7 @@ asset_type: "candidate-contract"
 domain: "independent-review"
 severity: "draft"
 name: "RB91 F1 Execution and Storage Provenance Separation"
-version: "0.1.2"
+version: "0.1.3"
 ---
 
 # RB91-F1 — Execution is not storage
@@ -67,8 +67,10 @@ and numeric ID/owner ID/default ref, approved ORIGINAL and RECOVERY workflow
 refs/source SHAs, fixed job/upload-step names, event types and authorized actor
 IDs. Source pins authorize only their explicit storage role. No ambient default,
 caller-provided workflow allowlist or arbitrary same-repository job suffices.
-Actor IDs in the protected policy are strict positive integers, not booleans
-or coerced numbers. The storage caller must also be independently authorized to recover this exact
+Actor IDs in the protected policy and provider repository/run/attempt/job/artifact
+identifiers are strict positive integers, not booleans or coerced numbers. A
+nested run repository identity must match the protected repository exactly; plain
+language equality cannot equate JSON true with integer1. The storage caller must also be independently authorized to recover this exact
 request/attempt under the broker's existing requester/admission scope; the
 trusted snapshot fixes that scope, it cannot be selected by an untrusted input.
 
@@ -116,7 +118,10 @@ In addition, fresh authenticated official GitHub observations must agree:
    must also match the immutable original locator. Recognized immutable metadata
    and presence are retained as canonical observation facts; later changes to
    creation, size, expiry, workflow context or other retained assertions refuse
-   before reservation. Initial upload-window checks cannot be invalidated by a
+   before reservation. Each initial and later artifact observation must also have
+   creation strictly before expiry; internally inconsistent concordant reads are
+   not evidence. This reuses the existing locator relation without selecting a
+   new clock-skew policy. Initial upload-window checks cannot be invalidated by a
    later observation. This table never suppresses a fresh provider read or acts
    as another durable authority. Reusing an older adapter cannot drop a contradiction.
 6. The retained ZIP's actual digest/size, safe extraction, exact path and complete

@@ -51,6 +51,11 @@ def instant(text):
     return value
 
 
+def provider_identifier(value):
+    require(type(value) is int and value > 0, 'PROVIDER_IDENTIFIER_TYPE')
+    return str(value)
+
+
 class ScopedArtifactStore(GitHubActionsArtifactStore):
     """Confront source/run metadata on EVERY read, including inherited download reads."""
     def __init__(self, repository, runner, bindings, repository_id, branch, original_locator):
@@ -65,14 +70,13 @@ class ScopedArtifactStore(GitHubActionsArtifactStore):
         value = super()._json(endpoint)
         for identifier, (run_id, source_sha) in self.bindings.items():
             if endpoint == f'repos/{self.repository}/actions/artifacts/{identifier}':
-                require(type(value.get('id')) is int and value['id'] == identifier, 'ARTIFACT_IDENTITY')
+                require(provider_identifier(value['id']) == str(identifier), 'ARTIFACT_IDENTITY')
                 observed = value['workflow_run']
-                require(type(observed['id']) is int and str(observed['id']) == run_id and
+                require(provider_identifier(observed['id']) == run_id and
                         observed['head_sha'] == source_sha, 'ARTIFACT_SOURCE_CONTEXT')
                 for field in ('repository_id','head_repository_id'):
                     if field in observed:
-                        require(type(observed[field]) is int and str(observed[field]) == self.repository_id,
-                                'ARTIFACT_REPOSITORY_CONTEXT')
+                        require(provider_identifier(observed[field]) == self.repository_id, 'ARTIFACT_REPOSITORY_CONTEXT')
                 if 'head_branch' in observed:
                     require(observed['head_branch'] == self.branch, 'ARTIFACT_BRANCH_CONTEXT')
                 for field, suffix in (('url',''),('archive_download_url','/zip')):
@@ -80,6 +84,7 @@ class ScopedArtifactStore(GitHubActionsArtifactStore):
                         require(value[field] == f'https://api.github.com/repos/{self.repository}/actions/artifacts/{identifier}{suffix}',
                                 'ARTIFACT_URL_CONTEXT')
                 require(value.get('expired') is False, 'ARTIFACT_EXPIRED')
+                require(instant(value['created_at']) < instant(value['expires_at']), 'ARTIFACT_TEMPORAL_ORDER')
                 original = self.original_locator
                 if identifier == original['artifact_id']:
                     expected = dict(name=original['artifact_name'],digest=original['artifact_digest'],
@@ -122,10 +127,13 @@ def _verify_job(pointer, policy, store):
             'STORAGE_ACTOR_NOT_ALLOWED')
     base = 'repos/' + policy.repository
     repo = store._json(base)
-    require(repo['full_name'] == policy.repository and str(repo['id']) == policy.repository_id, 'OBSERVED_REPOSITORY')
+    require(repo['full_name'] == policy.repository and provider_identifier(repo['id']) == policy.repository_id,
+            'OBSERVED_REPOSITORY')
     run = store._json(base + '/actions/runs/' + storage['run_id'] + '/attempts/' + storage['run_attempt'])
-    require(str(run['id']) == storage['run_id'] and str(run['run_attempt']) == storage['run_attempt'], 'OBSERVED_STORAGE_RUN')
-    require(run['repository']['id'] == repo['id'] and run['repository']['full_name'] == policy.repository,
+    require(provider_identifier(run['id']) == storage['run_id'] and
+            provider_identifier(run['run_attempt']) == storage['run_attempt'], 'OBSERVED_STORAGE_RUN')
+    require(provider_identifier(run['repository']['id']) == policy.repository_id and
+            run['repository']['full_name'] == policy.repository,
             'RUN_REPOSITORY')
     require(run['head_sha'] == allowed['workflow_sha'] and run['path'] == allowed['path'] and
             run['head_branch'] == policy.ref.removeprefix('refs/heads/'), 'OBSERVED_WORKFLOW')
@@ -139,8 +147,10 @@ def _verify_job(pointer, policy, store):
     named = [j for j in jobs if j['name'] == allowed['job_name']]
     require(len(named) == 1, 'STORAGE_JOB_AMBIGUOUS')
     job = named[0]
-    require(type(job['id']) is int and job['id'] == storage['job_id'] and str(job['run_id']) == storage['run_id'] and
-            str(job['run_attempt']) == storage['run_attempt'] and job['head_sha'] == allowed['workflow_sha'], 'OBSERVED_JOB')
+    require(provider_identifier(job['id']) == str(storage['job_id']) and
+            provider_identifier(job['run_id']) == storage['run_id'] and
+            provider_identifier(job['run_attempt']) == storage['run_attempt'] and
+            job['head_sha'] == allowed['workflow_sha'], 'OBSERVED_JOB')
     require(job['status'] == 'in_progress' or job['status'] == 'completed' and job['conclusion'] == 'success', 'JOB_NOT_USABLE')
     steps = [s for s in job['steps'] if s['name'] == allowed['upload_step']]
     require(len(steps) == 1 and steps[0]['status'] == 'completed' and steps[0]['conclusion'] == 'success', 'UPLOAD_STEP')

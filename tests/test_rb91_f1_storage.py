@@ -1,6 +1,7 @@
 """F1 positive/negative admission through real JWT, ZIP and evidence validators."""
 from copy import deepcopy
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import tempfile
@@ -265,6 +266,28 @@ class F1StorageTests(unittest.TestCase):
             value['url']=f'https://api.github.com/repos/{c.repository}/actions/artifacts/{identifier}'
             value['archive_download_url']=value['url']+'/zip';value['node_id']='synthetic-artifact-'+str(identifier)
         self.verify(c);self.assertEqual(len(c.calls),8)
+
+    def test_run_repository_identifier_requires_integer_not_boolean_alias(self):
+        c=self.case(repository_id='1');self.verify(c,suffix='integer-control');c.calls.clear()
+        endpoint=next(k for k in c.responses if '/attempts/' in k and '/jobs?' not in k)
+        c.responses[endpoint]['repository']['id']=True
+        store=PublicationStore(c.policy.execution_snapshot);before=deepcopy(store.record)
+        with self.assertRaisesRegex(ValueError,'RESULT_STORAGE_UNVERIFIED'):
+            store.reserve(c.record,c.policy,token=c.token(),issuer_reader=c.issuer,runner=c.runner,destination=c.root/'boolean-negative')
+        self.assertEqual(store.record,before);self.assertEqual(store.permissions,set());self.assertEqual(len(c.calls),2)
+
+    def test_initial_result_creation_must_precede_expiry_even_with_concordant_reads(self):
+        c=self.case();self.verify(c,suffix='concordant-control');c.calls.clear()
+        now=datetime.now(timezone.utc)
+        meta=c.responses['repos/'+c.repository+'/actions/artifacts/12']
+        meta.update(created_at=(now+timedelta(hours=2)).isoformat(),expires_at=(now+timedelta(hours=1)).isoformat())
+        jobs=c.responses[next(k for k in c.responses if '/jobs?' in k)]
+        jobs['jobs'][0]['steps'][0].update(started_at=(now+timedelta(hours=1)).isoformat(),
+                                         completed_at=(now+timedelta(hours=3)).isoformat())
+        store=PublicationStore(c.policy.execution_snapshot);before=deepcopy(store.record)
+        with self.assertRaisesRegex(ValueError,'RESULT_STORAGE_UNVERIFIED'):
+            store.reserve(c.record,c.policy,token=c.token(),issuer_reader=c.issuer,runner=c.runner,destination=c.root/'impossible-time')
+        self.assertEqual(store.record,before);self.assertEqual(store.permissions,set());self.assertEqual(len(c.calls),4)
 
     def test_malformed_policy_actor_cannot_authorize_integer_identity_through_bool_alias(self):
         c=self.case();s=c.record['publication_intent']['result_artifact']['storage']

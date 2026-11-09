@@ -42,11 +42,12 @@ def replace_last_evidence(record, value):
 
 
 class StorageCase:
-    def __init__(self, root, *, recovery=True, attempt='1', same_run=False, verdict='GO'):
+    def __init__(self, root, *, recovery=True, attempt='1', same_run=False, verdict='GO', repository_id=None):
         self.root = Path(root)
         self.repository = 'sample/broker'
         source = self.root/'source'
         ready = prepared()
+        if repository_id is not None:ready['admission_authority']['broker_repository_id']=repository_id
         admission = ready['admission']
         real_packet = test_evidence.build_packet
         def packet(records, **kwargs):
@@ -75,7 +76,7 @@ class StorageCase:
         replace_last_evidence(ready,artifact(cap))
         armed = fixture_armed(ready)
         armed['arm_binding'].update(subject_id=admission['subject_id'],
-            workflow_ref=self.repository+'/.github/workflows/review-request.yml@refs/heads/dev')
+            broker_repository_id=ready['admission_authority']['broker_repository_id'],workflow_ref=self.repository+'/.github/workflows/review-request.yml@refs/heads/dev')
         armed['history'][-1]['binding_sha256'] = hashlib.sha256(canonical_bytes(armed['arm_binding'])).hexdigest()
         self.armed = deepcopy(armed)
         context = dict(workflow_run_id=armed['arm_binding']['controller_run_id'],workflow_run_attempt='1')
@@ -139,7 +140,7 @@ class StorageCase:
         public = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(self.key.public_key()));public.update(kid='synthetic',alg='RS256',use='sig')
         self.jwks = dict(keys=[public])
         repo = dict(id=int(self.policy.repository_id),full_name=self.repository)
-        run = dict(id=int(run_id),run_attempt=int(attempt),repository=repo,head_sha=workflow_sha,path=workflow_path,
+        run = dict(id=int(run_id),run_attempt=int(attempt),repository=deepcopy(repo),head_sha=workflow_sha,path=workflow_path,
             head_branch='dev',event='workflow_dispatch',actor=actor,triggering_actor=actor)
         step = dict(name='Upload validated result',status='completed',conclusion='success',
             started_at=(now-timedelta(seconds=60)).isoformat(),completed_at=(now-timedelta(seconds=10)).isoformat())
