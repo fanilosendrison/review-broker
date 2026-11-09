@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 
 from review_broker.identity import canonical_bytes
+from tests.journal_http_response import scoped_response
 
 
 class JournalGitTransport:
@@ -64,6 +65,8 @@ class JournalGitTransport:
         method, endpoint = command[3:5]
         payload = json.loads(kwargs.get('input', '{}'))
         def result(value, code=0):
+            if '--include' in command:
+                return scoped_response(command, value, code)
             return subprocess.CompletedProcess(command, code, json.dumps(value), '')
         if '/contents/' in endpoint:
             sha = endpoint.split('?ref=')[1]

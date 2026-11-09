@@ -6,6 +6,7 @@ import unittest
 from review_broker.github_journal import GitHubRefJournal
 from review_broker.identity import attempt_identity, canonical_bytes
 from review_broker.queue import AttemptRecord, AttemptState, StateTransitionError
+from tests.journal_http_transport import scoped_response
 
 
 REQUEST_ID = "request:sha256:" + "a" * 64
@@ -23,7 +24,7 @@ def record(state: AttemptState) -> AttemptRecord:
 
 
 def response(command, value, returncode=0):
-    return subprocess.CompletedProcess(command, returncode, json.dumps(value), "")
+    return scoped_response(command, value, returncode)
 
 
 def record_bytes(value=None):

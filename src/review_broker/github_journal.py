@@ -1,10 +1,8 @@
 """Git-ref-backed durable attempt journal."""
 from __future__ import annotations
 
-import base64
 from dataclasses import replace
 import json
-import secrets
 import subprocess
 from typing import Any, Callable, Mapping
 
@@ -12,8 +10,11 @@ from .artifact_locator import (
     validate_evidence_artifact_locator,
     validate_evidence_artifact_plan,
 )
-from .identity import attempt_identity, canonical_bytes
-from .github_contents import decode_github_contents_base64 as _decode_github_contents_base64
+from .identity import attempt_identity
+from .github_journal_http import GitHubJournalResponse, JournalReadUnknown, journal_request
+from .github_journal_identity import ref_commit_sha, verify_ref_update_ack
+from .github_journal_objects import state_commit
+from .github_journal_read import JournalObservation, JournalReadKind, observe_journal
 from .publication import validate_publication_intent, validate_publication_receipt
 from .queue import (
     AttemptRecord,
@@ -54,16 +55,33 @@ class GitHubRefJournal:
         )
         base_sha = self._ref_sha(f"heads/{self.base_branch}")
         commit_sha = self._state_commit(base_sha, record)
-        self._api(
-            "POST",
-            f"repos/{self.repository}/git/refs",
+        response = self._request(
+            "POST", f"repos/{self.repository}/git/refs",
             {"ref": self._claim_ref(request_id), "sha": commit_sha},
-            check=False,
         )
-        # Ref creation, like updates, requires an independently observed outcome.
+        # An unknown POST outcome must never be recovered into creation authority.
+        # 422 is not a typed conflict: only a separately verified *other* winner
+        # can supply the existing deterministic claim, under the v1 duplicate rule.
+        if response.status not in {201, 422}:
+            raise JournalReadUnknown("ATOMIC_CLAIM_OUTCOME_UNKNOWN")
+        if response.status == 201:
+            try:
+                # ACK metadata cannot supply read authority, but any supplied
+                # scope must agree; exact authoritative readback is still owed.
+                acknowledged = ref_commit_sha(
+                    response.value, self.repository, self._claim_ref(request_id), require_url=False,
+                )
+                if acknowledged != commit_sha:
+                    raise ValueError
+            except (KeyError, TypeError, ValueError):
+                raise JournalReadUnknown("ATOMIC_CLAIM_OUTCOME_UNKNOWN") from None
         winner = self._read(request_id)
         if winner is None:
-            raise StateTransitionError("ATOMIC_CLAIM_FAILED")
+            raise JournalReadUnknown("ATOMIC_CLAIM_NOT_OBSERVED")
+        if response.status == 422 and winner[0] == commit_sha:
+            raise JournalReadUnknown("ATOMIC_CLAIM_OUTCOME_UNKNOWN")
+        if response.status == 201 and (winner[0] != commit_sha or winner[1] != record):
+            raise JournalReadUnknown("ATOMIC_CLAIM_NOT_OBSERVED")
         if admission is not None and winner[1].admission != admission:
             raise StateTransitionError("CLAIM_ADMISSION_CONFLICT")
         return winner[1]
@@ -292,76 +310,38 @@ class GitHubRefJournal:
         if observed is None or observed[0] != commit_sha or observed[1] != updated:
             raise StateTransitionError("STATE_COMPARE_AND_SWAP_NOT_OBSERVED")
 
+    def _observe(self, request_id: str) -> JournalObservation:
+        return observe_journal(
+            self.repository, self.base_branch, self._claim_ref(request_id),
+            request_id, self.STATE_PATH, self._request,
+        )
+
     def _read(self, request_id: str) -> tuple[str, AttemptRecord] | None:
-        ref = self._api(
-            "GET",
-            f"repos/{self.repository}/git/{self._claim_ref(request_id)}",
-            check=False,
-        )
-        if ref.returncode != 0:
+        observation = self._observe(request_id)
+        if observation.kind is JournalReadKind.UNKNOWN:
+            raise JournalReadUnknown(observation.reason)
+        if observation.kind is JournalReadKind.ABSENT_AUTHENTICATED:
             return None
-        try:
-            ref_value = json.loads(ref.stdout)
-            sha = ref_value["object"]["sha"]
-            if (
-                not isinstance(sha, str)
-                or len(sha) != 40
-                or any(character not in "0123456789abcdef" for character in sha)
-            ):
-                raise ValueError
-        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-            raise StateTransitionError("JOURNAL_REF_RESPONSE_INVALID") from exc
-        content = self._api(
-            "GET",
-            f"repos/{self.repository}/contents/{self.STATE_PATH}?ref={sha}",
-        )
-        try:
-            content_value = json.loads(content.stdout)
-            encoded = content_value["content"]
-            if content_value.get("encoding") != "base64" or not isinstance(encoded, str):
-                raise ValueError
-            raw = _decode_github_contents_base64(encoded)
-            value = json.loads(raw.decode("utf-8"))
-            if not isinstance(value, dict) or raw != canonical_bytes(value) + b"\n":
-                raise ValueError
-            record = AttemptRecord.from_dict(value)
-            if record.request_id != request_id:
-                raise ValueError
-        except (
-            KeyError,
-            TypeError,
-            ValueError,
-            UnicodeDecodeError,
-            json.JSONDecodeError,
-        ) as exc:
-            raise StateTransitionError("JOURNAL_CONTENT_RESPONSE_INVALID") from exc
-        return sha, record
+        if observation.snapshot is None:
+            raise JournalReadUnknown("JOURNAL_SNAPSHOT_UNKNOWN")
+        return observation.snapshot
+
+    def _request(
+        self, method: str, endpoint: str, payload: dict[str, Any] | None = None,
+    ) -> GitHubJournalResponse:
+        return journal_request(self.runner, method, endpoint, payload)
 
     def _state_commit(self, parent_sha: str, record: AttemptRecord) -> str:
-        parent = json.loads(self._api("GET", f"repos/{self.repository}/git/commits/{parent_sha}").stdout)
-        encoded = base64.b64encode(canonical_bytes(record.as_dict()) + b"\n").decode("ascii")
-        blob = json.loads(self._api(
-            "POST", f"repos/{self.repository}/git/blobs", {"content": encoded, "encoding": "base64"}
-        ).stdout)["sha"]
-        tree = json.loads(self._api(
-            "POST",
-            f"repos/{self.repository}/git/trees",
-            {
-                "base_tree": parent["tree"]["sha"],
-                "tree": [{"path": self.STATE_PATH, "mode": "100644", "type": "blob", "sha": blob}],
-            },
-        ).stdout)["sha"]
-        commit = json.loads(self._api(
-            "POST",
-            f"repos/{self.repository}/git/commits",
-            {"message": f"state: {record.state.value} {record.attempt_id}\n\ntransaction: {secrets.token_hex(32)}",
-             "tree": tree, "parents": [parent_sha]},
-        ).stdout)
-        return commit["sha"]
+        return state_commit(
+            self._api, self.repository, self.STATE_PATH, parent_sha, record,
+        )
 
     def _ref_sha(self, ref: str) -> str:
         result = self._api("GET", f"repos/{self.repository}/git/ref/{ref}")
-        return json.loads(result.stdout)["object"]["sha"]
+        try:
+            return ref_commit_sha(json.loads(result.stdout), self.repository, f"refs/{ref}")
+        except (KeyError, TypeError, ValueError):
+            raise JournalReadUnknown("JOURNAL_BASE_REF_UNKNOWN") from None
 
     def _claim_ref(self, request_id: str) -> str:
         digest = request_id.rsplit(":", 1)[-1]
@@ -377,17 +357,19 @@ class GitHubRefJournal:
         *,
         check: bool = True,
     ) -> subprocess.CompletedProcess[str]:
-        command = ["gh", "api", "--method", method, endpoint]
-        kwargs: dict[str, Any] = {
-            "text": True,
-            "capture_output": True,
-            "check": False,
-            "shell": False,
-        }
-        if payload is not None:
-            command.extend(["--input", "-"])
-            kwargs["input"] = canonical_bytes(payload).decode("utf-8")
-        result = self.runner(command, **kwargs)
-        if check and result.returncode != 0:
-            raise StateTransitionError("GITHUB_JOURNAL_API_FAILED")
-        return result
+        response = self._request(method, endpoint, payload)
+        expected = 201 if method == "POST" else 200
+        code = 0 if response.status == expected else 1
+        if method == "PATCH" and not code:
+            try:
+                prefix = f"repos/{self.repository}/git/"
+                if not endpoint.startswith(prefix) or payload is None:
+                    raise ValueError
+                verify_ref_update_ack(
+                    response.value, self.repository, endpoint[len(prefix):], payload["sha"],
+                )
+            except (KeyError, TypeError, ValueError, RecursionError):
+                raise JournalReadUnknown("JOURNAL_UPDATE_ACK_UNKNOWN") from None
+        if check and code:
+            raise JournalReadUnknown("GITHUB_JOURNAL_API_FAILED")
+        return subprocess.CompletedProcess([], code, json.dumps(response.value), "")
