@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fanilosendrison/review-broker/schemas/jch-quiescence-v1.schema.json",
+  "title": "Proposed J-CH quiescence evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "evidence_type": {
+      "type": "string",
+      "const": "jch-quiescence-v1"
+    },
+    "protocol_id": {
+      "type": "string",
+      "const": "j-ch-v1"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^request:sha256:[0-9a-f]{64}$"
+    },
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+    },
+    "invocation_count": {
+      "type": "integer",
+      "enum": [
+        0,
+        1
+      ]
+    },
+    "arm_commit_sha": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      ]
+    },
+    "arm_binding_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      ]
+    },
+    "codespace_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[A-Za-z0-9-]{1,200}$"
+    },
+    "codespace_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20,
+      "pattern": "^[1-9][0-9]{0,19}$"
+    },
+    "method": {
+      "enum": [
+        "codespace-shutdown",
+        "protected-process-tree-quiet"
+      ]
+    },
+    "observed_state": {
+      "enum": [
+        "Shutdown",
+        "QUIESCENT"
+      ]
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time",
+      "maxLength": 40
+    },
+    "lifecycle_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workflow_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "workflow_sha": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "run_attempt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "actor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "login": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "login",
+            "id"
+          ]
+        }
+      },
+      "required": [
+        "workflow_ref",
+        "workflow_sha",
+        "run_id",
+        "run_attempt",
+        "actor"
+      ]
+    },
+    "custody_evidence_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+    },
+    "observation_evidence_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+    }
+  },
+  "required": [
+    "schema_version",
+    "evidence_type",
+    "protocol_id",
+    "request_id",
+    "attempt_id",
+    "invocation_count",
+    "arm_commit_sha",
+    "arm_binding_sha256",
+    "codespace_name",
+    "codespace_id",
+    "method",
+    "observed_state",
+    "observed_at",
+    "lifecycle_context",
+    "custody_evidence_id",
+    "observation_evidence_id"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "invocation_count": {
+            "const": 0
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "arm_commit_sha": {
+            "type": "null"
+          },
+          "arm_binding_sha256": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "invocation_count": {
+            "const": 1
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "arm_commit_sha": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "arm_binding_sha256": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "method": {
+            "const": "codespace-shutdown"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "observed_state": {
+            "const": "Shutdown"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "observed_state": {
+            "const": "QUIESCENT"
+          }
+        }
+      }
+    }
+  ]
+}

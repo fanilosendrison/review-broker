@@ -1,0 +1,1421 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fanilosendrison/review-broker/schemas/jch-journal-v2.schema.json",
+  "title": "Proposed J-CH Journal v2",
+  "description": "Proposed normative resource. Formal integration, implementation, J20 and operational admission remain separate.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "arm_binding": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/binding"
+        }
+      ]
+    },
+    "attempt_id": {
+      "pattern": "^attempt:sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "evidence_ids": {
+      "items": {
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "maxItems": 32768,
+      "type": "array"
+    },
+    "evidence_locator": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/locator"
+        }
+      ]
+    },
+    "evidence_locator_plan": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/plan"
+        }
+      ]
+    },
+    "history": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "evidence_ids": {
+                "items": {
+                  "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "state": {
+                "enum": [
+                  "REQUESTED",
+                  "ADMITTED",
+                  "PREPARED",
+                  "ARMED",
+                  "TERMINAL_CAPTURED",
+                  "VALIDATED",
+                  "REPORTED",
+                  "INDETERMINATE",
+                  "STOPPED"
+                ]
+              }
+            },
+            "required": [
+              "state",
+              "evidence_ids"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "event": {
+                "enum": [
+                  "INPUT_CAPACITY_ASSESSED",
+                  "EVIDENCE_LOCATOR_PLANNED",
+                  "EVIDENCE_LOCATOR_RECORDED",
+                  "PUBLICATION_RESERVED"
+                ]
+              },
+              "evidence_ids": {
+                "items": {
+                  "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "event",
+              "evidence_ids"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "binding_sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "event": {
+                "const": "ATOMIC_ARM_CONSUMED"
+              },
+              "evidence_ids": {
+                "items": {
+                  "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "invocation_count": {
+                "const": 1,
+                "type": "integer"
+              },
+              "protocol_id": {
+                "const": "j-ch-v1"
+              }
+            },
+            "required": [
+              "event",
+              "protocol_id",
+              "binding_sha256",
+              "invocation_count",
+              "evidence_ids"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "maxItems": 4096,
+      "minItems": 1,
+      "type": "array"
+    },
+    "input_capacity": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt_id": {
+          "pattern": "^attempt:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "capacity_units": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "counting_rule": {
+          "const": "utf8-bytes-conservative-upper-bound-v1"
+        },
+        "evidence_type": {
+          "const": "rendered-input-capacity-v1"
+        },
+        "executing_broker_sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "input_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "limit_policy": {
+          "const": "codex-0.164.0-turn-input-v1"
+        },
+        "max_chars": {
+          "const": 1048576,
+          "type": "integer"
+        },
+        "packet_id": {
+          "pattern": "^packet:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "request_id": {
+          "pattern": "^request:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "runtime_distribution": {
+          "const": "@openai/codex"
+        },
+        "runtime_version": {
+          "const": "0.164.0"
+        },
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "REJECTED"
+          ]
+        },
+        "unicode_scalar_characters": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "utf16_code_units": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "utf8_bytes": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "attempt_id",
+        "capacity_units",
+        "counting_rule",
+        "evidence_type",
+        "executing_broker_sha",
+        "input_sha256",
+        "limit_policy",
+        "max_chars",
+        "packet_id",
+        "request_id",
+        "runtime_distribution",
+        "runtime_version",
+        "schema_version",
+        "status",
+        "unicode_scalar_characters",
+        "utf16_code_units",
+        "utf8_bytes"
+      ],
+      "type": "object"
+    },
+    "invocation_count": {
+      "enum": [
+        0,
+        1
+      ],
+      "type": "integer"
+    },
+    "protocol_id": {
+      "const": "j-ch-v1"
+    },
+    "publication_intent": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/intent"
+        }
+      ]
+    },
+    "publication_receipt": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/receipt"
+        }
+      ]
+    },
+    "request_id": {
+      "pattern": "^request:sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 2,
+      "type": "integer"
+    },
+    "state": {
+      "enum": [
+        "REQUESTED",
+        "ADMITTED",
+        "PREPARED",
+        "ARMED",
+        "TERMINAL_CAPTURED",
+        "VALIDATED",
+        "REPORTED",
+        "INDETERMINATE",
+        "STOPPED"
+      ]
+    },
+    "admission": {
+      "$ref": "#/$defs/admission"
+    },
+    "admission_authority": {
+      "$ref": "#/$defs/admission_authority"
+    }
+  },
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "request_id",
+    "attempt_id",
+    "state",
+    "invocation_count",
+    "history",
+    "evidence_ids",
+    "arm_binding",
+    "evidence_locator_plan",
+    "evidence_locator",
+    "publication_intent",
+    "publication_receipt",
+    "admission",
+    "admission_authority"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "invocation_count": {
+            "const": 0,
+            "type": "integer"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "arm_binding": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "invocation_count": {
+            "const": 1,
+            "type": "integer"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "arm_binding": {
+            "$ref": "#/$defs/binding"
+          }
+        },
+        "required": [
+          "input_capacity"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "REQUESTED",
+              "ADMITTED",
+              "PREPARED"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "invocation_count": {
+            "const": 0,
+            "type": "integer"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "ARMED",
+              "TERMINAL_CAPTURED",
+              "VALIDATED",
+              "REPORTED"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "invocation_count": {
+            "const": 1,
+            "type": "integer"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "REPORTED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "publication_intent": {
+            "$ref": "#/$defs/intent"
+          },
+          "publication_receipt": {
+            "$ref": "#/$defs/receipt"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "binding": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt_id": {
+          "pattern": "^attempt:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "binding_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "broker_repository_id": {
+          "pattern": "^[1-9][0-9]*$",
+          "type": "string"
+        },
+        "capacity_receipt_id": {
+          "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "challenge": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "codespace_id": {
+          "pattern": "^[1-9][0-9]*$",
+          "type": "string"
+        },
+        "codespace_name": {
+          "pattern": "^[a-zA-Z0-9-]{1,200}$",
+          "type": "string"
+        },
+        "controller_run_attempt": {
+          "pattern": "^[1-9][0-9]*$",
+          "type": "string"
+        },
+        "controller_run_id": {
+          "pattern": "^[1-9][0-9]*$",
+          "type": "string"
+        },
+        "input_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "launcher_program_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "packet_id": {
+          "pattern": "^packet:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "prepared_parent_sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "recipient_preflight_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "request_id": {
+          "pattern": "^request:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "reviewer_executable_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "reviewer_policy_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "subject_id": {
+          "pattern": "^subject:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "workflow_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "workflow_sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attempt_id",
+        "binding_version",
+        "broker_repository_id",
+        "capacity_receipt_id",
+        "challenge",
+        "codespace_id",
+        "codespace_name",
+        "controller_run_attempt",
+        "controller_run_id",
+        "input_sha256",
+        "launcher_program_sha256",
+        "packet_id",
+        "prepared_parent_sha",
+        "recipient_preflight_sha256",
+        "request_id",
+        "reviewer_executable_sha256",
+        "reviewer_policy_sha256",
+        "subject_id",
+        "workflow_ref",
+        "workflow_sha"
+      ],
+      "type": "object"
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "request": {
+          "oneOf": [
+            {
+              "title": "ReviewRequest v1",
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "schema_version",
+                "subject",
+                "mission",
+                "policy",
+                "reviewer"
+              ],
+              "properties": {
+                "schema_version": {
+                  "const": 1,
+                  "type": "integer"
+                },
+                "subject": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "repository",
+                    "pull_request"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "github_pr"
+                    },
+                    "repository": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+                    },
+                    "pull_request": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                },
+                "mission": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "objective",
+                    "instructions",
+                    "criteria"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                    },
+                    "objective": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20000
+                    },
+                    "criteria": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      }
+                    }
+                  }
+                },
+                "policy": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "profile",
+                    "version"
+                  ],
+                  "properties": {
+                    "profile": {
+                      "enum": [
+                        "publication",
+                        "architecture",
+                        "code",
+                        "scientific",
+                        "custom"
+                      ]
+                    },
+                    "version": {
+                      "const": 1,
+                      "type": "integer"
+                    }
+                  }
+                },
+                "reviewer": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "backend",
+                    "model",
+                    "reasoning_effort"
+                  ],
+                  "properties": {
+                    "backend": {
+                      "const": "codex-cli"
+                    },
+                    "model": {
+                      "const": "gpt-5.6-sol"
+                    },
+                    "reasoning_effort": {
+                      "const": "xhigh"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "title": "ReviewRequest v2",
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "schema_version",
+                "subject",
+                "mission",
+                "policy",
+                "reviewer",
+                "review_operation"
+              ],
+              "properties": {
+                "schema_version": {
+                  "const": 2,
+                  "type": "integer"
+                },
+                "subject": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "repository",
+                    "pull_request",
+                    "expected_head_commit"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "github_pr"
+                    },
+                    "repository": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+                    },
+                    "pull_request": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "expected_head_commit": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{40}$"
+                    }
+                  }
+                },
+                "mission": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "objective",
+                    "instructions",
+                    "criteria"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                    },
+                    "objective": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20000
+                    },
+                    "criteria": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      }
+                    }
+                  }
+                },
+                "policy": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "profile",
+                    "version"
+                  ],
+                  "properties": {
+                    "profile": {
+                      "enum": [
+                        "publication",
+                        "architecture",
+                        "code",
+                        "scientific",
+                        "custom"
+                      ]
+                    },
+                    "version": {
+                      "const": 1,
+                      "type": "integer"
+                    }
+                  }
+                },
+                "reviewer": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "backend",
+                    "model",
+                    "reasoning_effort"
+                  ],
+                  "properties": {
+                    "backend": {
+                      "const": "codex-cli"
+                    },
+                    "model": {
+                      "const": "gpt-5.6-sol"
+                    },
+                    "reasoning_effort": {
+                      "const": "xhigh"
+                    }
+                  }
+                },
+                "review_operation": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "initial"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "previous_request_id"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "changed_head"
+                        },
+                        "previous_request_id": {
+                          "type": "string",
+                          "pattern": "^request:sha256:[0-9a-f]{64}$"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "previous_request_id",
+                        "authorization_nonce"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "repeat_same_head"
+                        },
+                        "previous_request_id": {
+                          "type": "string",
+                          "pattern": "^request:sha256:[0-9a-f]{64}$"
+                        },
+                        "authorization_nonce": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{32}$"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^request:sha256:[0-9a-f]{64}$"
+        },
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "github_pr",
+              "type": "string"
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+            },
+            "repository_id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "pull_request": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "head_commit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "base_commit": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "merge_base": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[0-9a-f]{40}$"
+            }
+          },
+          "required": [
+            "kind",
+            "repository",
+            "repository_id",
+            "pull_request",
+            "head_commit",
+            "base_commit",
+            "merge_base"
+          ]
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^subject:sha256:[0-9a-f]{64}$"
+        },
+        "mission_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^mission:sha256:[0-9a-f]{64}$"
+        },
+        "policy_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^policy:sha256:[0-9a-f]{64}$"
+        },
+        "review_intent_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^review-intent:sha256:[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "schema_version",
+        "request",
+        "request_id",
+        "subject",
+        "subject_id",
+        "mission_id",
+        "policy_id"
+      ]
+    },
+    "admission_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "actor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "admission_mode": {
+          "enum": [
+            "low-sensitivity-v1",
+            "bounded-private-v1",
+            "comprehensive-security"
+          ]
+        },
+        "authorization_evidence_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+        },
+        "broker_repository_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "executing_broker_sha": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      },
+      "required": [
+        "actor",
+        "admission_mode",
+        "authorization_evidence_id",
+        "broker_repository_id",
+        "executing_broker_sha"
+      ]
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "stage": {
+          "const": "TERMINAL_CAPTURED",
+          "type": "string"
+        },
+        "broker_repository": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^request:sha256:[0-9a-f]{64}$"
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^subject:sha256:[0-9a-f]{64}$"
+        },
+        "packet_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^packet:sha256:[0-9a-f]{64}$"
+        },
+        "workflow_run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "workflow_run_attempt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "artifact_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9_.-]{1,255}$"
+        },
+        "artifacts": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 4096,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)[^\\u0000-\\u001f]+$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "artifact_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+              },
+              "byte_length": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "artifact_id",
+              "byte_length"
+            ]
+          }
+        },
+        "evidence_type": {
+          "const": "github-actions-artifact-plan",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "stage",
+        "broker_repository",
+        "request_id",
+        "attempt_id",
+        "subject_id",
+        "packet_id",
+        "workflow_run_id",
+        "workflow_run_attempt",
+        "artifact_name",
+        "artifacts",
+        "evidence_type"
+      ]
+    },
+    "locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "stage": {
+          "const": "TERMINAL_CAPTURED",
+          "type": "string"
+        },
+        "broker_repository": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^request:sha256:[0-9a-f]{64}$"
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^subject:sha256:[0-9a-f]{64}$"
+        },
+        "packet_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^packet:sha256:[0-9a-f]{64}$"
+        },
+        "workflow_run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "workflow_run_attempt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "artifact_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9_.-]{1,255}$"
+        },
+        "artifacts": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 4096,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)[^\\u0000-\\u001f]+$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "artifact_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+              },
+              "byte_length": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "artifact_id",
+              "byte_length"
+            ]
+          }
+        },
+        "evidence_type": {
+          "const": "github-actions-artifact-locator",
+          "type": "string"
+        },
+        "artifact_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "artifact_digest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "artifact_size_in_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 40
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 40
+        }
+      },
+      "required": [
+        "schema_version",
+        "stage",
+        "broker_repository",
+        "request_id",
+        "attempt_id",
+        "subject_id",
+        "packet_id",
+        "workflow_run_id",
+        "workflow_run_attempt",
+        "artifact_name",
+        "artifacts",
+        "evidence_type",
+        "artifact_id",
+        "artifact_digest",
+        "artifact_size_in_bytes",
+        "created_at",
+        "expires_at"
+      ]
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 2,
+          "type": "integer"
+        },
+        "evidence_type": {
+          "const": "jch-result-publication-intent-v2",
+          "type": "string"
+        },
+        "issue_number": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^request:sha256:[0-9a-f]{64}$"
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+        },
+        "result_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^result:sha256:[0-9a-f]{64}$"
+        },
+        "result_artifact": {
+          "$ref": "https://github.com/fanilosendrison/review-broker/schemas/jch-result-reference-v2.schema.json"
+        },
+        "publisher": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "login": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "login",
+            "id"
+          ]
+        },
+        "nonce": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reserved_at": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 40
+        },
+        "publication_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^publication:sha256:[0-9a-f]{64}$"
+        },
+        "comment_body_sha256": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "schema_version",
+        "evidence_type",
+        "issue_number",
+        "request_id",
+        "attempt_id",
+        "result_id",
+        "result_artifact",
+        "publisher",
+        "nonce",
+        "reserved_at",
+        "publication_id",
+        "comment_body_sha256"
+      ]
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "evidence_type": {
+          "const": "github-result-publication-observation",
+          "type": "string"
+        },
+        "publication_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^publication:sha256:[0-9a-f]{64}$"
+        },
+        "result_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^result:sha256:[0-9a-f]{64}$"
+        },
+        "issue_number": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "publisher": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "login": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "login",
+            "id"
+          ]
+        },
+        "comment_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "comment_node_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "comment_url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^https://github.com/[^/]+/[^/]+/issues/[1-9][0-9]*#issuecomment-[1-9][0-9]*$"
+        },
+        "comment_created_at": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 40
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 40
+        }
+      },
+      "required": [
+        "schema_version",
+        "evidence_type",
+        "publication_id",
+        "result_id",
+        "issue_number",
+        "publisher",
+        "comment_id",
+        "comment_node_id",
+        "comment_url",
+        "comment_created_at",
+        "observed_at"
+      ]
+    }
+  }
+}

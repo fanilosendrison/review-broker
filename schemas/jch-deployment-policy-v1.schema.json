@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fanilosendrison/review-broker/schemas/jch-deployment-policy-v1.schema.json",
+  "title": "Proposed protected J-CH deployment policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "protocol_id": {
+      "type": "string",
+      "const": "j-ch-v1"
+    },
+    "broker_repository": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "broker_repository_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20,
+      "pattern": "^[1-9][0-9]{0,19}$"
+    },
+    "broker_repository_owner_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20,
+      "pattern": "^[1-9][0-9]{0,19}$"
+    },
+    "ref": {
+      "type": "string",
+      "const": "refs/heads/dev"
+    },
+    "executing_broker_sha": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40,
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "workflow_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "workflow_sha": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40,
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "launcher_program_sha256": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "reviewer_native_sha256": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "permission_profile_sha256": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "reviewer_policy": {
+      "$ref": "https://github.com/fanilosendrison/review-broker/schemas/jch-deployment-policy-v1.schema.json#/$defs/reviewer_policy"
+    },
+    "codespace_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[A-Za-z0-9-]{1,200}$"
+    },
+    "codespace_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20,
+      "pattern": "^[1-9][0-9]{0,19}$"
+    },
+    "storage_workflows": {
+      "$ref": "https://github.com/fanilosendrison/review-broker/schemas/jch-storage-authority-basis-v1.schema.json#/$defs/workflows"
+    },
+    "storage_actor_ids": {
+      "$ref": "https://github.com/fanilosendrison/review-broker/schemas/jch-storage-authority-basis-v1.schema.json#/$defs/actors"
+    }
+  },
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "broker_repository",
+    "broker_repository_id",
+    "broker_repository_owner_id",
+    "ref",
+    "executing_broker_sha",
+    "workflow_ref",
+    "workflow_sha",
+    "launcher_program_sha256",
+    "reviewer_native_sha256",
+    "permission_profile_sha256",
+    "reviewer_policy",
+    "codespace_name",
+    "codespace_id",
+    "storage_workflows",
+    "storage_actor_ids"
+  ],
+  "$defs": {
+    "reviewer_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "distribution": {
+          "type": "string",
+          "const": "@openai/codex"
+        },
+        "distribution_version": {
+          "type": "string",
+          "const": "0.164.0"
+        },
+        "model": {
+          "type": "string",
+          "const": "gpt-5.6-sol"
+        },
+        "reasoning_effort": {
+          "type": "string",
+          "const": "xhigh"
+        },
+        "sandbox": {
+          "type": "string",
+          "const": "credential-isolated-read-only"
+        }
+      },
+      "required": [
+        "distribution",
+        "distribution_version",
+        "model",
+        "reasoning_effort",
+        "sandbox"
+      ]
+    }
+  }
+}
