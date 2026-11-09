@@ -1,0 +1,701 @@
+{
+  "$id": "urn:review-broker:rb91:qualification:jch-journal-v2-core:v0.1.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "REQUESTED",
+              "ADMITTED",
+              "PREPARED"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "arm_binding": {
+            "type": "null"
+          },
+          "invocation_count": {
+            "const": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "ARMED",
+              "TERMINAL_CAPTURED",
+              "VALIDATED",
+              "REPORTED"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "arm_binding": {
+            "additionalProperties": false,
+            "properties": {
+              "attempt_id": {
+                "pattern": "^attempt:sha256:[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "binding_version": {
+                "const": 1,
+                "type": "integer"
+              },
+              "broker_repository_id": {
+                "pattern": "^[1-9][0-9]*$",
+                "type": "string"
+              },
+              "capacity_receipt_id": {
+                "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "challenge": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "codespace_id": {
+                "pattern": "^[1-9][0-9]*$",
+                "type": "string"
+              },
+              "codespace_name": {
+                "pattern": "^[a-zA-Z0-9-]{1,200}$",
+                "type": "string"
+              },
+              "controller_run_attempt": {
+                "pattern": "^[1-9][0-9]*$",
+                "type": "string"
+              },
+              "controller_run_id": {
+                "pattern": "^[1-9][0-9]*$",
+                "type": "string"
+              },
+              "input_sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "launcher_program_sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "packet_id": {
+                "pattern": "^packet:sha256:[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "prepared_parent_sha": {
+                "pattern": "^[0-9a-f]{40}$",
+                "type": "string"
+              },
+              "recipient_preflight_sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "request_id": {
+                "pattern": "^request:sha256:[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "reviewer_executable_sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "reviewer_policy_sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "subject_id": {
+                "pattern": "^subject:sha256:[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "workflow_ref": {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              "workflow_sha": {
+                "pattern": "^[0-9a-f]{40}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "attempt_id",
+              "binding_version",
+              "broker_repository_id",
+              "capacity_receipt_id",
+              "challenge",
+              "codespace_id",
+              "codespace_name",
+              "controller_run_attempt",
+              "controller_run_id",
+              "input_sha256",
+              "launcher_program_sha256",
+              "packet_id",
+              "prepared_parent_sha",
+              "recipient_preflight_sha256",
+              "request_id",
+              "reviewer_executable_sha256",
+              "reviewer_policy_sha256",
+              "subject_id",
+              "workflow_ref",
+              "workflow_sha"
+            ],
+            "type": "object"
+          },
+          "invocation_count": {
+            "const": 1
+          }
+        },
+        "required": [
+          "input_capacity"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "INDETERMINATE",
+              "STOPPED"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "oneOf": [
+          {
+            "properties": {
+              "arm_binding": {
+                "type": "null"
+              },
+              "invocation_count": {
+                "const": 0
+              }
+            }
+          },
+          {
+            "properties": {
+              "arm_binding": {
+                "additionalProperties": false,
+                "properties": {
+                  "attempt_id": {
+                    "pattern": "^attempt:sha256:[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "binding_version": {
+                    "const": 1,
+                    "type": "integer"
+                  },
+                  "broker_repository_id": {
+                    "pattern": "^[1-9][0-9]*$",
+                    "type": "string"
+                  },
+                  "capacity_receipt_id": {
+                    "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "challenge": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "codespace_id": {
+                    "pattern": "^[1-9][0-9]*$",
+                    "type": "string"
+                  },
+                  "codespace_name": {
+                    "pattern": "^[a-zA-Z0-9-]{1,200}$",
+                    "type": "string"
+                  },
+                  "controller_run_attempt": {
+                    "pattern": "^[1-9][0-9]*$",
+                    "type": "string"
+                  },
+                  "controller_run_id": {
+                    "pattern": "^[1-9][0-9]*$",
+                    "type": "string"
+                  },
+                  "input_sha256": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "launcher_program_sha256": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "packet_id": {
+                    "pattern": "^packet:sha256:[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "prepared_parent_sha": {
+                    "pattern": "^[0-9a-f]{40}$",
+                    "type": "string"
+                  },
+                  "recipient_preflight_sha256": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "pattern": "^request:sha256:[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "reviewer_executable_sha256": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "reviewer_policy_sha256": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "subject_id": {
+                    "pattern": "^subject:sha256:[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "workflow_ref": {
+                    "maxLength": 512,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "workflow_sha": {
+                    "pattern": "^[0-9a-f]{40}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "attempt_id",
+                  "binding_version",
+                  "broker_repository_id",
+                  "capacity_receipt_id",
+                  "challenge",
+                  "codespace_id",
+                  "codespace_name",
+                  "controller_run_attempt",
+                  "controller_run_id",
+                  "input_sha256",
+                  "launcher_program_sha256",
+                  "packet_id",
+                  "prepared_parent_sha",
+                  "recipient_preflight_sha256",
+                  "request_id",
+                  "reviewer_executable_sha256",
+                  "reviewer_policy_sha256",
+                  "subject_id",
+                  "workflow_ref",
+                  "workflow_sha"
+                ],
+                "type": "object"
+              },
+              "invocation_count": {
+                "const": 1
+              }
+            },
+            "required": [
+              "input_capacity"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "description": "NON-NORMATIVE. Qualifies claim/pre-arm/AtomicArm core only. Optional embedded admission, publication, artifact objects are deliberately excluded from this slice; not valid for production or all J01-J23.",
+  "properties": {
+    "arm_binding": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "attempt_id": {
+              "pattern": "^attempt:sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "binding_version": {
+              "const": 1,
+              "type": "integer"
+            },
+            "broker_repository_id": {
+              "pattern": "^[1-9][0-9]*$",
+              "type": "string"
+            },
+            "capacity_receipt_id": {
+              "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "challenge": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "codespace_id": {
+              "pattern": "^[1-9][0-9]*$",
+              "type": "string"
+            },
+            "codespace_name": {
+              "pattern": "^[a-zA-Z0-9-]{1,200}$",
+              "type": "string"
+            },
+            "controller_run_attempt": {
+              "pattern": "^[1-9][0-9]*$",
+              "type": "string"
+            },
+            "controller_run_id": {
+              "pattern": "^[1-9][0-9]*$",
+              "type": "string"
+            },
+            "input_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "launcher_program_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "packet_id": {
+              "pattern": "^packet:sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "prepared_parent_sha": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            },
+            "recipient_preflight_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "request_id": {
+              "pattern": "^request:sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "reviewer_executable_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "reviewer_policy_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "subject_id": {
+              "pattern": "^subject:sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "workflow_ref": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            "workflow_sha": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "attempt_id",
+            "binding_version",
+            "broker_repository_id",
+            "capacity_receipt_id",
+            "challenge",
+            "codespace_id",
+            "codespace_name",
+            "controller_run_attempt",
+            "controller_run_id",
+            "input_sha256",
+            "launcher_program_sha256",
+            "packet_id",
+            "prepared_parent_sha",
+            "recipient_preflight_sha256",
+            "request_id",
+            "reviewer_executable_sha256",
+            "reviewer_policy_sha256",
+            "subject_id",
+            "workflow_ref",
+            "workflow_sha"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "attempt_id": {
+      "pattern": "^attempt:sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "evidence_ids": {
+      "items": {
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "maxItems": 32768,
+      "type": "array"
+    },
+    "evidence_locator": {
+      "type": "null"
+    },
+    "evidence_locator_plan": {
+      "type": "null"
+    },
+    "history": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "evidence_ids": {
+                "items": {
+                  "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "state": {
+                "enum": [
+                  "REQUESTED",
+                  "ADMITTED",
+                  "PREPARED",
+                  "ARMED",
+                  "TERMINAL_CAPTURED",
+                  "VALIDATED",
+                  "REPORTED",
+                  "INDETERMINATE",
+                  "STOPPED"
+                ]
+              }
+            },
+            "required": [
+              "state",
+              "evidence_ids"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "event": {
+                "enum": [
+                  "INPUT_CAPACITY_ASSESSED",
+                  "EVIDENCE_LOCATOR_PLANNED",
+                  "EVIDENCE_LOCATOR_RECORDED",
+                  "PUBLICATION_RESERVED"
+                ]
+              },
+              "evidence_ids": {
+                "items": {
+                  "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "event",
+              "evidence_ids"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "binding_sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "event": {
+                "const": "ATOMIC_ARM_CONSUMED"
+              },
+              "evidence_ids": {
+                "items": {
+                  "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "invocation_count": {
+                "const": 1,
+                "type": "integer"
+              },
+              "protocol_id": {
+                "const": "j-ch-v1"
+              }
+            },
+            "required": [
+              "event",
+              "protocol_id",
+              "binding_sha256",
+              "invocation_count",
+              "evidence_ids"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "maxItems": 4096,
+      "minItems": 1,
+      "type": "array"
+    },
+    "input_capacity": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt_id": {
+          "pattern": "^attempt:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "capacity_units": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "counting_rule": {
+          "const": "utf8-bytes-conservative-upper-bound-v1"
+        },
+        "evidence_type": {
+          "const": "rendered-input-capacity-v1"
+        },
+        "executing_broker_sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "input_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "limit_policy": {
+          "const": "codex-0.164.0-turn-input-v1"
+        },
+        "max_chars": {
+          "const": 1048576,
+          "type": "integer"
+        },
+        "packet_id": {
+          "pattern": "^packet:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "request_id": {
+          "pattern": "^request:sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "runtime_distribution": {
+          "const": "@openai/codex"
+        },
+        "runtime_version": {
+          "const": "0.164.0"
+        },
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "REJECTED"
+          ]
+        },
+        "unicode_scalar_characters": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "utf16_code_units": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "utf8_bytes": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "attempt_id",
+        "capacity_units",
+        "counting_rule",
+        "evidence_type",
+        "executing_broker_sha",
+        "input_sha256",
+        "limit_policy",
+        "max_chars",
+        "packet_id",
+        "request_id",
+        "runtime_distribution",
+        "runtime_version",
+        "schema_version",
+        "status",
+        "unicode_scalar_characters",
+        "utf16_code_units",
+        "utf8_bytes"
+      ],
+      "type": "object"
+    },
+    "invocation_count": {
+      "enum": [
+        0,
+        1
+      ],
+      "type": "integer"
+    },
+    "protocol_id": {
+      "const": "j-ch-v1"
+    },
+    "publication_intent": {
+      "type": "null"
+    },
+    "publication_receipt": {
+      "type": "null"
+    },
+    "request_id": {
+      "pattern": "^request:sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 2,
+      "type": "integer"
+    },
+    "state": {
+      "enum": [
+        "REQUESTED",
+        "ADMITTED",
+        "PREPARED",
+        "ARMED",
+        "TERMINAL_CAPTURED",
+        "VALIDATED",
+        "REPORTED",
+        "INDETERMINATE",
+        "STOPPED"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "request_id",
+    "attempt_id",
+    "state",
+    "invocation_count",
+    "history",
+    "evidence_ids",
+    "arm_binding",
+    "evidence_locator_plan",
+    "evidence_locator",
+    "publication_intent",
+    "publication_receipt"
+  ],
+  "title": "RB91 J-CH v2 journal core qualification schema — draft, NOT adopted",
+  "type": "object"
+}
