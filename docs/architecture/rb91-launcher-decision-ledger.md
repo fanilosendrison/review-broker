@@ -5,10 +5,20 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "RB91 Launcher Boundary and Decision Ledger"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # RB91 — D01–D08 and protected continuation
+
+## Current owner disposition — 2026-11-09
+
+The [owner decision](https://github.com/fanilosendrison/review-broker/issues/91#issuecomment-6731259973)
+conditionally selects J-CH, retains B/E as alternatives, approves journal2 /
+AtomicArm / j-ch-v1 design direction, accepts S2 for new v2 and confirms the
+protected-host boundary with ordinary defects still in scope. Those questions
+are not reopened. The owner requires the [F1 storage provenance revision](rb91-f1-storage-provenance.md).
+Formal normative adoption, construction and operational qualification remain
+separate; the detailed mechanism obligations below remain unchanged.
 
 ## D01 — Trust assumptions
 
@@ -76,7 +86,7 @@ A remains the consumption point even if no controller knows it succeeded.
 
 ## D05 — Privileged launcher boundary
 
-**Disposition: specified conditional mechanism; actual executable unqualified.**
+**Disposition: owner-confirmed boundary and conditional mechanism; actual executable unqualified.**
 Preferred L-S retains the synchronous child/evidence arrangement rather than
 inventing an external supervisor required by exec-in-place L-X. L-X remains a
 hardening option, not a necessary second authority.
@@ -192,8 +202,8 @@ interval. Once Shutdown is established, a cold restart generates fresh state,
 not a continuation of the consumed incarnation. Lifecycle custody prevents
 restart races from invalidating the shutdown observation before terminal CAS.
 
-Owner adoption must approve the v2 ordering change. Existing v1 recovery is NOT
-modified. Actual Shutdown, cancellation ACK integrity, all-mutator custody,
+The owner has accepted the v2 ordering direction; formal contract adoption remains
+pending. Existing v1 recovery is NOT modified. Actual Shutdown, cancellation ACK integrity, all-mutator custody,
 remote child death and terminal-evidence races require separate live qualification.
 
 ## D07 — Retention and rollback
@@ -209,9 +219,10 @@ malicious GitHub administration. Missing/corrupt/inaccessible state denies grant
 
 ## D08 — Selection
 
-**Disposition: RECOMMEND_J_CH conditional, owner selection outstanding.**
-The [comparison](rb91-architecture-comparison.md) uses the exact historical
-variants, including J2-B's post-ARM late-binding semantic question. J-CH is not
+**Disposition: J-CH conditionally selected by owner; formal adoption outstanding.**
+The [comparison](rb91-architecture-comparison.md) preserves the exact historical
+variants, including J2-B's post-ARM late-binding semantic question. B remains a
+nonpreferred alternative under the owner's conditional selection. J-CH is not
 preferred merely because earlier comments preferred it: it removes the split
 ARM window without exposing a writer to the executor or requiring unqualified
 persistent storage. Its D05/D06 obligations remain real and are not removed by

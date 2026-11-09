@@ -5,7 +5,7 @@ asset_type: "design-analysis"
 domain: "independent-review"
 severity: "draft"
 name: "RB91 Durable Authority Alternatives"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # RB91 — Definitive bounded architecture comparison
@@ -89,7 +89,9 @@ OIDC/launcher. J20 does not disappear merely by adding a field or namespace.
 
 ## Explicit recommendation and reversal conditions
 
-**RECOMMEND_J_CH**, conditional on the five obligations in the dossier.
+**RECOMMEND_J_CH**, conditionally selected by the owner on 2026-11-09, with the
+five obligations in the dossier and the required F1 revision. The owner retained
+B/E as reconsideration alternatives; no reselection is requested here.
 The reason is authority placement and semantics, not development cost:
 GitHub already provides the required durable ordinary-profile history;
 AtomicArm eliminates stranded split-ARM ownership, fixes the launcher before
@@ -103,8 +105,12 @@ the conservative no-recovery boundary unless separately adopted; an ARM-bound
 J2-B removes that behavior but retains an otherwise unjustified third CAS.
 E is justified if another necessary invariant cannot be enforced with trusted
 GitHub, or if the owner chooses the distinct compromised-GitHub assurance tier.
-B remains a conditional earlier deployment target, not a demonstrated retained
-store; the owner must explicitly resolve its relationship to J-CH on adoption.
+B is no longer the preferred deployment target under that owner decision; it
+remains a nonpreferred reconsideration option, not a demonstrated retained store.
+F1 separates immutable execution from authenticated recovery storage using
+existing GitHub workload identity, Actions artifacts and journal custody. Its
+storage-proof issuer/read/retention costs and qualification are additional
+obligations, not a second consumption mechanism or a new service.
 
 Reverse or suspend this recommendation if a conforming ordinary-profile trace
 still gives two starts, if D06's real quiescence fence cannot be qualified, if

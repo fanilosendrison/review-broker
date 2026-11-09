@@ -5,7 +5,7 @@ asset_type: "design-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "RB91 Durable Authority Decision Dossier"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # RB91 — Durable authority decision dossier
@@ -14,8 +14,10 @@ version: "0.1.0"
 
 ## Executive recommendation
 
-**RECOMMEND_J_CH**, conditionally, for the ordinary trusted-GitHub profile.
-GitHub remains the sole durable consumption authority; a protected live
+**RECOMMEND_J_CH**, now conditionally selected by the owner for the ordinary
+trusted-GitHub profile in the [2026-11-09 decision](https://github.com/fanilosendrison/review-broker/issues/91#issuecomment-6731259973).
+The owner requires the [F1 provenance revision](rb91-f1-storage-provenance.md),
+not acceptance of original-run-only publication blockage. GitHub remains the sole durable consumption authority; a protected live
 launcher supplies an ephemeral, non-transferable-in-protocol continuation.
 Neither a second database nor a persistent Codespace volume is necessary for
 the required safety property under the accepted dependency assumptions.
@@ -67,9 +69,13 @@ Original Draft [PR94](https://github.com/fanilosendrison/review-broker/pull/94):
 `64ee8062c5016cdc5a862b49b8acea18eec0aab4`.
 This dossier starts from current `dev`, copies PR94's six design/test files,
 and changes only its still-executable obsolete legacy-decoder assertions.
-The original proposal, journal proposal, Q4 report and core schema are retained
-byte-for-byte. Their historical present-tense labels are NOT current status.
-The dated disposition is authoritative only as a report of new evidence.
+At initial HEAD85149a17c6eda3e8f7cbc5f0f00c280f1b5ecdf9, five historical
+proposal/report/schema/model files were byte-identical. The F1 revision removes
+only the two hard-break trailing-space pairs at lines13–14 of the copied
+`jch-journal-contract-proposal.md`; that copy is NO LONGER byte-identical.
+The other four historical files remain byte-identical, and PR94's exact original
+bytes remain untouched. Their historical present-tense labels are NOT current
+status. The dated disposition records new evidence, not rewritten history.
 
 A new Draft avoids force-updating or merging into PR94's research branch.
 PR94 remains open/Draft; it is not closed or declared an accepted replacement.
@@ -113,23 +119,25 @@ Derived, not new product choices: UNKNOWN never creates permission; lost ARM
 ACK never mints; old executable bytes are not repaired by merging new source;
 STOPPED requires actual observed Shutdown; v1 histories cannot become v2.
 
-Still for the owner, as one explicit adoption packet:
+The owner has conditionally selected J-CH, retained B/E as nonpreferred
+alternatives, approved journal2/AtomicArm/disjoint j-ch-v1 direction and S2 for
+v2, and confirmed the host boundary with ordinary defects still in scope.
+Those decisions are NOT reopened. The owner also required F1's separate
+execution versus authenticated original/recovery storage provenance.
 
-- Select J-CH rather than J2-A/J2-B/E/B for the ordinary profile.
-- Accept claim-time journal v2 and a disjoint `j-ch-v1` OIDC envelope, AtomicArm
-  consumption semantics and the complete candidate ABI (including referenced,
-  rather than embedded, publication result bytes).
-- Accept the proposed v2 quiescence-before-terminal recovery ordering; v1 stays
-  mark-first. Select S2 for incompatible terminal decisions, not instantaneous
-  revocation on cancellation request.
-- Confirm the stated protected-host boundary excludes arbitrary privileged
-  memory cloning, while ordinary fork/reentry/relaunch bugs remain testable
-  implementation defects and cannot be waived as host trust.
+Still outstanding:
+
+- Complete the bounded F1 candidate and obtain a NEW exact-SHA independent GO
+  for readiness for normative adoption. The earlier GO covers only85149a17….
+- Formally adopt the exact versioned contract/ADR amendments; no candidate
+  publication or design-direction acceptance performs that promotion.
 - Later, separately authorize construction, bounded live non-inference
   qualification, J20 rollout and operational admission on exact configurations.
 
 No additional owner decision about a database, permanent VM, persistent volume,
-GitHub plan upgrade or namespace is required by current evidence. If J20 cannot
+GitHub plan upgrade or namespace is required by current evidence. F1 uses the
+existing GitHub issuer/artifact/journal mechanisms with a disjoint storage-proof
+purpose; actual source/job permission and capability qualification remain open. If J20 cannot
 establish writer isolation, a separate namespace proposal or alternative custody
 requires a NEW explicit decision, not an automatic fallback.
 

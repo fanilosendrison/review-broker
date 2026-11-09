@@ -10,8 +10,8 @@ version: "0.1.1"
 
 # J-CH Versioned Journal and AtomicArm Contract — Proposal v0.1.1
 
-**DRAFT / NON-NORMATIVE / NOT IMPLEMENTED / CORE SLICE TESTED — FULL CONTRACT NOT QUALIFIED**  
-**Design issue:** [#91](https://github.com/fanilosendrison/review-broker/issues/91). **Companion candidate:** [J-CH ARM-bound Challenge proposal](arm-challenge-authority-proposal.md) (v0.1.2).  
+**DRAFT / NON-NORMATIVE / NOT IMPLEMENTED / CORE SLICE TESTED — FULL CONTRACT NOT QUALIFIED**
+**Design issue:** [#91](https://github.com/fanilosendrison/review-broker/issues/91). **Companion candidate:** [J-CH ARM-bound Challenge proposal](arm-challenge-authority-proposal.md) (v0.1.2).
 This document proposes *journal* semantics only. It does **not** amend accepted OIDC ARM v1, ReviewRequest v1/v2, any executable schema, or the production journal. Requirements prefixed `J01`–`J23` are **candidate contract requirements**, not authorization to execute or merge.
 
 ## 1. Evidence, threat boundary, and nonclaims

@@ -5,17 +5,20 @@ asset_type: "candidate-contract"
 domain: "independent-review"
 severity: "draft"
 name: "RB91 Complete Journal V2 ABI Candidate"
-version: "0.1.0"
+version: "0.2.0"
 ---
 
 # RB91 — Complete journal v2 ABI candidate
 
 **Non-normative, offline candidate only. No production implementation/admission.**
 This completes the missing journal object domains in PR94 J01–J23 without
-altering PR94/Q4. Its standalone executable
-[JSON Schema Draft 2020-12](qualification/rb91-journal-v2-candidate.schema.json)
-is a candidate resource under architecture, NOT an accepted resource in schemas/.
-It is not imported by product code. The historical core schema stays unchanged.
+altering PR94/Q4. Its executable offline
+[JSON Schema Draft 2020-12 bundle](qualification/rb91-journal-v2-candidate.schema.json)
+includes the closed [F1 result reference](qualification/rb91-result-reference-v2.schema.json).
+Both are candidate resources under architecture, NOT accepted resources in schemas/.
+Neither is imported by product code. The historical core schema stays unchanged.
+The [F1 provenance contract](rb91-f1-storage-provenance.md) owns the revised
+execution/storage/authentication gates required by the 2026-11-09 owner decision.
 
 ## Boundary of completeness
 
@@ -172,27 +175,41 @@ bound ARM identities. Missing, duplicate, expired or contradictory observations
 block recovery. Plan only at TERMINAL_CAPTURED; locator at TERMINAL_CAPTURED or
 VALIDATED; both persist unchanged thereafter, including interrupted outcomes.
 
-Candidate publication intent is explicitly **schema2** and a new evidence type
+Candidate publication intent is explicitly **schema2** and evidence type
 `jch-result-publication-intent-v2`. This is NOT silently compatible with the v1
 publisher. It closes issue, request/attempt, result ID, publisher login/numeric ID,
 nonce, reservation time, publication ID, comment-body digest and `result_artifact`.
 
-`result_artifact` is a CLOSED exact-byte reference: artifact ID, byte length,
-`application/json`, `review-result-v1`, and a CLOSED Actions location (repository,
-original run/attempt, numeric artifact ID, name, archive digest and fixed path
-`review-result.json`). After validation, result bytes are retained in a separate
-private Actions artifact and its metadata/digest observed BEFORE intent creation.
-This does not insert a future result into the earlier terminal-capture plan.
-The location may be absent/expired at recovery; that blocks publication, not a
-new invocation. No general new content-addressing format/store is invented.
+`result_artifact` is a CLOSED exact-byte reference with three distinct domains:
+
+- `execution` binds immutable original request/attempt/subject/policy/packet,
+  controller workflow/run/attempt, ARM commit/binding and terminal/validation evidence.
+- `storage` binds the actual original OR authorized recovery workflow/run/attempt,
+  job and actors, plus a closed authenticated authorization receipt and its ID.
+- Artifact ID/length/type/contract bind the exact result bytes. `location` binds
+  actual STORAGE run/attempt, repository, numeric Actions artifact ID, archive
+  digest/name and fixed `review-result.json` path, not a forged original run.
+
+The [F1 contract](rb91-f1-storage-provenance.md) specifies the distinct original/
+recovery predicates, independently trusted policy/execution snapshot, disjoint
+storage-purpose workload proof, authenticated Actions observations, exact original
+terminal-archive validation and exact result retrieval. Removing RESULT_RUN alone
+is insufficient. A declarative mode, hash, actor or receipt cannot authorize use.
+Raw JWTs stay transient and outside all evidence; only the verified non-secret
+receipt is journaled. No new model permission, storage service or consumption
+mechanism is introduced. Real storage-role configuration remains unqualified.
+
+Result bytes are retained after independent validation and BEFORE intent creation.
+A recovery may reconstruct/store those same bytes under its own authenticated
+storage identity without changing execution or result identity. Missing/expired/
+contradictory artifacts still block use, never historical consumption. The separate
+result is not inserted into the earlier immutable terminal-capture plan.
 
 Exact result bytes must be canonical JSON+LF, match byte identity/length,
 validate the accepted public ReviewResult v1 contract and credential veto, and
-match request/attempt/subject/policy/packet and independently reconstructed
-validation. The journal does not embed or normalize that versioned public
+match request/attempt/subject/policy/packet, resolved admission and independently
+reconstructed validation. The journal does not embed or normalize that public
 payload, whose existing extensibility is NOT silently tightened by this draft.
-The closed journal has no untyped nested result object. Retrieval verifies exact
-Actions archive metadata and safe single-path extraction before byte validation.
 
 Candidate publication ID is `publication:sha256:` plus SHA256 of canonical intent
 basis excluding ONLY `evidence_type`, `publication_id`, `comment_body_sha256`.
@@ -204,10 +221,12 @@ permission. The receipt closes current observation fields and must match intent,
 actor, issue, exact comment ID/node/URL/timestamps and rendered body. It is set
 only together with REPORTED, whose history includes its exact artifact ID.
 
-The new reference avoids cloning an open public result payload into the closed
-journal ABI, but introduces an explicit result-retention/retrieval obligation
-and additional upload/read costs. Owner adoption and future implementation must
-include that obligation; no existing v1 intent/result is transformed.
+The reference avoids cloning an open public result payload into the closed
+journal ABI, but introduces explicit result-retention/retrieval and storage-proof
+obligations and additional upload/read/issuer costs. The owner selected this F1
+revision direction; formal adoption and future qualification must include those
+obligations. No existing v1 intent/result is transformed, and no existing
+publication reservation is rebound or allowed a second POST.
 
 ## GitHub and OIDC — J14–J19
 

@@ -5,7 +5,7 @@ asset_type: "evidence-disposition"
 domain: "independent-review"
 severity: "draft"
 name: "RB91 Current Evidence Disposition"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # RB91 — Current disposition, 2026-11-09
@@ -13,9 +13,13 @@ version: "0.1.0"
 ## Immutable historical observations and exact present source
 
 This dated addendum does not edit historical Q4, verdicts or Issue comments.
-The frozen PR94 documents/core-schema are copied byte-identically from
-`eb1e2772159ba7faa4ae5f57cb24b3bf40d9d6ce`. Their contemporary failure labels
-remain correct for the source they examined, not the present integrated binary.
+At initial dossier SHA85149a17c6eda3e8f7cbc5f0f00c280f1b5ecdf9 the five
+historical documents/schema/model files were byte-identical to PR94
+`eb1e2772159ba7faa4ae5f57cb24b3bf40d9d6ce`. F1 removes the two trailing-space
+pairs from lines13–14 of the copied journal proposal; that copy is no longer
+byte-identical. Four other historical files and PR94 itself remain unchanged.
+Their contemporary failure labels remain correct for the source they examined,
+not the present integrated binary.
 
 Fresh fetch and GitHub PR reads observed:
 
@@ -124,3 +128,19 @@ Next action: preserve accepted docs untouched; this dossier uses their common
 stable identities/no-retry/disabled-admission requirements and explicitly does
 not promote source into normative execution authority. This status-prose issue
 is not a new prerequisite for choosing the durable authority concept.
+
+## F1 owner disposition and revision — 2026-11-09
+
+The [owner](https://github.com/fanilosendrison/review-broker/issues/91#issuecomment-6731259973)
+conditionally selected J-CH and resolved ED03's design direction: do NOT accept
+permanent publication blockage solely because a valid terminal execution's
+original run ended before result retention. Keep execution immutable and permit
+separately authenticated recovery storage. S2 and the protected-host boundary
+are confirmed; B/E remain nonpreferred alternatives. These decisions are not
+reopened and do not perform formal normative adoption.
+
+The prior independent GO and F1 counterexample on85149a17… remain immutable.
+The new [F1 candidate](../rb91-f1-storage-provenance.md) replaces RESULT_RUN with
+distinct execution, storage/job/actor, issuer, evidence and content predicates.
+A NEW exact-SHA review for normative-adoption readiness is required; no old GO
+qualifies amended bytes. Historical Q4 and R1/R2 outcomes are unchanged.

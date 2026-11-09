@@ -5,10 +5,17 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "RB91 Decision Preparation Offline Experiments"
-version: "0.1.0"
+version: "0.1.1"
 ---
 
 # RB91 — Decision preparation experiments
+
+This section preserves initial dossier results on
+85149a17c6eda3e8f7cbc5f0f00c280f1b5ecdf9. Current F1 revision results and the
+explicit copied-file whitespace differences are recorded in the separate
+[F1 qualification report](rb91-f1-provenance-qualification.md). The old counts,
+limits and nonpassing historical observations below are not rewritten as new
+qualification or extended to amended bytes.
 
 ## Scope, source and method
 
@@ -88,7 +95,7 @@ still available on its pinned PR94 SHA, unchanged there.
 ## Full suite, failure honesty and validation
 
 Command: `python -m unittest discover -s tests -p 'test*.py' -v` with the two
-exact fixture environment variables specified by CI. Current run: **739 tests,
+exact fixture environment variables specified by CI. Initial dossier run: **739 tests,
 739 PASS, zero failures/errors/skips/expected failures**, 254.745 seconds unittest
 time, process exit0. Package install passed. This includes existing R1/R2 tests,
 not a substitute for their independent or operational scopes.
