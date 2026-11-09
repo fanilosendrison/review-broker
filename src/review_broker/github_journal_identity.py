@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from graphlib import TopologicalSorter
 from urllib.parse import urlsplit
 
 from .github_contents import decode_github_contents_base64
 from .git_blob_identity import blob_identity, sha1_oid as commit_sha
+from .github_journal_tree_bindings import TreeEntry, TreePath, tree_bindings, verify_tree_paths
 
 
 _GIT_RESOURCES = {'blob': 'blobs', 'tree': 'trees', 'commit': 'commits'}
@@ -62,24 +64,15 @@ def object_links(
     return {source: frozenset(targets) for source, targets in links.items()}
 
 
-def verify_tree_paths(paths: Mapping[str, str]) -> None:
-    _tree_path_ancestors(paths)
+@dataclass(frozen=True)
+class GitObjectFacts:
+    """Complete checked context local to one immutable proposal, not a wire ABI."""
 
-
-def _tree_path_ancestors(paths: Mapping[str, str]) -> list[tuple[str, str]]:
-    ancestors = []
-    for path in paths:
-        components = path.split('/')
-        if any(part in {'', '.', '..'} or '\x00' in part for part in components):
-            raise ValueError
-        for end in range(1, len(components)):
-            prefix = '/'.join(components[:end])
-            ancestor = paths.get(prefix)
-            if ancestor is not None:
-                if ancestor != 'tree':
-                    raise ValueError
-                ancestors.append((prefix, path))
-    return ancestors
+    sha: str
+    roles: dict[str, str]
+    sizes: dict[str, int]
+    links: dict[str, frozenset[str]]
+    bindings: dict[TreePath, TreeEntry]
 
 
 def git_object_sha(
@@ -108,16 +101,34 @@ def git_object_facts(
     known_sizes: Mapping[str, int] | None = None,
     known_links: Mapping[str, frozenset[str]] | None = None,
 ) -> tuple[str, dict[str, str], dict[str, int], dict[str, frozenset[str]]]:
+    """Preserve the established four-value projection over the canonical validator."""
+    facts = git_object_context(value, repository, resource, known_roles=known_roles,
+        known_sizes=known_sizes, known_links=known_links)
+    return facts.sha, facts.roles, facts.sizes, facts.links
+
+
+def git_object_context(
+    value: object, repository: str, resource: str, *, known_roles: Mapping[str, str] | None = None,
+    known_sizes: Mapping[str, int] | None = None,
+    known_links: Mapping[str, frozenset[str]] | None = None,
+    known_bindings: Mapping[TreePath, TreeEntry] | None = None,
+) -> GitObjectFacts:
     roles = object_roles([], known_roles)
     sizes = blob_sizes([], known_sizes)
     links: list[tuple[str, str]] = []
-    sha = _git_object_sha(value, repository, resource, roles, sizes, links)
-    return sha, roles, sizes, object_links(links, known_links)
+    assertions: list[tuple[TreePath, TreeEntry]] = []
+    sha = _git_object_sha(value, repository, resource, roles, sizes, links, assertions)
+    bindings = tree_bindings(assertions, known_bindings)
+    for (tree, _), (_, kind, child) in bindings.items():
+        _add_object_role(roles, tree, 'tree')
+        _add_object_role(roles, child, kind)
+        links.append((tree, child))
+    return GitObjectFacts(sha, roles, sizes, object_links(links, known_links), bindings)
 
 
 def _git_object_sha(
     value: object, repository: str, resource: str, roles: dict[str, str], sizes: dict[str, int],
-    links: list[tuple[str, str]],
+    links: list[tuple[str, str]], assertions: list[tuple[TreePath, TreeEntry]],
 ) -> str:
     if not isinstance(value, dict):
         raise ValueError
@@ -134,8 +145,7 @@ def _git_object_sha(
             if not isinstance(value['tree'], list):
                 raise ValueError
             paths = {}
-            identities = {}
-            modes = {'blob': {'100644', '100755', '120000'}, 'tree': {'040000'}, 'commit': {'160000'}}
+
             for entry in value['tree']:
                 if (not isinstance(entry, dict) or not isinstance(entry['path'], str)
                         or not entry['path'] or entry['path'] in paths):
@@ -143,22 +153,18 @@ def _git_object_sha(
                 paths[entry['path']] = entry['type']
                 if 'size' in entry and (type(entry['size']) is not int or entry['size'] < 0):
                     raise ValueError
-                if entry['mode'] not in modes[entry['type']]:
-                    raise ValueError
-                identities[entry['path']] = _git_object_sha(entry, repository, _GIT_RESOURCES[entry['type']], roles, sizes, links)
-                links.append((sha, identities[entry['path']]))
-            for ancestor, path in _tree_path_ancestors(paths):
-                links.append((identities[ancestor], identities[path]))
+                child = _git_object_sha(entry, repository, _GIT_RESOURCES[entry['type']], roles, sizes, links, assertions)
+                assertions.append(((sha, entry['path']), (entry['mode'], entry['type'], child)))
     if resource == 'commits':
         if 'html_url' in value and value['html_url'] != f'https://github.com/{repository}/commit/{sha}':
             raise ValueError
         if 'tree' in value:
-            links.append((sha, _git_object_sha(value['tree'], repository, 'trees', roles, sizes, links)))
+            links.append((sha, _git_object_sha(value['tree'], repository, 'trees', roles, sizes, links, assertions)))
         if 'parents' in value:
             if not isinstance(value['parents'], list):
                 raise ValueError
             for parent in value['parents']:
-                links.append((sha, _git_object_sha(parent, repository, 'commits', roles, sizes, links)))
+                links.append((sha, _git_object_sha(parent, repository, 'commits', roles, sizes, links, assertions)))
     return sha
 
 
