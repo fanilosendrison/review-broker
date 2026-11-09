@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "source_sha": "b7316e5e8cadc718872ea56dfecfb61709c636ce",
+  "purpose": "qualified-offline-reference-not-runtime-authority",
+  "files": {
+    "tests/rb91_continuation_model.py": "7c9d79b16df5e38225d1fd34c66c66bd9a931b0b695c19873025400419465321",
+    "tests/rb91_full_abi_fixtures.py": "38c88303185f4ff3f3eb59dc5d20ce94cbd211f572f3b992c79e6903ebc0e729",
+    "tests/rb91_full_abi_model.py": "cf80c03d8422a30799a8c4b56b097b5fa038c45806b113587184be8daa7a85b4",
+    "tests/rb91_jch_contract_model.py": "74039e6d249c22947d71b56e39e9bdbaf9df8ffffa0352dc7aa800b9e5f615cf",
+    "tests/rb91_publication_recovery_model.py": "ac92b600fe382c8fa6ae56f702a4493b1965719b9d48afc097e069b4fbdf728d",
+    "tests/rb91_result_reference_model.py": "a29359fc281c605584dfd019dd50c80f54ce4774579025814523646e8e9bbf80",
+    "tests/rb91_storage_fixtures.py": "3ef8101bd7670173d83e5d2aad5c7ad2dece41722d7440b59f0ca4a6e5e4cc9e",
+    "tests/rb91_storage_provenance_model.py": "392993c6424f8ce1c7abe6ef39f80f120ba64d69bd97ca6d4a6d57bc1c3f49fc",
+    "tests/test_rb91_continuation_candidate.py": "393dc39accbde6c5f298e43ca79a299a8143b7d6458dc9a3b3ed28cc34541e1f",
+    "tests/test_rb91_f1_publication.py": "85cc56b76f2fabd94ed9b788a653422d7c485d41df6f72ba00712ca5ad84831a",
+    "tests/test_rb91_f1_storage.py": "8ea502069e5b8d1354886253d82248440157b2a7da4a6122a604e87e4397a383",
+    "tests/test_rb91_full_abi_candidate.py": "01eff67be1746291b6fdea983b4510309fec62e56afee4976c07a59fb455cb30",
+    "tests/test_rb91_jch_contract_qualification.py": "c5ab175061b2fecdd54c1771b2d9ae360d548748390a0e8ee9a52fe852505f65",
+    "docs/architecture/qualification/rb91-jch-journal-v2-core.schema.json": "a419744cb45adb0e0249491f07f289b65b9a4101cd3c3c4b18b5e54588f4e24c",
+    "docs/architecture/qualification/rb91-journal-v2-candidate.schema.json": "e110e5304ece4f81ee2e6dcc8b1ecd9fa31bfc34f3d22852b95ebaad3d366334",
+    "docs/architecture/qualification/rb91-result-reference-v2.schema.json": "8cb2b3ada0fd3f30cfdd12d1ae5fab7184c380d98eadf21fe4d993659c548171"
+  }
+}
