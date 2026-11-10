@@ -1,0 +1,45 @@
+name: RB115 Linux diagnostic qualification
+
+on:
+  push:
+    branches:
+      - diagnostic/rb115-linux-artifact-child-20261110-a
+
+permissions:
+  contents: read
+
+jobs:
+  linux-diagnostic:
+    if: github.ref == 'refs/heads/diagnostic/rb115-linux-artifact-child-20261110-a'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11"
+      - name: Verify exact diagnostic checkout and unchanged production blobs
+        env:
+          EXPECTED_DIAGNOSTIC_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_DIAGNOSTIC_SHA"
+          test "$(git hash-object --no-filters src/review_broker/actions_artifact_child_v3.py)" = 8921f85af1561b7336bd6031eafb90b9068718af
+          test "$(git hash-object --no-filters tests/test_issue70_live_prep_artifact_child.py)" = 3e463c07e3f0746d460285fff29c87015ae03c4b
+          uname -a
+          python --version
+      - name: Install unchanged candidate package
+        run: python -m pip install .
+      - name: Fixed exact-source real-subprocess Linux matrix (200/100/100/50)
+        env:
+          EXPECTED_DIAGNOSTIC_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -m 700 "$RUNNER_TEMP/rb115-home"
+          env -i PATH="$PATH" HOME="$RUNNER_TEMP/rb115-home" LANG=C.UTF-8 \
+            EXPECTED_DIAGNOSTIC_SHA="$EXPECTED_DIAGNOSTIC_SHA" \
+            python -W always::ResourceWarning diagnostics/rb115/linux_qualification.py
