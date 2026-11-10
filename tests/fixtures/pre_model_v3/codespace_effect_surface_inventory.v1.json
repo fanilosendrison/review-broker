@@ -1,0 +1,177 @@
+{
+  "inventory_schema_version": 1,
+  "source_commit_sha": "f9e902ee577d3a22330c3bf2fb04dcae28ed3034",
+  "scope": [
+    ".github/workflows/*.yml",
+    "src/review_broker/*.py",
+    "scripts/*.py"
+  ],
+  "interpretation": "Source inventory and static match closure only; not proof of all deployed paths or trusted credential boundaries.",
+  "codespace_name_equality_to_runtime_variable": "UNVERIFIED",
+  "full_runtime_prepared_gate_qualified": false,
+  "old_workers_excluded": false,
+  "resource_owner_exclusivity_qualified": false,
+  "scanned_effect_surfaces": [
+    {
+      "path": ".github/workflows/review-request.yml",
+      "blob_sha": "d8543537a4d94285de78e546ada4a538ab9a53f2",
+      "kind": "review-workflow",
+      "mechanism": "direct-api-ssh-copy-and-cli-cleanup",
+      "concurrency_group": "review-broker-single-reviewer",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": ".github/workflows/review-reconciler.yml",
+      "blob_sha": "1389764ffb93f6849256206405dc75592ad36c9b",
+      "kind": "reconciler-workflow",
+      "mechanism": "indirect-remote-stop-via-internal-reconcile",
+      "concurrency_group": "review-broker-single-reviewer",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": ".github/workflows/codespace-control-qualification.yml",
+      "blob_sha": "b357dae24d5f4f10d63039c425f3486c82281524",
+      "kind": "independent-qualification-workflow",
+      "mechanism": "direct-api-start-ssh-copy-stop",
+      "concurrency_group": "review-broker-codespace-control-qualification",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": "src/review_broker/codespace.py",
+      "blob_sha": "83a33dccddee6df593c263a3f2e793c3d7d5b1d8",
+      "kind": "codespace-transport",
+      "mechanism": "start-stop-ssh-copy-recover",
+      "concurrency_group": "none",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": "src/review_broker/cli.py",
+      "blob_sha": "b562a8fd36e927a53a1675207ff88d274edf8299",
+      "kind": "cli-route",
+      "mechanism": "internal-recover-stop-reconcile-and-pilot-controller",
+      "concurrency_group": "none",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": "src/review_broker/reconciliation.py",
+      "blob_sha": "97a79133b049f82226b2f138257f378227e3d421",
+      "kind": "reconciler-core",
+      "mechanism": "indirect-controller-stop",
+      "concurrency_group": "none",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": "src/review_broker/execution_recovery.py",
+      "blob_sha": "81ae4047f17e11f508ae7be7e0d571ad7b343855",
+      "kind": "cleanup-core",
+      "mechanism": "controller-recover-stop",
+      "concurrency_group": "none",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": "src/review_broker/pilot03_controller.py",
+      "blob_sha": "d5fa26580d63c7ca672a1a72ac9e009885f0cd8e",
+      "kind": "pilot-controller",
+      "mechanism": "transport-prepare-shutdown",
+      "concurrency_group": "none",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": "src/review_broker/pilot03_transport.py",
+      "blob_sha": "26fc083560de6ed5de9e486099a0ceab82058124",
+      "kind": "pilot-transport",
+      "mechanism": "lifecycle-start-stop-and-direct-ssh",
+      "concurrency_group": "none",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": "src/review_broker/pilot03_remote_preflight.py",
+      "blob_sha": "8b36cedbf42ff1a13cdbfac590155b0f3e5d613d",
+      "kind": "pilot-ssh-preflight",
+      "mechanism": "direct-ssh-and-gh-codespace-copy",
+      "concurrency_group": "none",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": "src/review_broker/pilot03_remote_artifacts.py",
+      "blob_sha": "5873e5e6d5fafd7039b421739f6dfc23bce86f1f",
+      "kind": "pilot-artifacts",
+      "mechanism": "direct-ssh-and-literal-copier",
+      "concurrency_group": "none",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": "src/review_broker/pilot_private_retention.py",
+      "blob_sha": "79119c8beae20b03fa5d6e7fd3e85fbcff67a05d",
+      "kind": "pilot-artifact-copy",
+      "mechanism": "gh-codespace-copy",
+      "concurrency_group": "none",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": "src/review_broker/pilot03_ssh_config.py",
+      "blob_sha": "f1a0323fec765a830e1a5788f61f6efb1ee7a8a1",
+      "kind": "pilot-proxy",
+      "mechanism": "ssh-proxycommand-gh-codespace",
+      "concurrency_group": "none",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": "src/review_broker/pilot_cli.py",
+      "blob_sha": "cd580c0ce3b17d025f9e30944242a72877cad56c",
+      "kind": "pilot-cli-route",
+      "mechanism": "caller-selected-codespace-transport",
+      "concurrency_group": "none",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": "src/review_broker/pilot04_controller.py",
+      "blob_sha": "014e6dafa2f4f2a8ce8fa73711932a2bdfc934dc",
+      "kind": "pilot-wrapper",
+      "mechanism": "shared-pilot03-controller",
+      "concurrency_group": "none",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    },
+    {
+      "path": "src/review_broker/pilot05_controller.py",
+      "blob_sha": "bf0ac64cd584b445f2ed48f5adcb475bf3d52c48",
+      "kind": "pilot-wrapper",
+      "mechanism": "shared-pilot03-controller",
+      "concurrency_group": "none",
+      "gate_v3_present": false,
+      "review_request_target_overlap": "NOT_QUALIFIED"
+    }
+  ],
+  "supporting_boundaries": [
+    {
+      "path": "src/review_broker/pilot03_authorization.py",
+      "blob_sha": "5cd869397ebdb4756403e5803f8a158766d3d6dd",
+      "note": "pilot-authorization-shape-not-v3-gate"
+    },
+    {
+      "path": "src/review_broker/orchestration.py",
+      "blob_sha": "666f6266ac9909c98692e718d235d6492ca46981",
+      "note": "preparation-path-without-direct-codespace"
+    },
+    {
+      "path": ".github/workflows/private-source-qualification.yml",
+      "blob_sha": "9052e63d0ad798c7b9f571278b979329cbfed438",
+      "note": "negative-control-no-codespace-command"
+    }
+  ]
+}
