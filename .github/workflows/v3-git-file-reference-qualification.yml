@@ -1,0 +1,71 @@
+name: V3 Git-file reference qualification
+
+on:
+  pull_request:
+    branches: [feat/issue51-v3-inline-reference-packet-v2-20261031]
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    if: >-
+      github.repository == 'fanilosendrison/review-broker' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'feat/issue51-v3-git-file-reference-20261101' &&
+      github.base_ref == 'feat/issue51-v3-inline-reference-packet-v2-20261031' &&
+      github.event.pull_request.user.login == 'fanilosendrison'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - run: python -m pip install .
+      - name: Authenticated read-only Git object qualification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          python - <<'PY'
+          import os
+          from review_broker.github_git_file_v3 import GitHubGitFileReaderV3, GitHubGitFileV3Error
+          from review_broker.identity import artifact_identity, canonical_bytes
+          repository = "fanilosendrison/review-broker"
+          repository_id = 1433701208
+          commit = "f9e902ee577d3a22330c3bf2fb04dcae28ed3034"
+          path = "docs/contracts/review-request-v2.md"
+          authority = artifact_identity(canonical_bytes({"schema_version": 1,
+              "evidence_type": "same-repository-actions-read-qualification",
+              "repository": repository, "repository_id": repository_id}) + b"\n")
+          reader = GitHubGitFileReaderV3(os.environ["GH_TOKEN"], repository, repository_id,
+                                        authority_evidence_id=authority, qualification_only=True)
+          first = reader.observe(commit, path)
+          second = reader.observe(commit, path, first.sha256)
+          assert (first.commit_sha, first.root_tree_sha, first.git_blob_oid, first.sha256,
+                  first.original_bytes) == (second.commit_sha, second.root_tree_sha,
+                  second.git_blob_oid, second.sha256, second.original_bytes)
+          try:
+              reader.observe(commit, path, "0" * 64)
+          except GitHubGitFileV3Error as exc:
+              assert "EXPECTED_SHA256_MISMATCH" in str(exc)
+          else:
+              raise AssertionError("mismatched digest accepted")
+          try:
+              GitHubGitFileReaderV3(os.environ["GH_TOKEN"], repository, 1,
+                  authority_evidence_id=authority, qualification_only=True).observe(commit, path)
+          except GitHubGitFileV3Error as exc:
+              assert "REPOSITORY_IDENTITY_MISMATCH" in str(exc)
+          else:
+              raise AssertionError("wrong repository id accepted")
+          print("AUTHENTICATED_GIT_FILE_READ=PASS")
+          print("INDEPENDENT_AUTHENTICATED_REREAD=PASS")
+          print("EXPECTED_SHA256_REJECTION=PASS")
+          print("WRONG_REPOSITORY_ID_REJECTION=PASS")
+          print("LIVE_GITHUB_MUTATIONS=0")
+          print("LIVE_CODESPACE_EFFECTS=0")
+          PY
