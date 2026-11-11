@@ -1,0 +1,62 @@
+from dataclasses import replace
+import os,subprocess,sys,tempfile,time,unittest
+from unittest import mock
+from pathlib import Path
+from tests.issue69_test_support import *
+from review_broker.github_pull_request_observation_v3 import GitHubPullRequestObservationReaderV3
+from review_broker.github_subject_capture_v3 import capture_authenticated_subject_v3,bind_authenticated_capture_v3,GitHubSubjectCaptureV3Error
+from review_broker.packet_v2 import subject_capture_evidence_id_v2
+from review_broker.packets import GitSourceReader,SourceSpec
+class Issue69SubjectCaptureTests(unittest.TestCase):
+ def setup_capture(self,root):
+  origin,base,head,merge,files=git_graph(root);authority=source_authority();api=PullApi(base,head,merge,files);observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=api);scope=observer.observe_scope();authorization=authority.authorize(REPOSITORY,REPOSITORY_ID);capture=capture_authenticated_subject_v3(scope,observer,authorization,authority.scope_observation.evidence_id,TOKEN,root/"capture",acquire_repository=local_acquirer(origin));pr=observer.finalize(scope,capture);capture=bind_authenticated_capture_v3(capture,authorization.evidence_id,pr.evidence_id);return origin,scope,observer,authorization,capture,pr
+ def test_I69_F27_exited_leader_descendant_is_killed_on_pipe_timeout(self):
+  from review_broker.github_subject_capture_v3 import _run
+  with tempfile.TemporaryDirectory() as temporary:
+   marker=Path(temporary)/"orphan-descendant";script="import subprocess,sys;subprocess.Popen([sys.executable,'-c',\"import time,pathlib;time.sleep(1);pathlib.Path(r'%s').write_text('bad')\"])"%marker
+   with self.assertRaisesRegex(GitHubSubjectCaptureV3Error,"COMMAND_TIMEOUT"):_run([sys.executable,"-c",script],{"PATH":os.environ["PATH"]},.1)
+   time.sleep(1.2);self.assertFalse(marker.exists())
+ def test_I69_N06_N07_N08_real_merge_base_images_diff_and_evidence(self):
+  with tempfile.TemporaryDirectory() as temporary:
+   _,scope,_,authorization,capture,pr=self.setup_capture(Path(temporary));self.assertEqual(capture.merge_base_sha,scope.merge_base_sha);self.assertEqual([x["status"] for x in capture.changes],["added","modified"]);self.assertEqual(len(capture.records),3);self.assertEqual(capture.evidence_id,subject_capture_evidence_id_v2(capture));self.assertEqual(capture.source_authorization_evidence_id,authorization.evidence_id);self.assertEqual(capture.pr_observation_evidence_id,pr.evidence_id)
+ def test_I69_N07_partial_clone_materializes_blobs_before_credential_removal(self):
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);origin,base,head,merge,files=git_graph(root);bare=root/"remote.git";subprocess.run(["git","clone","-q","--bare",str(origin),str(bare)],check=True);subprocess.run(["git","-C",str(bare),"config","uploadpack.allowFilter","true"],check=True);missing=[]
+   def partial(destination,environment):
+    subprocess.run(["git","clone","-q","--filter=blob:none","--no-checkout","--depth=256",bare.as_uri(),str(destination)],check=True,env=dict(environment));missing.append(subprocess.check_output(["git","-C",str(destination),"rev-list","--objects","--all","--missing=print"],text=True).count("?"))
+   authority=source_authority();observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=PullApi(base,head,merge,files));scope=observer.observe_scope();capture=capture_authenticated_subject_v3(scope,observer,authority.authorize(REPOSITORY,REPOSITORY_ID),authority.scope_observation.evidence_id,TOKEN,root/"capture",acquire_repository=partial);self.assertGreater(missing[0],0);self.assertEqual(len(capture.records),3)
+ def test_I69_F03_substituted_source_token_rejected_before_git(self):
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);origin,base,head,merge,files=git_graph(root);authority=source_authority();observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=PullApi(base,head,merge,files));scope=observer.observe_scope()
+   with self.assertRaisesRegex(GitHubSubjectCaptureV3Error,"SOURCE_AUTHORITY_MISMATCH"):capture_authenticated_subject_v3(scope,observer,authority.authorize(REPOSITORY,REPOSITORY_ID),authority.scope_observation.evidence_id,"different-token",root/"capture",acquire_repository=local_acquirer(origin))
+ def test_I69_F17_F18_ancestry_and_merge_base_fail_closed(self):
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);origin,base,head,merge,files=git_graph(root);authority=source_authority();observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=PullApi(base,head,"f"*40,files));scope=observer.observe_scope()
+   with self.assertRaisesRegex(GitHubSubjectCaptureV3Error,"MERGE_BASE_MISMATCH"):capture_authenticated_subject_v3(scope,observer,authority.authorize(REPOSITORY,REPOSITORY_ID),authority.scope_observation.evidence_id,TOKEN,root/"capture",acquire_repository=local_acquirer(origin))
+ def test_I69_F17_unavailable_ancestry_fails_closed(self):
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);origin=root/"orphan";origin.mkdir();subprocess.run(["git","init","-q","-b","main",str(origin)],check=True);subprocess.run(["git","-C",str(origin),"config","user.email","test@example.invalid"],check=True);subprocess.run(["git","-C",str(origin),"config","user.name","Test"],check=True);(origin/"base.md").write_text("base");subprocess.run(["git","-C",str(origin),"add","."],check=True);subprocess.run(["git","-C",str(origin),"commit","-q","-m","base"],check=True);base=subprocess.check_output(["git","-C",str(origin),"rev-parse","HEAD"],text=True).strip();subprocess.run(["git","-C",str(origin),"checkout","-q","--orphan","feature"],check=True);subprocess.run(["git","-C",str(origin),"rm","-q","-rf","."],check=True);(origin/"head.md").write_text("head");subprocess.run(["git","-C",str(origin),"add","."],check=True);subprocess.run(["git","-C",str(origin),"commit","-q","-m","head"],check=True);head=subprocess.check_output(["git","-C",str(origin),"rev-parse","HEAD"],text=True).strip();files=[{"status":"added","filename":"head.md"}];authority=source_authority();observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=PullApi(base,head,"f"*40,files));scope=observer.observe_scope()
+   with self.assertRaisesRegex(GitHubSubjectCaptureV3Error,"ANCESTRY_UNAVAILABLE"):capture_authenticated_subject_v3(scope,observer,authority.authorize(REPOSITORY,REPOSITORY_ID),authority.scope_observation.evidence_id,TOKEN,root/"capture",acquire_repository=local_acquirer(origin))
+ def test_I69_F22_blob_stall_is_timed_out_and_terminated(self):
+  from review_broker.github_subject_capture_v3 import _read_regular
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);_,_,_,_,capture,_=self.setup_capture(root);record=capture.records[0]
+   def stalled(*args,**kwargs):return subprocess.Popen([sys.executable,"-c","import time;time.sleep(10)"],stdout=kwargs["stdout"],stderr=kwargs["stderr"],start_new_session=True)
+   started=time.monotonic()
+   with mock.patch("review_broker.github_subject_capture_v3._popen",side_effect=stalled):
+    with self.assertRaisesRegex(GitHubSubjectCaptureV3Error,"IMAGE_READ_FAILED"):_read_regular(GitSourceReader(capture.repository_root,timeout_seconds=.1),SourceSpec(record.repository,record.commit,record.path))
+   self.assertLess(time.monotonic()-started,2)
+ def test_I69_F27_credential_process_descendant_is_killed_on_timeout(self):
+  from review_broker.github_subject_capture_v3 import _run
+  with tempfile.TemporaryDirectory() as temporary:
+   marker=Path(temporary)/"descendant";script="import subprocess,sys,time;subprocess.Popen([sys.executable,'-c',\"import time,pathlib;time.sleep(1);pathlib.Path(r'%s').write_text('bad')\"]);time.sleep(10)"%marker
+   with self.assertRaisesRegex(GitHubSubjectCaptureV3Error,"COMMAND_TIMEOUT"):_run([sys.executable,"-c",script],{"PATH":os.environ["PATH"]},.1)
+   time.sleep(1.2);self.assertFalse(marker.exists())
+ def test_I69_F19_F21_missing_image_and_change_mismatch(self):
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);origin,base,head,merge,files=git_graph(root);files=[{"status":"modified","filename":"missing.md"}];authority=source_authority();observer=GitHubPullRequestObservationReaderV3(TOKEN,REPOSITORY,REPOSITORY_ID,71,head,source_authority=authority,executor=PullApi(base,head,merge,files));scope=observer.observe_scope()
+   with self.assertRaisesRegex(GitHubSubjectCaptureV3Error,"CHANGE_SCOPE_MISMATCH"):capture_authenticated_subject_v3(scope,observer,authority.authorize(REPOSITORY,REPOSITORY_ID),authority.scope_observation.evidence_id,TOKEN,root/"capture",acquire_repository=local_acquirer(origin))
+ def test_I69_F20_F27_corrupt_git_object_and_no_token_retention(self):
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);_,_,_,_,capture,_=self.setup_capture(root);config=(capture.repository_root/".git/config").read_bytes();self.assertNotIn(TOKEN.encode(),config)
+if __name__=="__main__":unittest.main()
