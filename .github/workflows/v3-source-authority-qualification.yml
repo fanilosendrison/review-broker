@@ -1,0 +1,35 @@
+name: V3 source authority qualification blocked candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      approved_code_sha:
+        description: Independently reviewed exact candidate SHA
+        required: true
+        type: string
+      accepted_authority_decision:
+        description: Accepted decision authorizing the successor credential boundary
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  authority-gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Stop before credentials or source effects
+        env:
+          APPROVED_CODE_SHA: ${{ inputs.approved_code_sha }}
+          OWNER_APPROVED_CODE_SHA: ${{ vars.REVIEW_BROKER_V3_SOURCE_QUALIFICATION_SHA }}
+          ACCEPTED_AUTHORITY_DECISION: ${{ inputs.accepted_authority_decision }}
+        run: |
+          set -euo pipefail
+          test -n "$APPROVED_CODE_SHA"
+          test -n "$OWNER_APPROVED_CODE_SHA"
+          test "$GITHUB_SHA" = "$APPROVED_CODE_SHA"
+          test "$APPROVED_CODE_SHA" = "$OWNER_APPROVED_CODE_SHA"
+          test -n "$ACCEPTED_AUTHORITY_DECISION"
+          echo 'LIVE_SOURCE_APP_PERMISSION=BLOCKED_AUTHORITY_CONFLICT'
+          echo 'No credential was minted and no source request was made.'
+          exit 1

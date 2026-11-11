@@ -1,0 +1,15 @@
+name: v3 original pre-model Python Worker
+description: Launch exactly one trusted original Python Worker with runner Artifact context
+inputs:
+  request-id:
+    required: true
+    description: Original workflow_dispatch request_id
+  reservation-id:
+    required: true
+    description: Original workflow_dispatch reservation_id
+  generation:
+    required: true
+    description: Initial generation only
+runs:
+  using: node24
+  main: index.js
