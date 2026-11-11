@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fanilosendrison/review-broker/schemas/review-request-v3.candidate.schema.json",
+  "title": "Experimental candidate-only ReviewRequest v3",
+  "description": "UNACCEPTED, NON-NORMATIVE, NON-OPERATIONAL candidate schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "subject", "mission", "reviewer", "atomicity", "references", "review_operation"],
+  "properties": {
+    "schema_version": {"type": "integer", "const": 3},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "repository", "repository_id", "pull_request", "expected_head_commit"],
+      "properties": {
+        "kind": {"const": "github_pr"},
+        "repository": {"$ref": "#/$defs/repository"},
+        "repository_id": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "pull_request": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "expected_head_commit": {"$ref": "#/$defs/git_sha"}
+      }
+    },
+    "mission": {"$ref": "#/$defs/mission"},
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend", "model", "reasoning_effort"],
+      "properties": {
+        "backend": {"const": "codex-cli"},
+        "model": {"const": "gpt-5.6-sol"},
+        "reasoning_effort": {"const": "xhigh"}
+      }
+    },
+    "atomicity": {"type": "boolean"},
+    "references": {
+      "type": "array",
+      "maxItems": 997,
+      "items": {"$ref": "#/$defs/reference"}
+    },
+    "review_operation": {"$ref": "#/$defs/review_operation"}
+  },
+  "$defs": {
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+    "identifier": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+    "git_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "mission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "objective", "instructions", "criteria"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "objective": {"type": "string", "minLength": 1, "maxLength": 2000},
+        "instructions": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {"type": "string", "minLength": 1, "maxLength": 2000}
+        }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "required", "source"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "required": {"type": "boolean"},
+        "source": {
+          "oneOf": [
+            {"$ref": "#/$defs/inline"},
+            {"$ref": "#/$defs/git_file"},
+            {"$ref": "#/$defs/github_issue_body"},
+            {"$ref": "#/$defs/github_issue_comment"}
+          ]
+        }
+      }
+    },
+    "inline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "text"],
+      "properties": {
+        "kind": {"const": "inline"},
+        "text": {"type": "string", "maxLength": 2000000}
+      }
+    },
+    "git_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "repository", "path", "commit"],
+      "properties": {
+        "kind": {"const": "git_file"},
+        "repository": {"$ref": "#/$defs/repository"},
+        "path": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"},
+        "commit": {"$ref": "#/$defs/git_sha"},
+        "expected_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "github_issue_body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "repository", "issue"],
+      "properties": {
+        "kind": {"const": "github_issue_body"},
+        "repository": {"$ref": "#/$defs/repository"},
+        "issue": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "expected_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "github_issue_comment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "repository", "comment_id"],
+      "properties": {
+        "kind": {"const": "github_issue_comment"},
+        "repository": {"$ref": "#/$defs/repository"},
+        "comment_id": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "expected_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "review_operation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "initial"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "previous_request_id"],
+          "properties": {
+            "kind": {"const": "changed_head"},
+            "previous_request_id": {"type": "string", "pattern": "^request:sha256:[0-9a-f]{64}$"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "previous_request_id", "authorization_nonce"],
+          "properties": {
+            "kind": {"const": "repeat_same_head"},
+            "previous_request_id": {"type": "string", "pattern": "^request:sha256:[0-9a-f]{64}$"},
+            "authorization_nonce": {"type": "string", "pattern": "^[0-9a-f]{32}$"}
+          }
+        }
+      ]
+    }
+  }
+}
