@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://review-broker.invalid/schemas/packet-v2.candidate.schema.json",
+  "title": "Experimental Reviewer Packet v2 Candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "review_intent_id", "subject_id", "admission_evidence_id", "subject", "atomicity", "change_scope", "subject_sources", "reference_sources", "reference_outcomes", "technical_policy", "program", "source_manifest_id", "program_id", "packet_id", "prompt_sha256", "prompt_byte_length"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "request_id": {"$ref": "#/$defs/requestId"},
+    "review_intent_id": {"type": "string", "pattern": "^review-intent:sha256:[0-9a-f]{64}$"},
+    "subject_id": {"type": "string", "pattern": "^subject:sha256:[0-9a-f]{64}$"},
+    "admission_evidence_id": {"$ref": "#/$defs/artifactId"},
+    "subject": {"$ref": "#/$defs/subject"},
+    "atomicity": {"type": "boolean"},
+    "change_scope": {"$ref": "#/$defs/changeScope"},
+    "subject_sources": {"type": "array", "minItems": 1, "maxItems": 999, "items": {"$ref": "#/$defs/subjectSource"}},
+    "reference_sources": {"type": "array", "maxItems": 997, "items": {"$ref": "#/$defs/referenceSource"}},
+    "reference_outcomes": {"type": "array", "maxItems": 997, "items": {"$ref": "#/$defs/referenceOutcome"}},
+    "technical_policy": {"$ref": "#/$defs/technicalPolicy"},
+    "program": {"$ref": "#/$defs/program"},
+    "source_manifest_id": {"type": "string", "pattern": "^source-manifest:sha256:[0-9a-f]{64}$"},
+    "program_id": {"type": "string", "pattern": "^program:sha256:[0-9a-f]{64}$"},
+    "packet_id": {"type": "string", "pattern": "^packet:sha256:[0-9a-f]{64}$"},
+    "prompt_sha256": {"$ref": "#/$defs/digest"},
+    "prompt_byte_length": {"type": "integer", "minimum": 1, "maximum": 8000000}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sourceId": {"type": "string", "pattern": "^S[0-9]{3}$", "not": {"const": "S000"}},
+    "requestId": {"type": "string", "pattern": "^request:sha256:[0-9a-f]{64}$"},
+    "artifactId": {"type": "string", "pattern": "^artifact:sha256:[0-9a-f]{64}$"},
+    "physicalLine": {
+      "type": "object", "additionalProperties": false,
+      "required": ["line", "byte_start", "content_start", "content_end", "line_end", "ending"],
+      "properties": {
+        "line": {"type": "integer", "minimum": 1}, "byte_start": {"type": "integer", "minimum": 0},
+        "content_start": {"type": "integer", "minimum": 0}, "content_end": {"type": "integer", "minimum": 0},
+        "line_end": {"type": "integer", "minimum": 0}, "ending": {"enum": ["LF", "CRLF", "CR", "NONE"]}
+      }
+    },
+    "subject": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "repository_id", "pull_request", "pull_request_id", "head_sha", "base_sha", "merge_base_sha", "source_admission_id", "subject_capture_evidence_id", "capture_qualification"],
+      "properties": {
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+        "repository_id": {"type": "integer", "minimum": 1}, "pull_request": {"type": "integer", "minimum": 1},
+        "pull_request_id": {"type": "integer", "minimum": 1}, "head_sha": {"$ref": "#/$defs/sha"},
+        "base_sha": {"$ref": "#/$defs/sha"}, "merge_base_sha": {"$ref": "#/$defs/sha"},
+        "source_admission_id": {"$ref": "#/$defs/artifactId"}, "subject_capture_evidence_id": {"$ref": "#/$defs/artifactId"},
+        "capture_qualification": {"enum": ["SYNTHETIC_OFFLINE_VERIFIED", "AUTHENTICATED_SOURCE_READ_ONLY"]},
+        "source_authorization_evidence_id": {"$ref": "#/$defs/artifactId"},
+        "pr_observation_evidence_id": {"$ref": "#/$defs/artifactId"}
+      },
+      "allOf": [{"if": {"properties": {"capture_qualification": {"const": "AUTHENTICATED_SOURCE_READ_ONLY"}}}, "then": {"required": ["source_authorization_evidence_id", "pr_observation_evidence_id"]}}]
+    },
+    "change": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "path", "previous_path", "before_source_id", "after_source_id"],
+      "properties": {
+        "status": {"enum": ["added", "removed", "modified", "renamed", "copied", "changed"]},
+        "path": {"type": "string", "minLength": 1}, "previous_path": {"type": ["string", "null"]},
+        "before_source_id": {"oneOf": [{"$ref": "#/$defs/sourceId"}, {"type": "null"}]},
+        "after_source_id": {"oneOf": [{"$ref": "#/$defs/sourceId"}, {"type": "null"}]}
+      }
+    },
+    "changeScope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["changes", "merge_base", "head", "change_diff_sha256", "change_diff_byte_length", "diff_snapshot", "changed_paths"],
+      "properties": {
+        "changes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/change"}},
+        "merge_base": {"$ref": "#/$defs/sha"}, "head": {"$ref": "#/$defs/sha"},
+        "change_diff_sha256": {"$ref": "#/$defs/digest"}, "change_diff_byte_length": {"type": "integer", "minimum": 1},
+        "diff_snapshot": {"const": "changes.patch"},
+        "changed_paths": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "subjectSource": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_id", "role", "image", "repository", "commit", "path", "git_blob_oid", "sha256", "original_byte_length", "encoding", "physical_lines", "snapshot"],
+      "properties": {
+        "source_id": {"$ref": "#/$defs/sourceId"}, "role": {"const": "subject"}, "image": {"enum": ["before", "after"]},
+        "repository": {"type": "string", "minLength": 1}, "commit": {"$ref": "#/$defs/sha"}, "path": {"type": "string", "minLength": 1},
+        "git_blob_oid": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"}, "sha256": {"$ref": "#/$defs/digest"},
+        "original_byte_length": {"type": "integer", "minimum": 0, "maximum": 2000000}, "encoding": {"enum": ["utf-8", "utf-8-sig"]},
+        "physical_lines": {"type": "array", "items": {"$ref": "#/$defs/physicalLine"}}, "snapshot": {"type": "string", "pattern": "^sources/S[0-9]{3}\\.bin$"}
+      }
+    },
+    "referenceSource": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_id", "reference_id", "request_id", "role", "required", "source_kind", "sha256", "original_byte_length", "encoding", "physical_lines", "snapshot"],
+      "properties": {
+        "source_id": {"$ref": "#/$defs/sourceId"}, "reference_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
+        "request_id": {"$ref": "#/$defs/requestId"}, "role": {"const": "reference"}, "required": {"type": "boolean"}, "source_kind": {"enum": ["inline", "git_file", "github_issue_body", "github_issue_comment"]},
+        "sha256": {"$ref": "#/$defs/digest"}, "original_byte_length": {"type": "integer", "minimum": 0, "maximum": 2000000},
+        "encoding": {"enum": ["utf-8", "utf-8-sig"]}, "physical_lines": {"type": "array", "items": {"$ref": "#/$defs/physicalLine"}},
+        "snapshot": {"type": "string", "pattern": "^sources/S[0-9]{3}\\.bin$"},
+        "repository": {"type": "string", "minLength": 1}, "repository_id": {"type": "integer", "minimum": 1},
+        "commit": {"$ref": "#/$defs/sha"}, "path": {"type": "string", "minLength": 1}, "root_tree_sha": {"$ref": "#/$defs/sha"},
+        "git_blob_oid": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "provenance_evidence_id": {"$ref": "#/$defs/artifactId"},
+        "selector_id": {"type": "integer", "minimum": 1}, "issue_id": {"type": "integer", "minimum": 1},
+        "issue_number": {"type": "integer", "minimum": 1}, "comment_id": {"type": ["integer", "null"]},
+        "author_id": {"type": "integer", "minimum": 1}, "updated_at": {"type": "string", "minLength": 1},
+        "observed_at": {"type": "string", "minLength": 1}, "api_source": {"type": "string", "minLength": 1}, "qualification": {"enum": ["AUTHENTICATED_READ_ONLY", "SAME_REPOSITORY_ACTIONS_QUALIFICATION"]},
+        "authority_evidence_id": {"$ref": "#/$defs/artifactId"}, "installation_id": {"type": "integer", "minimum": 1}
+      },
+      "allOf": [
+        {"if": {"properties": {"source_kind": {"const": "git_file"}}}, "then": {"required": ["repository", "repository_id", "commit", "path", "root_tree_sha", "git_blob_oid", "provenance_evidence_id"]}},
+        {"if": {"properties": {"source_kind": {"enum": ["github_issue_body", "github_issue_comment"]}}}, "then": {"required": ["repository", "repository_id", "selector_id", "issue_id", "issue_number", "comment_id", "author_id", "updated_at", "observed_at", "api_source", "qualification", "authority_evidence_id", "installation_id", "provenance_evidence_id"]}}
+      ]
+    },
+    "referenceOutcome": {
+      "type": "object", "additionalProperties": false, "required": ["id", "status", "source_id"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "status": {"const": "captured"}, "source_id": {"$ref": "#/$defs/sourceId"}}
+    },
+    "technicalPolicy": {
+      "oneOf": [
+        {"$ref": "#/$defs/syntheticTechnicalPolicy"},
+        {"$ref": "#/$defs/authorizedTechnicalPolicy"}
+      ]
+    },
+    "syntheticTechnicalPolicy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["technical_policy_id", "basis", "profile_evidence_id", "qualification"],
+      "properties": {
+        "technical_policy_id": {"type": "string", "pattern": "^technical-policy:sha256:[0-9a-f]{64}$"},
+        "basis": {"type": "object", "additionalProperties": false, "required": ["identity_schema_version", "permission_profile_name", "permission_profile_sha256"],
+          "properties": {"identity_schema_version": {"const": 1}, "permission_profile_name": {"type": "string", "minLength": 1}, "permission_profile_sha256": {"$ref": "#/$defs/digest"}}},
+        "profile_evidence_id": {"$ref": "#/$defs/artifactId"}, "qualification": {"const": "SYNTHETIC_OFFLINE_ONLY"}
+      }
+    },
+    "authorizedTechnicalPolicy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["technical_policy_id", "basis", "profile_evidence_id", "qualification", "policy_source_evidence_id", "selection_authorization_evidence_id"],
+      "properties": {
+        "technical_policy_id": {"type": "string", "pattern": "^technical-policy:sha256:[0-9a-f]{64}$"},
+        "basis": {"$ref": "#/$defs/syntheticTechnicalPolicy/properties/basis"},
+        "profile_evidence_id": {"$ref": "#/$defs/artifactId"},
+        "qualification": {"const": "PREMODEL_POLICY_SOURCE_VERIFIED_ONLY"},
+        "policy_source_evidence_id": {"$ref": "#/$defs/artifactId"},
+        "selection_authorization_evidence_id": {"$ref": "#/$defs/artifactId"}
+      }
+    },
+    "mission": {
+      "type": "object", "additionalProperties": false, "required": ["id", "objective", "instructions", "criteria"],
+      "properties": {"id": {"type": "string"}, "objective": {"type": "string"}, "instructions": {"type": "string"}, "criteria": {"type": "array", "items": {"type": "string"}}}
+    },
+    "reviewer": {
+      "type": "object", "additionalProperties": false, "required": ["backend", "model", "reasoning_effort"],
+      "properties": {"backend": {"const": "codex-cli"}, "model": {"const": "gpt-5.6-sol"}, "reasoning_effort": {"const": "xhigh"}}
+    },
+    "program": {
+      "type": "object", "additionalProperties": false, "required": ["mission", "reviewer", "technical_policy_id", "renderer_id", "output_instructions"],
+      "properties": {"mission": {"$ref": "#/$defs/mission"}, "reviewer": {"$ref": "#/$defs/reviewer"}, "technical_policy_id": {"type": "string", "pattern": "^technical-policy:sha256:[0-9a-f]{64}$"}, "renderer_id": {"const": "review-broker-packet-v2-renderer:1"}, "output_instructions": {"type": "string", "minLength": 1}}
+    }
+  }
+}
