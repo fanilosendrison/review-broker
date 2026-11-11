@@ -1,0 +1,478 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "attempt_id",
+    "state",
+    "evidence_ids",
+    "invocation_count",
+    "evidence_locator_plan",
+    "evidence_locator",
+    "publication_intent",
+    "publication_receipt",
+    "admission",
+    "pre_model_control",
+    "history"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^request:sha256:[0-9a-f]{64}$"
+    },
+    "attempt_id": {
+      "type": "string",
+      "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+    },
+    "state": {
+      "enum": [
+        "REQUESTED",
+        "ADMITTED",
+        "PREPARED",
+        "ARMED",
+        "TERMINAL_CAPTURED",
+        "VALIDATED",
+        "REPORTED",
+        "STOPPED",
+        "INDETERMINATE"
+      ]
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "invocation_count": {
+      "enum": [
+        0,
+        1
+      ]
+    },
+    "evidence_locator_plan": {
+      "anyOf": [
+        {
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "evidence_locator": {
+      "anyOf": [
+        {
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "publication_intent": {
+      "anyOf": [
+        {
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "publication_receipt": {
+      "anyOf": [
+        {
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "admission": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "pre_model_control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "generation",
+        "disposition",
+        "reservation_id",
+        "authorization_id",
+        "worker",
+        "failure_receipt_id"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "disposition": {
+          "enum": [
+            "UNRESERVED",
+            "RESERVED",
+            "BLOCKED",
+            "REFUSED_PERMANENT"
+          ]
+        },
+        "reservation_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^preparation-dispatch:sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authorization_id": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^request:sha256:[0-9a-f]{64}$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^pre-model-recovery:sha256:[0-9a-f]{64}$"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "worker": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "run_id",
+                "run_attempt"
+              ],
+              "properties": {
+                "run_id": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "run_attempt": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failure_receipt_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "generation": {
+                "const": 0
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reservation_id": {
+                "type": "null"
+              },
+              "authorization_id": {
+                "type": "null"
+              },
+              "worker": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "generation": {
+                "minimum": 1
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reservation_id": {
+                "type": "string",
+                "pattern": "^preparation-dispatch:sha256:[0-9a-f]{64}$"
+              },
+              "authorization_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^request:sha256:[0-9a-f]{64}$"
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^pre-model-recovery:sha256:[0-9a-f]{64}$"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "UNRESERVED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "generation": {
+                "const": 0
+              },
+              "worker": {
+                "type": "null"
+              },
+              "failure_receipt_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "RESERVED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "failure_receipt_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "BLOCKED",
+                  "REFUSED_PERMANENT"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "failure_receipt_id": {
+                "type": "string",
+                "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "history": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "state",
+              "evidence_ids"
+            ],
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "REQUESTED",
+                  "ADMITTED",
+                  "PREPARED",
+                  "ARMED",
+                  "TERMINAL_CAPTURED",
+                  "VALIDATED",
+                  "REPORTED",
+                  "STOPPED",
+                  "INDETERMINATE"
+                ]
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "event",
+              "evidence_ids"
+            ],
+            "properties": {
+              "event": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "event",
+              "evidence_ids",
+              "pre_model"
+            ],
+            "properties": {
+              "event": {
+                "enum": [
+                  "PRE_MODEL_DISPATCH_RESERVED",
+                  "PRE_MODEL_WORKER_BOUND",
+                  "PRE_MODEL_FAILURE",
+                  "PRE_MODEL_RECOVERY_AUTHORIZED",
+                  "PRE_MODEL_REFUSAL_STOPPED"
+                ]
+              },
+              "evidence_ids": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+                }
+              },
+              "pre_model": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "generation",
+                  "reservation_id"
+                ],
+                "properties": {
+                  "generation": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "reservation_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^preparation-dispatch:sha256:[0-9a-f]{64}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "receipt": {
+                    "type": "object",
+                    "minProperties": 1
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "pre_model_control": {
+            "properties": {
+              "disposition": {
+                "const": "UNRESERVED"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "const": "REQUESTED"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "PREPARED",
+              "ARMED"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "pre_model_control": {
+            "properties": {
+              "disposition": {
+                "const": "RESERVED"
+              },
+              "worker": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fanilosendrison/review-broker/tests/fixtures/pre_model_v3/journal-v2.compat.candidate.schema.json",
+  "title": "UNACCEPTED compatibility candidate: v1 AttemptRecord keys + pre_model_control only",
+  "description": "Experimental full-state v2 journal candidate; retains the serialized field names and historical state/event evidence_id entries of existing AttemptRecord; adds only pre_model_control. Semantic CAS/evidence gates require code checks."
+}
