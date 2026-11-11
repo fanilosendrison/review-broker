@@ -1,0 +1,394 @@
+---
+okf_version: "1.0"
+kind: "KnowledgeAsset"
+asset_type: "qualification-report"
+domain: "independent-review"
+severity: "draft"
+name: "Issue 70 RWP-04 Offline Remote Retention Implementation"
+version: "0.1.0"
+---
+
+# Issue 70 RWP-04 — Offline remote retention implementation
+
+## Exact input and disposition
+
+This experimental successor starts at PR #87 SHA
+`65e38e3546fc92d99880eb315729c13c95590f65`, tree
+`29b2a85da15bbdcfbf9dd4b20e3af276c49325ff`. Its RWP-01/02/03 offline PASS,
+964-test Linux CI and independent GO remain separate historical facts. Earlier
+STOP/NO_GO verdicts are not transferred to that accepted base or overwritten.
+
+The [RWP-04 architecture candidate](../architecture/issue70-rwp04-remote-retention-candidate.md)
+records owner-selected experimental semantics. No public schema, accepted
+contract, production workflow, prior qualification report or #83 file changes.
+This report records evidence acquired before publication; exact final CI and
+review receipts belong in the successor PR and bounded #70 handoff.
+
+```text
+RWP04_OFFLINE_REMOTE_RETENTION_AND_PREPARED=NOT_QUALIFIED
+LIVE_PREMODEL_PREPARED=NOT_QUALIFIED
+EFFECTIVE_CODEX_POLICY=NOT_ATTESTED
+```
+
+No overall RWP-04 PASS is asserted until exact-source Ubuntu CI and the prescribed
+independent construction review are complete.
+
+## Implemented composition
+
+The original Worker continuation consumes its successful process-local handoff
+once. A caller-created result, packet ID, retained path, fresh continuation
+object or ADMITTED read cannot recreate that permission. The claim determines
+the retained path. The packet loader, actual Packet v2 verifier and guarded
+historical inventory recheck original admission, source snapshots, policy source
+and independent selection before upload. The original offline receipt is built
+purely and is never written into the authorized evidence inventory.
+
+The injected Actions upload boundary accepts one deterministic plan and bounded
+ZIP with retention target 30 days, without overwrite, deletion or retry. It is
+not a fabricated REST upload implementation and is not an operational workflow
+connection. ACK, established refusal and unknown outcome remain distinct.
+An unknown upload can be resolved through bounded exact-object observations
+within the same still-authorized continuation, before its single PREPARED CAS.
+Ambiguity leaves an orphan without a second upload or cleanup.
+
+Metadata and exact-attempt Worker observations use independent injected HTTP
+boundaries. Complete scoped pagination rejects drift, duplicate identities,
+inconsistent counts and missing continuation. Complete final prev/first links
+are accepted. The original timestamped Worker-binding preimage is not claimed
+to be reconstructible. The verified job ID identifies the recognized Worker,
+not the artifact uploader. Mutable observation time and job status do not
+participate in the remote receipt.
+
+Download resolution is an authenticated GitHub request; its validated HTTPS
+storage destination receives a new credential-free request. The ZIP's exact
+streamed bytes are counted and hashed, with no implicit network fallback.
+Budgets are explicit constructor inputs. ZIP handling rejects ambiguous or
+unsafe paths, symlinks, special types, duplicates and collisions. Directories
+and files are private from creation. Declared and actual byte counts are
+checked before writing. Empty admitted-reference structure is restored without
+inventing missing files. Complete authorized packet verification follows.
+
+The remote receipt has the exact closed experimental schema, canonical bytes
+and one LF. Its offline receipt identity is recalculated from authenticated A,
+the verified manifest and unchanged ordered inventory. It excludes its own ID,
+P's SHA, signed URLs, credentials and mutable observation fields. JSON numeric
+fields are exact bounded integers; artifact/job identifiers are canonical decimal
+strings, including values above the binary64 exact-integer range without rounding.
+
+The existing prepare transition and CAS remain authoritative. Freshness reaches
+inventory enumeration and file reads, archive operations, injected transports,
+Git commit preparation and the CAS request. A narrow writer wrapper guards
+write-producing internal transport calls while leaving reconciliation read-only.
+These guards do not provide a transaction between Git and Actions.
+
+Historical reconstruction reads authenticated P and its actual Git parent A by
+SHA, validates independent origin and mutation evidence and compares P with the
+exact existing transition applied to A and R's identity. The historical policy
+boundary is a distinct closed class, not a subclass or fake current journal.
+It reuses the complete policy verification rules while keeping selection bound
+to A. Builders and persistence reject it before effects.
+
+After an attributable PREPARED outcome, subsequent read or retention failure
+preserves COMMITTED/PREPARED and reports reconstruction UNAVAILABLE. No source
+recapture, new selection, artifact replacement, journal rollback or redispatch
+is exposed by the observer path.
+
+## Qualification mechanisms and independent oracles
+
+The new tests extend the real RWP-03 scenario. Only external service and trust
+boundaries are injected. Actual canonicalization, packet construction/loading,
+full Packet v2 verification, state transition and journal CAS execute.
+Transport-side effect lists independently count upload and PREPARED requests.
+Fixtures do not merely assert decision strings.
+
+The cold test serializes separate simulated-server origin, mutation, dispatch,
+admission and selection observations outside the downloaded ZIP. It then deletes
+the entire original Worker root, both source clones, original packet and parent
+readback and discards Python objects. A distinct interpreter starts from the
+remote archive and independent fixture trust. Complete manifest, inventory,
+offline receipt, remote receipt and packet ID are compared with parent byte
+oracles. Forbidden capture, selection, source-read, packet-build, upload, claim,
+commit and ref-mutation entry points are independently observed and must have
+zero calls. A second cold case has no remote references.
+
+On Linux the new child installs and verifies the existing libseccomp boundary
+before reconstruction, with minimal environment and closed inherited file
+descriptors. Download and authentication of observations remain outside that
+child. Existing twelve RWP-03 Linux isolation tests are unchanged; they remain
+mandatory without skips on Ubuntu. macOS functional reconstruction is not Linux
+network-isolation qualification.
+
+The pure receipt oracle uses literal field sets, direct integer/decimal cases,
+independently sorted ASCII JSON and SHA-256. ZIP adversaries include byte-level
+NUL names rather than names silently sanitized by the fixture writer. Actual
+expansion accounting is exercised at the decompression stream boundary, with
+zero oversized bytes written. Production inventory and transition rules are not
+copied into a second implementation.
+
+## Local validation and retained failures
+
+The isolated Python 3.11 environment uses an editable installation with declared
+`rfc8785` and `jsonschema` dependencies. Dependency consistency passed.
+Platform observation is Darwin x86-64; Linux isolation is not locally qualified.
+
+Executed targeted receipts, in chronological order:
+
+- Initial real remote nominal: 1 test PASS, 43.595 seconds.
+- Initial continuation suite: 11 tests PASS, 348.613 seconds.
+- First pure receipt/archive suite: 12 tests, one fixture failure and one
+  exception-expectation error. The ZIP writer had truncated NUL before the test
+  reached verification; the timestamp parser correctly raised its established
+  typed error rather than ValueError. Both test defects were corrected without
+  weakening production rejection. The original failed log is retained.
+- Corrected pure receipt/archive plus cold: 14 tests PASS, 107.834 seconds.
+- Historical observation plus empty-reference cold: 8 tests PASS, 95.680 seconds.
+- Internal freshness and interruption tests: 7 tests PASS, 217.008 seconds.
+- Full local suite: **1004 tests in 2176.866 seconds; one failure, 12 Linux skips**.
+  This is FAILED evidence, not a suite PASS. The new historical transport helper
+  imported the concrete live transport's error type, violating the existing
+  import-isolation oracle. The error type was extracted into a transport-neutral
+  module; the live public error import remains compatible. The isolation test
+  and workflows were not modified.
+- A new post-CAS unavailability witness then reproduced a task-local state
+  classification defect: a later failed read downgraded an already attributable
+  COMMITTED journal outcome. That RED is preserved. The corrected continuation
+  retains COMMITTED/PREPARED and reports availability separately.
+- Final correction checks: 20 tests PASS, 147.727 seconds, including original
+  transport-isolation tests, receipt/archive falsifications, coherent historical
+  synthetic downgrade, unknown ambiguous upload, divergent CAS readback and
+  post-CAS unavailability. This is not a complete-suite PASS.
+
+Compilation, CI-equivalent JSON parsing, whitespace and all changed/new Python
+400-line checks passed. Pre-existing unrelated source-size excesses are not
+waived or reformatted. The final complete suite is required in normal
+Ubuntu 24.04 CI after draft publication; local evidence does not substitute for
+that exact-tree gate. All logs and transient evidence remain private and ignored.
+
+## Q01–Q24 coverage inventory
+
+The entries below identify executable witnesses, not an overall acceptance verdict.
+The exact-source CI must execute all final tests, including the cold processes.
+
+- Q01: real four-reference continuation and full cold disappearance roundtrip.
+- Q02: real no-remote-reference admission and cold structural-empty directory.
+- Q03: every closed field, numeric domain, canonical decimal, LF and date ordering;
+  builder checks integer types before canonicalization can erase a float's type.
+- Q04: later clock, observation metadata and terminal job retain receipt identity.
+- Q05: latest rerun differs while exact attempt 1 and its jobs remain selected.
+- Q06: absent, expired, duplicate, substituted ID and changed committed metadata.
+- Q07: incomplete, duplicate, cyclic, out-of-scope and inconsistent pagination;
+  complete final prev/first links pass.
+- Q08: repository/run/attempt/workflow/SHA/job faults and absent/ambiguous job.
+- Q09: exact remote byte mutation, truncation and additional bytes.
+- Q10: invalid redirects stop before storage; valid storage requests have no
+  GitHub Authorization or cookies.
+- Q11: all budget types and limits, metadata pages/responses, actual expansion.
+- Q12: traversal, aliases, NUL, special members, collision and creation modes.
+- Q13: changed/missing source, reference, policy, manifest, prompt and origin;
+  extra/missing inventory members.
+- Q14: independent source/selection authority loss and historical origin loss.
+- Q15: a fully valid synthetic packet/layout passes its historical default loader
+  but is refused under the historical authorized boundary.
+- Q16: journal movement inside inventory, ZIP writes, observations and after
+  preparation authority prevents subsequent effects.
+- Q17: wrong parent, unrecognized origin/write identity and repository identity;
+  exact canonical A/P transition remains required.
+- Q18: historical authority cannot enter builders/persistence; copied handoff
+  cannot enter the active remote continuation.
+- Q19: established refusal, interruption before creation, lost response after
+  creation and ambiguous objects; independently counted zero repeated uploads.
+- Q20: before/after CAS interruption, lost ACK and divergent readback; independently
+  counted zero repeated PREPARED requests.
+- Q21: cold-process forbidden-effect counters and ADMITTED observer refusal.
+- Q22: committed journal survives missing/expired/replaced retention and later
+  read failure without rollback.
+- Q23: mutable remote Issue changes after engagement do not trigger recapture.
+- Q24: existing v1/v2, offline receipt and RWP-01/02/03 tests are retained intact;
+  final exact-tree CI is the complete regression gate.
+
+## First publication, exact CI and independent NO_GO
+
+Draft PR #89 first published SHA
+`d8de11da1e3b1b0e71f7c16729a609822edab7e1`, tree
+`eb94e93354eedc082d671f2602a07538e8802e80`, through governed publisher run
+`01M6PJT5YX1AHKZS28MHVV4PVX`. Its one authorized branch bootstrap was at the
+exact base; neither dev nor the persistent checkout was synchronized.
+
+Normal Ubuntu 24.04 CI run `42094129066`, job `127479610308`, passed
+**1009 tests in 481.820 seconds without skips**, installation, compilation and
+JSON checks. Its authenticated checkout
+`efe7e4e3e76c8e9233d3242f3448691942eb032f` has the exact candidate tree. All twelve
+RWP-03 Linux tests and both new cold processes executed. Log SHA-256:
+`8ebac22a4c4696f59b1437c6479c5afb0d551fce358bc272584e165c0b1e52ce`.
+This PASS applies to that tree, not automatically to its correction.
+
+The fresh independent Pi review returned **NO_GO** on that exact candidate.
+Its [complete non-sensitive review and verified configuration receipt](https://github.com/fanilosendrison/review-broker/pull/89#issuecomment-6668180928)
+remain historical evidence. Pi 0.84.2 used
+`openai-codex-1 / gpt-6.1-sol / high`; both registered and active tools were
+exactly builtin read, grep, find and ls. Actual calls were 56 read, 13 grep,
+2 ls and 1 find. Prompt completion and waitForIdle were awaited; settled and
+idle were true and the final stop reason was stop. No shell or mutation tool
+was exposed. Review-text SHA-256:
+`fdfb701c44caf56c5552bda03b71fb78a70f9a4cf65a98df29f56808f87abbe3`.
+Private trace SHA-256:
+`de8dd6004bd783349a5515d27fdb60f04d4a696fe11cfca0044f7ae5c306a675`.
+
+### Material discovery classification and bounded corrections
+
+Each record below is independent. Existing authority is the owner RWP-04 mandate
+and its experimental candidate, under the repository's technical-authority
+order. All five dispositions are `no-normative-impact`; the affected layers are
+architecture-or-implementation and verification-or-qualification-evidence.
+Their durable record also affects repository-governance-or-documentation.
+No normative obligation or new product decision is promoted. Existing in-scope
+correction authority suffices; the required next gate is new exact-tree CI and
+independent review, not acceptance transferred from the prior tree.
+
+- **RWP04-R1 — Manifest confinement:** the initial loader read an absolute or
+  traversing subject snapshot before schema/path validation. Five new witness
+  methods produced six expected assertion failures: four observed outside reads
+  across active/historical and absolute/traversal cases, plus the two pagination
+  failures below. Correction extracts the existing canonical schema and snapshot
+  path rules into `packet_v2_manifest.py`, shared by builder, verifier and loader.
+  The complete canonical manifest and exact expected path are checked before any
+  manifest-directed snapshot read. Outside-canary tests require zero reads, not
+  eventual rejection. Historical packet bytes and golden identities stay intact.
+- **RWP04-R2 — Pagination completeness:** a future last page without next, or a
+  changing terminal page, contradicted completeness while the count matched.
+  The listing now retains and confronts the advertised terminal page, rejecting
+  unfetched future pages and terminal drift. Valid consistent last and complete
+  final prev/first controls remain green.
+- **RWP04-Q16 — Concrete internal HTTP evidence:** earlier races did not establish
+  the concrete Git Database callback. New tests use the actual guarded writer
+  and concrete live-transport code with an injected HTTP server only. They move
+  the authenticated journal after blob, tree and commit effects and after the
+  final identity query before GraphQL CAS. Independent HTTP request counters
+  require no subsequent forbidden mutation. Temporarily removing the callback
+  made both guard methods RED with three failures and actual forbidden requests;
+  the source was restored byte-identically, then all three concrete transport
+  tests passed in 17.213 seconds. The historical SHA read is also checked through
+  real Git-object decoding while a different head is visible.
+- **RWP04-Q17 — Historical authority evidence:** new tests produce canonical A/P
+  pairs using existing register/transition functions, changing original admission
+  or Worker coherently. They separately withdraw independent admission and
+  dispatch recognition. Each fails historical authorization; the valid original
+  context remains accepted. Matching hashes or nonempty writer fields are not
+  substituted for those external authorities.
+- **RWP04-Q18/Q21 — Restart evidence:** a new isolated process starts from valid
+  ADMITTED, authenticated external journal/dispatch/execution/selection fixtures
+  and original packet bytes after complete deletion of the Worker root. A
+  positive control first recognizes the genuine current Worker. A newly
+  constructed producer and copied COMMITTED result still cannot acquire the
+  original process-local handoff. Capture, selection, upload, metadata/storage,
+  builder, stage, journal-mutation and dispatch counters remain zero; both
+  continuations refuse and ADMITTED is unchanged. Linux uses the same effective
+  seccomp boundary before these checks.
+
+Correction validation passed **45 tests in 717.206 seconds**: all new review
+witnesses, concrete Git boundaries, restarted-ADMITTED process, existing Packet
+v2 construction/integrity tests and the independent historical synthetic golden
+oracle. The original NO_GO and all RED logs are preserved. The correction is not
+qualified by the preceding 1009-test CI; new complete exact-tree CI and a fresh
+prescribed review remain mandatory.
+
+### Corrected-candidate CI failure and legacy diagnostic preservation
+
+The first correction published SHA
+`ff27309075f68f9cc6b9946e569a8c884d5c9378`, tree
+`34bf32b1cecad79a0c0091c13429952b6959d48b`. Normal CI run `42101788467`,
+job `127506158294`, failed: **1018 tests in 802.585 seconds, seven errors**.
+Compilation and JSON steps were skipped, not passed. Checkout
+`71b95290ef44c1772f37375c31bb74d87b5db066` tested that correction.
+Log SHA-256:
+`5064ae97d1c5d66bd22e64128e73be56278dc58907940ab10e132ba8098c4054`.
+
+All seven errors were task-attributable exception-order compatibility regressions
+in two unchanged historical test methods. Early full schema validation correctly
+refused invalid authority fields and unknown capture qualification, but emitted
+the generic Packet error before the established Retention error and diagnostic.
+The fix preserves those existing pure capture-mode checks ahead of full schema
+validation, without any manifest-directed read between them. Canonical parsing,
+capture-mode diagnostics, full schema validation and exact snapshot-path checking
+remain separate ordered operations with one implementation of each rule. No test
+oracle was weakened, skipped or rewritten.
+
+The final compatibility/confinement check passed **19 tests in 157.140 seconds**:
+all thirteen original #70 composition methods, both review findings and coherent
+historical mutations, plus genuine disappeared-Worker cold reconstruction.
+Complete CI on the new tree and its independent review remain required. This
+failed run is retained separately and does not qualify either correction.
+
+### Complete test success but failed CI job deadline
+
+Candidate `daa888c66a14e2a12aa7c14c92d5112b2960971c`, tree
+`a622408dc25e7b4fd8793d4dbc20eb6eff6ff0dc`, ran all **1018 tests in
+914.068 seconds, OK**, with no skips in run `42104877423`, job `127516941817`.
+Installation, compilation and JSON steps completed successfully. Nevertheless,
+the job exceeded its fifteen-minute budget and its overall conclusion is failed.
+This is **not** an exact-candidate CI PASS. Log SHA-256:
+`fad4164166bdd8acce285fc71395783a4c502faf946fcc36f1b1db5b35a62eb6`.
+
+- Statement: the extended mandatory corpus exceeded the existing job deadline
+  even though every test and validation command completed successfully.
+- Source and evidence: the run's actual 914.068-second test summary and GitHub's
+  maximum-execution-time annotation; earlier runs remain distinct observations.
+- Existing authority: the owner requires all tests, normal Ubuntu CI, effective
+  Linux cold controls and no masking of failures; no fifteen-minute product or
+  operational deadline is specified by this tranche.
+- Semantic disposition: `no-normative-impact`.
+- Affected layers: `integration-or-conformance`,
+  `verification-or-qualification-evidence`, and
+  `repository-governance-or-documentation`.
+- Related consequence: overall CI qualification remains unavailable on this run.
+- Required authority: existing in-scope validation correction mandate; no new
+  operational or normative authority is created.
+- Next action: increase only the normal CI job budget from fifteen to thirty
+  minutes, keeping every command, test, assertion, runner, action pin and
+  permission unchanged, then qualify the exact new tree. No retry of an
+  operational attempt, test removal or weaker oracle is involved.
+
+### Second independent NO_GO and original-packet integrity anchor
+
+Candidate `7d9222d81ee63282e8162c6194dbfd5e1fe208a8`, tree
+`2f058b1e479ca006b31891895a5e6ed69072b5a7`, passed normal CI run
+`42107771113`, job `127527031374`: 1018 tests in 915.270 seconds, no skips,
+installation, compilation and JSON checks SUCCESS. Its exact-tree checkout is
+`542884a2e489983de34b4b18a8ce057cacc380fc`. The thirty-minute budget allowed
+normal completion without reducing coverage. Log SHA-256:
+`011e91bb89cbc6d60cae556e966ac0a2c9283525f17e2c03c32283a97569ce1e`.
+The [second independent review](https://github.com/fanilosendrison/review-broker/pull/89#issuecomment-6670044704)
+closed R1/R2 and all three qualification gaps but returned NO_GO for RWP04-R3.
+A coherent changed diff, capture/packet identities, manifest and rendered prompt
+could replace the genuine handoff's original packet before remote retention.
+The real loader and external authorities accepted the coherent attack; the RED
+observed an upload and attributable PREPARED. The correction compares the fully
+verified loaded packet ID with the authenticated original handoff ID before
+upload. The ID remains an integrity anchor, never an effect permit. Independent
+counters now require zero uploads and zero PREPARED requests. Four focused
+correction, nominal, lost-upload-response and empty-reference cold tests passed
+in 218.113 seconds. New exact-tree CI and independent review remain required.
+R3 is `no-normative-impact` under the existing mandate, affecting implementation
+and qualification evidence; the new witness and correction are its next action.
+The prior CI PASS and both NO_GO verdicts remain bound to their original trees.
+
+## Governance observations and remaining gates
+
+Live preflight confirmed #87 at the exact mandated SHA/tree, OPEN/DRAFT, and no
+RWP-04 successor before implementation. Official adapter inspection found #70
+absent from Project 17. This is a `no-normative-impact` repository-governance
+observation, not new product semantics. The explicit mandate prohibits Project
+changes; no item, field, label, milestone or Issue lifecycle was modified.
+
+The required review is a fresh Pi session fixed to
+`openai-codex-1 / gpt-6.1-sol / high`, with read-only tools. Installed Pi 0.84.2,
+the exact alias/model catalog and non-sensitive OAuth readiness were observed.
+These checks are not a completed review or GO. Exact session/tool evidence and
+substantive final verdict remain required after publication and CI.
+
+Real Worker dispatches, prepared-artifact uploads, operational journal mutations,
+source acquisitions, Codespace effects and broker model invocations are zero.
+Construction review and governed commit-planning inference are separate effects.
+Production activation, normative adoption, dev integration, #83 changes, merge,
+#70/#67 closure and RWP-05 execution are excluded. No successful CI or review can
+authorize those effects implicitly.
