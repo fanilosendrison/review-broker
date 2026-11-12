@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "J-CH Normative Adoption Preparation Validation"
-version: "0.1.0"
+version: "0.1.1"
 adoption_status: "proposed"
 ---
 
@@ -53,14 +53,20 @@ python scripts/render-adr-index.py --check
 python -m compileall -q src scripts tests
 ```
 
-Observed complete suite: **805 PASS**, 243.267s, exit0, no failures/errors/skips/
-expected failures. It includes the780 qualified tests plus25 new controls:
+Initial local preparation: **805 PASS**, 243.267s, exit0. Exact published initial
+SHA72d1869331bec7d0ead6515c5f1ed6883a1f0882 also ran805 tests in CI42635116796.
+Its independent review nevertheless returned NO_GO; that outcome remains intact.
+
+Corrected local preparation: **809 PASS**, 378.607s, exit0, no failures/errors/
+skips/expected failures. It includes the780 qualified tests plus29 new controls:
 
 - 7 ADR/profile controls: calendar-aware dates/leap days, pin/hash/schema,
   proposed IDs, exact body/H1/metadata, duplicate/BOM/CRLF/alteration refusal,
   immutable accepted/retired record transitions and pure stale/missing-index refusal.
 - 6 adoption/ED04/legacy/frozen-source integrity controls.
-- 9 normative-schema/relocation/positive-negative binding/wire/frame/quiescence controls.
+- 13 normative-schema/relocation/positive-negative binding/wire/frame/quiescence
+  controls, including exact publication basis, metadata domain, actual Gregorian
+  date-time assertions and missing/permissive-checker fail-closed controls.
 - 3 synthetic-key actual JOSE checks for new execution purpose versus legacy/
   storage/wrong-workload/changed-binding proofs. No live mint or model call.
 
@@ -84,6 +90,80 @@ aa84e816385f082ea353b6254e490d85fe17bceb and SHA256
 records have no asserted outgoing ADR amendments to nonexistent prior records.
 Their index derives reverse relations from source metadata, never stores both.
 
+## Preserved initial review and atomic dispositions
+
+[The complete initial NO_GO](https://github.com/fanilosendrison/review-broker/pull/113#issuecomment-6743090544)
+reviews only SHA72d1869331bec7d0ead6515c5f1ed6883a1f0882. Its report SHA256 is
+27451138cf8e3f4248f939deb7795009b0a16f5357b906b29e1c8c3f84a6a2aa.
+The independent805-test PASS does not erase its8-probe run with1 failure.
+A preliminary reviewer representation-comparison oracle also failed; its corrected
+explicit-expansion comparison passed. Both original outputs remain preserved.
+
+### NR-01-TRANSFER — metadata/profile prose correction
+
+- **Statement/source/evidence:** the initial workload prose ascribed profile
+  fields to the closed ten-field metadata domain; fresh extension probes refused
+  those fields and distinct protected profile contexts retained identical metadata.
+- **Existing authority:** the qualified source's preserved metadata preimage and
+  distinct preflight/runtime bindings; the preparation mandate requires fidelity,
+  not a new hash domain. The initial reviewer classified its uncertainty separately.
+- **Semantic disposition:** `no-normative-impact` for correcting this proposed
+  transfer; no accepted product obligation is promoted or changed.
+- **Affected layers/impacts:** normative-contract proposal,
+  integration-or-conformance and repository-governance-or-documentation.
+- **Relations/required authority/next action:** NR-01 concerns the initial prose;
+  version0.1.1 states the actual separate owners. Final owner integration remains
+  required; no profile fields or alternative metadata version are introduced.
+
+### NR-02-TRANSFER — omitted qualified publication derivation
+
+- **Statement/source/evidence:** the initial normative proposal omitted the
+  complete schema2 publication basis. Two shape-valid bases had different IDs;
+  the frozen semantic oracle rejected the legacy-derived alternative.
+- **Existing authority:** qualified sourceb7316e5e8cadc718872ea56dfecfb61709c636ce,
+  `docs/architecture/rb91-journal-v2-candidate.md`, its result-retention/publication
+  section explicitly excludes ONLY three fields and uses the existing renderer.
+  This is the mandate's exact proposal input, NOT accepted journal2 authority.
+- **Semantic disposition:** `no-normative-impact` for the fidelity/extraction work
+  alone. The procedural mandate uniquely selects which candidate bytes to transfer;
+  it does NOT accept their product semantics or derive them from accepted v1.
+- **Affected layers/impacts:** normative-contract proposal,
+  verification-or-qualification-evidence, integration-or-conformance and
+  repository-governance-or-documentation.
+- **Relations/required authority/next action:** the reviewer's NR-02
+  `decision-required` final acceptance question remains owner-locked. The proposed
+  contract now carries the already qualified reference-inclusive rule explicitly;
+  the incompatible legacy-derived alternative is neither adopted nor substituted.
+  Separate owner integration may accept, reject or defer this proposal. No new
+  semantic arbitration, F1 reinvestigation or current normative adoption occurs.
+
+### NR-03-VERIFICATION — effective date-time assertion
+
+- **Statement/source/evidence:** the initial environment lacked registered
+  `date-time` support, accepting impossible Gregorian dates; the independent
+  negative assertion failed and remains preserved unchanged.
+- **Existing authority:** declared schema `format: date-time` and the validation
+  obligation, not a new execution, chronology or trusted-observation rule.
+- **Semantic disposition:** `no-normative-impact`.
+- **Affected layers/impacts:** verification-or-qualification-evidence,
+  integration-or-conformance and repository-governance-or-documentation.
+- **Relations/required authority/next action:** NR-03 is corrected through pinned
+  test-only `rfc3339-validator==0.1.4`, registration and positive/negative functional
+  qualification of the exact checker used. Missing or permissive implementations
+  refuse before schema validation. A byte restoration guard permits ONLY this
+  test-extra line change in pyproject; every runtime/build/entry-point byte stays
+  exact. No runtime adapter or production requirement was changed.
+
+All three initial witnesses were rerun without changing their assertions:
+**8 probes PASS**, 0.532s, exit0. Probe source SHA256 is
+514fb013dda700fa35d7b6930f919f3b41a1604ba9a1774b8f9bbade85e68ed7.
+Profile fields remain absent from metadata; two structural publication shapes
+remain schema-valid while the semantic oracle rejects the legacy basis; impossible
+date-time now refuses. Prose transfer, not schema tightening, resolves the first
+two mismatches. These are new outcomes, not retroactive changes to the initial
+review. No equivalent new memory entry is needed: the shared registry already
+documents optional-format fail-open behavior and positive/negative qualification.
+
 ## Remaining publication and review gates
 
 Complete-range whitespace, JSON, source-size, links and production-byte guards
@@ -93,8 +173,10 @@ verified; no old F1 GO is reused for these new amendments. Raw local logs and
 GitHub readbacks remain private; exact later publication receipts identify that
 state independently of this local run.
 
-No production source/dependencies, existing public request/result schemas,
+No production source/runtime dependencies, existing public request/result schemas,
 workflow/permission, historical journal or admission configuration is changed.
+The sole dependency amendment is the pinned test-only format implementation;
+its exact before/after line and baseline file hash are recorded in the manifest.
 All original7/extended11 journal1 forms remain unchanged/non-replayable. Issue107
 remains the separately tracked umask077 fixture problem; normal022 PASS is not
 its remediation or qualification.

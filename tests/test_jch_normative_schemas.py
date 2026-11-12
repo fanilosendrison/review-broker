@@ -3,14 +3,18 @@ from copy import deepcopy
 import hashlib
 import json
 import unittest
+from unittest.mock import patch
 
 from jsonschema import ValidationError
 from review_broker.arm_authority_contract import validate_envelope, ArmAuthorityError
 from review_broker.identity import canonical_bytes
 from rb91_full_abi_fixtures import publication_chain
+from rb91_full_abi_model import publication_identity
+from review_broker.publication import render_result_comment
 from jch_normative_fixtures import workload, quiescence
 from jch_normative_schemas import (
     ROOT, PREFIX, RESOURCES, check, validate_arm, arm_audience, frame_payload, proof_budget,
+    qualified_format_checker,
 )
 
 MAPPING={'urn:review-broker:rb91:candidate:journal-v2:0.2.0':PREFIX+'jch-journal-v2.schema.json',
@@ -98,6 +102,47 @@ class NormativeSchemaTests(unittest.TestCase):
         # This vector independently proves the complete pre-ARM byte-budget gate.
         envelope['binding']['controller_run_id']='1'*100000
         with self.assertRaises(ValueError):proof_budget(envelope)
+
+    def test_date_time_calendar_values_are_actually_asserted(self):
+        _,_,record,_,_=workload();valid=quiescence(record)
+        check('jch-quiescence-v1.schema.json',valid)
+        for timestamp in ('2026-02-30T00:00:00Z','2025-02-29T00:00:00Z','not-a-timestamp','2026-11-09T00:00:00'):
+            bad=deepcopy(valid);bad['observed_at']=timestamp
+            with self.subTest(timestamp=timestamp),self.assertRaises(ValidationError):
+                check('jch-quiescence-v1.schema.json',bad)
+
+    def test_missing_or_permissive_format_checker_fails_closed(self):
+        class Missing:
+            checkers={}
+        class Permissive:
+            checkers={'date-time':object()}
+            def conforms(self,*_args):return True
+        for checker in (Missing(),Permissive()):
+            with self.subTest(checker=type(checker).__name__),patch('jch_normative_schemas.FormatChecker',return_value=checker):
+                with self.assertRaises(ValueError):qualified_format_checker()
+        self.assertTrue(qualified_format_checker().conforms('2024-02-29T00:00:00Z','date-time'))
+
+    def test_metadata_preimage_does_not_claim_os_profile_fields(self):
+        _,_,_,_,raw=workload();metadata=json.loads(raw)
+        self.assertEqual(len(metadata),10)
+        for key,value in [('permission_profile','synthetic-profile'),('permission_profile_sha256','0'*64)]:
+            altered=deepcopy(metadata);altered[key]=value
+            with self.subTest(key=key),self.assertRaises(ValidationError):
+                check('jch-broker-metadata-v1.schema.json',altered)
+
+    def test_normative_publication_basis_is_exact_qualified_v2_not_legacy(self):
+        records,raw=publication_chain();intent=records[-2]['publication_intent']
+        keys=('schema_version','issue_number','request_id','attempt_id','result_id','result_artifact','publisher','nonce','reserved_at')
+        basis={key:intent[key] for key in keys}
+        expected='publication:sha256:'+hashlib.sha256(canonical_bytes(basis)).hexdigest()
+        self.assertEqual(expected,intent['publication_id']);self.assertEqual(publication_identity(intent),expected)
+        legacy={key:value for key,value in basis.items() if key!='result_artifact'}
+        self.assertNotEqual('publication:sha256:'+hashlib.sha256(canonical_bytes(legacy)).hexdigest(),expected)
+        body=render_result_comment(json.loads(raw),publication_id=expected).encode()
+        self.assertEqual(hashlib.sha256(body).hexdigest(),intent['comment_body_sha256'])
+        text=(ROOT/'docs/contracts/jch-result-retention.md').read_text()
+        for excluded in ('evidence_type','publication_id','comment_body_sha256'):self.assertIn('`'+excluded+'`',text)
+        self.assertIn('No other field is omitted',text)
 
     def test_quiescence_shape_disambiguates_pre_post_arm_and_shutdown(self):
         _,_,record,_,_=workload()

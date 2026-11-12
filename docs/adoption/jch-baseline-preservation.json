@@ -85,10 +85,6 @@
       "mode": "100644",
       "sha256": "75145d22a37b0ee91d09ecf56805aecdfb5a0992d514275ea4e93d6fa8c50a18"
     },
-    "pyproject.toml": {
-      "mode": "100644",
-      "sha256": "89920f7611022c561aa07219956e5adead759f816208588a11a226141aa062f2"
-    },
     "schemas/review-request-v2.schema.json": {
       "mode": "100644",
       "sha256": "fbdb0a4fa7101fbd73ffe9645704218d7d2117e292f94662b5efe1522dce2301"
@@ -477,5 +473,11 @@
       "mode": "100644",
       "sha256": "62ec62f2bfb0afae45496d476a8f6c5d320d292c5255a63e2bbf993f74df90fd"
     }
+  },
+  "test_dependency_amendment": {
+    "path": "pyproject.toml",
+    "baseline_sha256": "89920f7611022c561aa07219956e5adead759f816208588a11a226141aa062f2",
+    "before": "test = [\"PyYAML==6.0.3\"]",
+    "after": "test = [\"PyYAML==6.0.3\", \"rfc3339-validator==0.1.4\"]"
   }
 }

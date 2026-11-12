@@ -5,7 +5,7 @@ asset_type: "implementation-contract"
 domain: "independent-review"
 severity: "strict"
 name: "J-CH Result Retention and Publication"
-version: "0.1.0"
+version: "0.1.1"
 adoption_status: "proposed"
 ---
 
@@ -203,6 +203,34 @@ changed/cross-attempt content, expired artifacts or contradictory provider
 observations blocks validation/publication, NEVER historical consumption.
 
 ## Publication ownership and interruption
+
+### Exact journal2 identity derivation
+
+For this protocol's closed schema2 intent, the publication basis is the COMPLETE
+intent object with ONLY `evidence_type`, `publication_id` and
+`comment_body_sha256` removed. No other field is omitted: schema version, Issue,
+request/attempt, semantic result ID, the entire typed result reference (including
+immutable execution, actual storage/authorization receipt and location), expected
+publisher, nonce and reservation time all participate.
+
+`publication_id` is `publication:sha256:` followed by lowercase SHA256 of RFC8785
+canonical basis bytes, WITHOUT trailing LF. This is the qualified schema2 rule,
+not the legacy eight-field basis with its version relabeled. Legacy publication
+identity derivation remains unchanged for legacy intents.
+
+`comment_body_sha256` is lowercase SHA256 of the exact UTF-8 bytes produced by
+the existing accepted `render_result_comment(result, publication_id=derived_id)`
+renderer: the complete canonical public ReviewResult v1 and its original marker/
+publication wrapper, with exact LF framing. Do not normalize, truncate, omit
+permitted result fields or independently reconstruct a different renderer.
+The result/receipt artifact IDs separately use their canonical document+LF byte
+identity; those preimages are not interchangeable with the no-LF basis.
+
+Both identities are recomputed before reservation and exact observed body/actor/
+ID are confronted before publication is reported. F1 model construction references
+verify this rule but do not own or replace this normative definition.
+
+### Creator and interruption rules
 
 All F1 gates precede a new publication-intent reservation. One expected-old CAS
 from unreserved VALIDATED chooses one complete intent and its exact storage

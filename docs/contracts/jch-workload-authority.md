@@ -5,7 +5,7 @@ asset_type: "implementation-contract"
 domain: "independent-review"
 severity: "strict"
 name: "J-CH Workload and Stream Authority"
-version: "0.1.0"
+version: "0.1.1"
 adoption_status: "proposed"
 ---
 
@@ -40,9 +40,12 @@ is the accepted artifact identity over canonical complete receipt+LF.
 `reviewer_policy_sha256` commits canonical RFC8785 bytes of the complete reviewer
 command policy object in the envelope. The requested per-attempt OS permission
 profile and exact installed profile digest remain separately bound in the
-verified preflight/runtime observations and canonical broker metadata. Neither
-identity substitutes for the other. The native executable digest matches the
-protected runtime and binding. No PATH re-resolution or weaker fallback.
+verified preflight/runtime observations, HELLO runtime identity and protected
+deployment policy. They are NOT fields in the preserved closed broker-metadata
+preimage. That metadata separately commits original admission/Issue/source
+context; its digest cannot stand in for the profile bindings. Reviewer command
+policy and installed OS profile digests do not substitute for one another.
+The native executable digest matches the protected runtime and binding. No PATH re-resolution or weaker fallback.
 
 Execution audience is exactly:
 

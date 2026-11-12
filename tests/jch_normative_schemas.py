@@ -25,8 +25,18 @@ def require(condition, code):
     if not condition:raise ValueError(code)
 
 
+def qualified_format_checker():
+    checker=FormatChecker()
+    require('date-time' in checker.checkers,'DATE_TIME_ASSERTION_UNAVAILABLE')
+    require(checker.conforms('2024-02-29T00:00:00Z','date-time'),'DATE_TIME_ASSERTION_BROKEN')
+    for invalid in ('2026-02-30T00:00:00Z','2025-02-29T00:00:00Z','2026-13-01T00:00:00Z',
+                    '2026-11-09T00:00:00','not-a-timestamp'):
+        require(not checker.conforms(invalid,'date-time'),'DATE_TIME_ASSERTION_PERMISSIVE')
+    return checker
+
+
 def check(name,value):
-    Draft202012Validator(RESOURCES[name],registry=REGISTRY,format_checker=FormatChecker()).validate(value)
+    Draft202012Validator(RESOURCES[name],registry=REGISTRY,format_checker=qualified_format_checker()).validate(value)
     return value
 
 

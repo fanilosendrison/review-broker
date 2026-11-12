@@ -28,6 +28,10 @@ class AdoptionIntegrityTests(unittest.TestCase):
             path=ROOT/name
             raw=path.readlink().as_posix().encode() if entry['mode']=='120000' else path.read_bytes()
             with self.subTest(path=name):self.assertEqual(hashlib.sha256(raw).hexdigest(),entry['sha256'])
+        change=data['test_dependency_amendment'];text=(ROOT/change['path']).read_text()
+        self.assertEqual(text.count(change['after']),1)
+        restored=text.replace(change['after'],change['before']).encode()
+        self.assertEqual(hashlib.sha256(restored).hexdigest(),change['baseline_sha256'])
 
     def test_legacy_normative_body_tails_are_unchanged_except_explicit_ed04_status(self):
         data=json.loads((ROOT/'docs/adoption/jch-baseline-preservation.json').read_text())
@@ -58,7 +62,7 @@ class AdoptionIntegrityTests(unittest.TestCase):
             text=(ROOT/'docs/contracts'/name).read_text()
             with self.subTest(contract=name):
                 self.assertIn('adoption_status: "proposed"',text)
-                self.assertIn('version: "0.1.0"',text)
+                self.assertRegex(text,r'version: "0[.]1[.][0-9]+"')
         text=(ROOT/'docs/adoption/jch-normative-adoption.md').read_text()
         self.assertIn('No final adoption, merge, construction or activation',text)
         self.assertIn('J20',text)
