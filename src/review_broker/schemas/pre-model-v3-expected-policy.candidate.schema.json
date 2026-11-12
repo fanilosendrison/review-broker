@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "policy_name", "policy_revision", "requirements", "reviewer", "schema_version"],
+  "properties": {
+    "kind": {"type": "string", "const": "pre-model-expected-technical-policy"},
+    "policy_name": {"type": "string", "const": "review-broker"},
+    "policy_revision": {"type": "integer", "const": 1},
+    "schema_version": {"type": "integer", "const": 1},
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allow_login_shell", "approval_policy", "credential_material_access", "filesystem_minimal", "include_environment_context", "include_environment_context_time", "network_enabled", "packet_directory", "reviewed_source_execution", "reviewer_home", "shell_environment_inheritance", "trusted_workspace"],
+      "properties": {
+        "allow_login_shell": {"type": "boolean", "const": false},
+        "approval_policy": {"type": "string", "const": "never"},
+        "credential_material_access": {"type": "string", "const": "deny"},
+        "filesystem_minimal": {"type": "string", "const": "read"},
+        "include_environment_context": {"type": "boolean", "const": false},
+        "include_environment_context_time": {"type": "boolean", "const": false},
+        "network_enabled": {"type": "boolean", "const": false},
+        "packet_directory": {"type": "string", "const": "read"},
+        "reviewed_source_execution": {"type": "string", "const": "forbidden"},
+        "reviewer_home": {"type": "string", "const": "deny"},
+        "shell_environment_inheritance": {"type": "string", "const": "none"},
+        "trusted_workspace": {"type": "string", "const": "deny"}
+      }
+    },
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend", "model", "reasoning_effort"],
+      "properties": {
+        "backend": {"type": "string", "const": "codex-cli"},
+        "model": {"type": "string", "const": "gpt-5.6-sol"},
+        "reasoning_effort": {"type": "string", "const": "xhigh"}
+      }
+    }
+  }
+}
