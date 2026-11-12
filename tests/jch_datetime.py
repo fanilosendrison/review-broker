@@ -1,12 +1,15 @@
 """Offline RFC3339 leap-event adapter; never an observation-time authenticator."""
-from datetime import datetime, timedelta, timezone
+import calendar
+from datetime import date
 import hashlib
 from pathlib import Path
 import re
 
+from rfc3339_validator import RFC3339_REGEX
+
 DATA=Path(__file__).parent/'fixtures'/'iana-leap-seconds.list'
 DATA_SHA256='db5a895f16853b03bfc865e8d68f9fc8710ef1740e3400c701cd46a5bbbc3433'
-NTP_EPOCH=datetime(1900,1,1,tzinfo=timezone.utc)
+NTP_EPOCH_ORDINAL=date(1900,1,1).toordinal()
 # Only the missing leap-second branch. Ordinary grammar remains library-owned.
 LEAP=re.compile(r'([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt]'
                 r'([0-9]{2}):([0-9]{2}):60(?:[.][0-9]+)?'
@@ -48,21 +51,29 @@ def complete_date_time(value, ordinary):
     if not isinstance(value,str):return ordinary(value)
     if '\n' in value:return False
     if ordinary(value):return True
+    # The dependency explicitly excludes year zero despite RFC3339 section1.
+    # Reuse its complete lexical grammar and Python's proleptic Gregorian calendar.
+    if value.startswith('0000-'):
+        ordinary_match=RFC3339_REGEX.fullmatch(value.upper())
+        if ordinary_match is not None:
+            year,month,day=map(int,ordinary_match.groups())
+            return 1<=day<=calendar.monthrange(year,month)[1]
     match=LEAP.fullmatch(value)
     if match is None:return False
     year,month,day,hour,minute=map(int,match.groups()[:5]);zone=match[6]
-    try:
-        # This is the start of the containing minute, not a parsed/normalized
-        # replacement timestamp. :60 and all fraction digits remain untouched.
-        minute_start=datetime(year,month,day,hour,minute,tzinfo=timezone.utc)
-        offset=0
-        if zone not in ('Z','z'):
-            hours=int(zone[1:3]);minutes=int(zone[4:6])
-            if hours>23 or minutes>59:return False
-            offset=(hours*60+minutes)*(1 if zone[0]=='+' else -1)
-        boundary=minute_start-timedelta(minutes=offset)+timedelta(minutes=1)
-    except (ValueError,OverflowError):return False
-    seconds=int((boundary-NTP_EPOCH).total_seconds())
+    if not 1<=month<=12 or not 1<=day<=calendar.monthrange(year,month)[1]:return False
+    if hour>23 or minute>59:return False
+    offset=0
+    if zone not in ('Z','z'):
+        hours=int(zone[1:3]);minutes=int(zone[4:6])
+        if hours>23 or minutes>59:return False
+        offset=(hours*60+minutes)*(1 if zone[0]=='+' else -1)
+    if year==0:
+        raise LeapSecondCoverageError('LEAP_SECOND_OUTSIDE_PINNED_COVERAGE')
+    # Count the containing UTC minute in integers: no datetime conversion of
+    # :60, no floating fractions and no year-boundary overflow/normalization.
+    days=date(year,month,day).toordinal()-NTP_EPOCH_ORDINAL
+    seconds=days*86400+(hour*60+minute-offset+1)*60
     start,expires,positive,negative=leap_seconds()
     if negative:
         # This adapter has no qualified negative-leap ordinary-second path.
@@ -75,11 +86,13 @@ def complete_date_time(value, ordinary):
 def qualify_complete_checker(checker):
     """Require known positive and negative evidence on the actual local checker."""
     for value in ('1990-12-31T23:59:60Z','1990-12-31T15:59:60-08:00',
-                  '1991-01-01T00:59:60+01:00','1990-12-31t23:59:60.123z'):
+                  '1991-01-01T00:59:60+01:00','1990-12-31t23:59:60.123z',
+                  '0000-01-01T00:00:00Z','0000-02-29T00:00:00+00:00'):
         if not checker.conforms(value,'date-time'):
             raise ValueError('DATE_TIME_ASSERTION_INCOMPLETE')
     for value in ('1990-12-30T23:59:60Z','1990-12-31T12:00:60Z',
                   '1990-12-31T23:59:61Z','1990-12-31T15:59:60+08:00',
-                  '1990-12-31T23:59:60Z\n'):
+                  '1990-12-31T23:59:60Z\n','0000-02-30T00:00:00Z',
+                  '0000-01-01T00:00:00Z\n'):
         if checker.conforms(value,'date-time'):
             raise ValueError('DATE_TIME_ASSERTION_PERMISSIVE')
