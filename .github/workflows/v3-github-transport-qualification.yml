@@ -1,0 +1,248 @@
+name: Experimental v3 GitHub transport qualification
+
+on:
+  pull_request:
+    branches:
+      - feat/issue51-v3-journal-pre-effect-gate-20261030
+
+permissions:
+  contents: write
+
+jobs:
+  qualify:
+    if: >-
+      github.repository == 'fanilosendrison/review-broker' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.base.ref == 'feat/issue51-v3-journal-pre-effect-gate-20261030' &&
+      github.event.pull_request.head.ref == 'feat/issue51-v3-live-github-transport-20261030' &&
+      github.actor == 'fanilosendrison' &&
+      github.triggering_actor == 'fanilosendrison'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11"
+      - name: Verify exact executing source
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - name: Install exact executing source
+        run: python -m pip install .
+      - name: Qualify bounded live transport
+        env:
+          QUALIFICATION_TOKEN: ${{ github.token }}
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+          EXPECTED_ACTOR: ${{ github.actor }}
+          EXPECTED_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          EXECUTING_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_MERGE_SHA: ${{ github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.request
+
+          from review_broker.github_journal_transport_v3 import (
+              CreateRefStatusV3, GraphQLRefUpdateV3, ReadStatusV3,
+          )
+          from review_broker.github_transport_live_v3 import GitHubTransportLiveV3
+
+          repository = os.environ["EXPECTED_REPOSITORY"]
+          token = os.environ.pop("QUALIFICATION_TOKEN")
+          run_id = os.environ["RUN_ID"]
+          run_attempt = os.environ["RUN_ATTEMPT"]
+          qualification_ref = (
+              f"refs/heads/review-claims-v3/qualification-transport-{run_id}-{run_attempt}"
+          )
+          transport = GitHubTransportLiveV3(
+              token, repository, allow_qualification_refs=True
+          )
+          pinned_repository_node_id = transport.repository_node_id
+
+          class RejectRedirects(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  raise RuntimeError("QUALIFICATION_REDIRECT_REJECTED")
+
+          observation_opener = urllib.request.build_opener(RejectRedirects())
+
+          def authenticated_get(path):
+              request = urllib.request.Request(
+                  "https://api.github.com" + path,
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {token}",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                  },
+              )
+              with observation_opener.open(request, timeout=30) as response:
+                  if response.status != 200:
+                      raise RuntimeError("QUALIFICATION_OBSERVATION_FAILED")
+                  return json.loads(response.read().decode("utf-8"))
+
+          def bounded_exact_read(expected_sha, expected_payload):
+              observations = []
+              consecutive_matches = 0
+              for attempt in range(1, 7):
+                  observed = transport.read_claim(qualification_ref)
+                  sha = observed.snapshot.commit_sha if observed.snapshot else None
+                  observations.append({"attempt": attempt, "status": observed.status.value,
+                                       "sha": sha})
+                  if (observed.status is ReadStatusV3.FOUND
+                          and sha == expected_sha
+                          and observed.snapshot.journal_bytes == expected_payload):
+                      consecutive_matches += 1
+                      if consecutive_matches == 2:
+                          return observations
+                  else:
+                      consecutive_matches = 0
+                  if attempt != 6:
+                      time.sleep(2)
+              raise RuntimeError("QUALIFICATION_EXACT_READBACK_UNRESOLVED")
+
+          identity = {
+              "repository": repository,
+              "actor": os.environ["EXPECTED_ACTOR"],
+              "triggering_actor": os.environ["EXPECTED_TRIGGERING_ACTOR"],
+              "executing_sha": os.environ["EXECUTING_SHA"],
+              "event_merge_sha": os.environ["EVENT_MERGE_SHA"],
+              "head_sha": os.environ["HEAD_SHA"],
+              "base_sha": os.environ["BASE_SHA"],
+              "run_id": run_id,
+              "run_attempt": run_attempt,
+              "qualification_ref": qualification_ref,
+          }
+          def ref_inventory(prefix):
+              values = []
+              for page in range(1, 21):
+                  observed = authenticated_get(
+                      f"/repos/{repository}/git/matching-refs/{prefix}"
+                      f"?per_page=100&page={page}"
+                  )
+                  values.extend(observed)
+                  if len(observed) < 100:
+                      break
+              else:
+                  raise RuntimeError("QUALIFICATION_REF_INVENTORY_UNBOUNDED")
+              inventory = {item["ref"]: item["object"]["sha"] for item in values}
+              if len(inventory) != len(values):
+                  raise RuntimeError("QUALIFICATION_REF_INVENTORY_DUPLICATE")
+              return inventory
+
+          branches_before = ref_inventory("heads/")
+          tags_before = ref_inventory("tags/")
+          legacy_before = {
+              ref: sha for ref, sha in branches_before.items()
+              if ref.startswith("refs/heads/review-claims/")
+          }
+          dev_before = authenticated_get(f"/repos/{repository}/git/ref/heads/dev")
+          if transport.read_claim(qualification_ref).status is not ReadStatusV3.MISSING:
+              raise RuntimeError("QUALIFICATION_REF_NOT_ABSENT")
+
+          parent = os.environ["BASE_SHA"]
+          parent_observation = authenticated_get(f"/repos/{repository}/git/commits/{parent}")
+          if parent_observation.get("sha") != parent:
+              raise RuntimeError("QUALIFICATION_PARENT_MISMATCH")
+          payload_a = ("NON_OPERATIONAL_V3_TRANSPORT_QUALIFICATION_A\n"
+                       f"run={run_id}/{run_attempt}\n").encode("utf-8")
+          payload_b = ("NON_OPERATIONAL_V3_TRANSPORT_QUALIFICATION_B\n"
+                       f"run={run_id}/{run_attempt}\n").encode("utf-8")
+          commit_a = transport.create_journal_commit(parent, payload_a)
+          created = transport.create_ref(qualification_ref, commit_a)
+          if created.status is not CreateRefStatusV3.CREATED:
+              raise RuntimeError("QUALIFICATION_CREATE_REF_NOT_CREATED")
+          observations_a = bounded_exact_read(commit_a, payload_a)
+
+          commit_b = transport.create_journal_commit(commit_a, payload_b)
+          update = GraphQLRefUpdateV3(
+              transport.repository_node_id, qualification_ref, commit_a, commit_b, False
+          )
+          updated = transport.update_ref(update)
+          if updated.http_status != 200 or updated.errors:
+              raise RuntimeError("QUALIFICATION_UPDATE_REFS_FAILED")
+          observations_b = bounded_exact_read(commit_b, payload_b)
+
+          stale = transport.update_ref(update)
+          print(json.dumps({"stale_probe_http_status": stale.http_status,
+                            "stale_probe_errors": list(stale.errors),
+                            "stale_probe_expected_old_rejected": stale.expected_old_rejected},
+                           sort_keys=True))
+          provider_graphql_errors = bool(
+              stale.errors and all(
+                  error == "GRAPHQL_APPLICATION_ERROR"
+                  or error.startswith("GRAPHQL_TYPED_")
+                  for error in stale.errors
+              )
+          )
+          stale_replay_graphql_error = bool(
+              stale.http_status == 200 and provider_graphql_errors
+              and stale.writer_evidence_id is None
+              and not stale.expected_old_rejected
+              and stale.rejection_evidence_id is None
+          )
+          final_observations = bounded_exact_read(commit_b, payload_b)
+          stale_replay_ref_nonadvancement = True
+          stale_replay_qualified = (
+              stale_replay_graphql_error and stale_replay_ref_nonadvancement
+          )
+          branches_after = ref_inventory("heads/")
+          tags_after = ref_inventory("tags/")
+          expected_branches = dict(branches_before)
+          expected_branches[qualification_ref] = commit_b
+          legacy_after = {
+              ref: sha for ref, sha in branches_after.items()
+              if ref.startswith("refs/heads/review-claims/")
+          }
+          dev_after = authenticated_get(f"/repos/{repository}/git/ref/heads/dev")
+          if (branches_after != expected_branches or tags_after != tags_before
+                  or legacy_after != legacy_before or dev_after != dev_before):
+              raise RuntimeError("QUALIFICATION_REF_INVENTORY_CHANGED")
+          if transport.mutation_attempt_count != 9:
+              raise RuntimeError("QUALIFICATION_MUTATION_ATTEMPT_COUNT_INVALID")
+          if transport.verify_repository_identity() != pinned_repository_node_id:
+              raise RuntimeError("QUALIFICATION_REPOSITORY_IDENTITY_DRIFT")
+
+          evidence = {
+              **identity,
+              "repository_node_id": pinned_repository_node_id,
+              "parent_sha": parent,
+              "commit_a": commit_a,
+              "commit_b": commit_b,
+              "create_ref_status": created.status.value,
+              "update_http_status": updated.http_status,
+              "stale_http_status": stale.http_status,
+              "stale_errors": list(stale.errors),
+              "stale_replay_graphql_error": (
+                  "PASS" if stale_replay_graphql_error else "FAIL"
+              ),
+              "stale_replay_ref_nonadvancement": (
+                  "PASS" if stale_replay_ref_nonadvancement else "FAIL"
+              ),
+              "stale_replay_typed_causal_attribution": "UNQUALIFIED",
+              "stale_replay_qualified": stale_replay_qualified,
+              "superseded_typed_gate_expression": (
+                  'error == "GRAPHQL_TYPED_UNPROCESSABLE"'
+              ),
+              "superseded_typed_gate_failure_code": (
+                  "QUALIFICATION_STALE_REPLAY_UNRESOLVED_AFTER_POSTFLIGHT"
+              ),
+              "observations_a": observations_a,
+              "observations_b": observations_b,
+              "final_observations": final_observations,
+              "mutation_attempt_count": transport.mutation_attempt_count,
+              "mutation_retry_count": 0,
+              "synthetic_non_operational": True,
+          }
+          print(json.dumps(evidence, sort_keys=True))
+          if not stale_replay_graphql_error:
+              raise RuntimeError("QUALIFICATION_STALE_REPLAY_ERROR_NOT_OBSERVED")
+          PY
