@@ -70,6 +70,26 @@ class DateTimeConformanceTests(unittest.TestCase):
                 with self.subTest(suffix=suffix),self.assertRaises(ValidationError):
                     validator.validate('1990-12-31T23:59:60Z'+suffix)
 
+    def test_year_zero_ordinary_gregorian_domain(self):
+        receipt=quiescence(workload()[2])
+        for value in ('0000-01-01T00:00:00Z','0000-02-29T00:00:00+00:00',
+                      '0000-02-29t23:59:59.123-23:59','9999-12-31T23:59:59Z'):
+            with self.subTest(value=value):check('jch-quiescence-v1.schema.json',dict(receipt,observed_at=value))
+        for value in ('0000-02-30T00:00:00Z','0000-00-01T00:00:00Z',
+                      '0000-01-00T00:00:00Z','0000-01-01T24:00:00Z',
+                      '0000-01-01T00:00:00Z\n','0000-01-01T00:00:00+24:00'):
+            with self.subTest(value=value),self.assertRaises(ValidationError):
+                check('jch-quiescence-v1.schema.json',dict(receipt,observed_at=value))
+
+    def test_utc_overflow_is_coverage_not_invalid_calendar(self):
+        checker=qualified_format_checker()
+        for value in ('9999-12-31T23:59:60Z','9999-12-31T22:59:60-01:00',
+                      '0001-01-01T00:00:60+00:01','0000-02-29T23:59:60Z'):
+            with self.subTest(value=value),self.assertRaisesRegex(LeapSecondCoverageError,'COVERAGE'):
+                checker.conforms(value,'date-time')
+        for value in ('9999-02-29T23:59:60Z','0001-02-29T00:00:60Z','0000-02-30T00:00:60Z'):
+            with self.subTest(value=value):self.assertFalse(checker.conforms(value,'date-time'))
+
     def test_all_established_positive_events_and_coverage(self):
         dates=('1972-06-30','1972-12-31','1973-12-31','1974-12-31','1975-12-31',
                '1976-12-31','1977-12-31','1978-12-31','1979-12-31','1981-06-30',
