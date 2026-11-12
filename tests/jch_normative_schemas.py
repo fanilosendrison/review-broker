@@ -13,6 +13,7 @@ from review_broker.github_oidc import verify_github_identity
 from review_broker.oidc_subject import immutable_repository_subject
 from rb91_jch_contract_model import artifact, parse_strict
 from rb91_full_abi_model import validate as validate_qualified_record
+from jch_datetime import complete_date_time, qualify_complete_checker
 
 ROOT=Path(__file__).resolve().parents[1]
 PREFIX='https://github.com/fanilosendrison/review-broker/schemas/'
@@ -28,20 +29,22 @@ def require(condition, code):
 def qualified_format_checker():
     checker=FormatChecker()
     require('date-time' in checker.checkers,'DATE_TIME_ASSERTION_UNAVAILABLE')
-    require(checker.conforms('2024-02-29T00:00:00Z','date-time'),'DATE_TIME_ASSERTION_BROKEN')
+    for valid in ('2024-02-29T00:00:00Z','1985-04-12T23:20:50.52Z',
+                  '1996-12-19T16:39:57-08:00','1937-01-01T12:00:27.87+00:20',
+                  '2024-02-29t00:00:00z'):
+        require(checker.conforms(valid,'date-time'),'DATE_TIME_ASSERTION_BROKEN')
     for invalid in ('2026-02-30T00:00:00Z','2025-02-29T00:00:00Z','2026-13-01T00:00:00Z',
                     '2026-11-09T00:00:00','not-a-timestamp'):
         require(not checker.conforms(invalid,'date-time'),'DATE_TIME_ASSERTION_PERMISSIVE')
     original,raises=checker.checkers['date-time']
 
     @checker.checks('date-time',raises=raises)
-    def complete_date_time(value):
-        # The maintained validator's `$` anchor permits a final LF. Reject it,
-        # without trimming input or replacing its calendar/offset implementation.
-        return (not isinstance(value,str) or '\n' not in value) and original(value)
+    def qualified_date_time(value):
+        return complete_date_time(value,original)
 
     require(not checker.conforms('2026-11-09T00:00:00Z\n','date-time'),
             'DATE_TIME_ASSERTION_PERMISSIVE')
+    qualify_complete_checker(checker)
     return checker
 
 
