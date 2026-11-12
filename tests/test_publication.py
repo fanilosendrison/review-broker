@@ -177,6 +177,27 @@ class PublicationJournalTests(unittest.TestCase):
         self.assertEqual(read_verified_result("sample/repo", REQUEST_ID,
                                              journal=journal, publisher=publisher), result())
 
+    def test_cli_ignores_unattributable_marker_and_body_copies(self):
+        journal, holder, publisher, comment = self.published_fixture()
+        marker = ("<!-- review-broker-publication:v1 "
+                  + holder["record"].publication_intent["publication_id"] + " -->")
+        adversaries = [
+            {**comment, "id": 18, "body": marker,
+             "user": {"login": "attacker", "id": 10}},
+            {**comment, "id": 19, "user": {"login": "attacker", "id": 10}},
+            {**comment, "id": 20, "body": marker},
+            {**comment, "id": 21, "body": comment["body"] + " altered"},
+        ]
+        for adversary in adversaries:
+            with self.subTest(comment_id=adversary["id"]):
+                publisher.listed = [adversary, comment]
+                self.assertEqual(read_verified_result("sample/repo", REQUEST_ID,
+                    journal=journal, publisher=publisher), result())
+                observer = GitHubPublisher("sample/repo")
+                observer.comments = lambda _issue: publisher.listed
+                self.assertEqual(observer.observe(holder["record"].publication_intent,
+                    result())["comment_id"], 17)
+
     def test_cli_rejects_forged_publisher_and_conflicting_result(self):
         journal, _, publisher, comment = self.published_fixture()
         publisher.exact = {**comment, "user": {"login": "untrusted", "id": 10}}
@@ -205,6 +226,50 @@ class PublicationJournalTests(unittest.TestCase):
         publisher.exact = {**comment, "body": "modified"}
         with self.assertRaisesRegex(PublicationError, "IDENTITY_MISMATCH"):
             read_verified_result("sample/repo", REQUEST_ID, journal=journal, publisher=publisher)
+
+    def test_cli_rejects_receipt_and_comment_identity_variants(self):
+        for field, replacement in (
+            ("comment_id", 18), ("comment_node_id", "IC_OTHER"),
+            ("comment_url", "https://example.invalid/other"),
+            ("comment_created_at", "2026-10-27T00:01:00+00:00"),
+            ("publication_id", "publication:sha256:" + "0" * 64),
+            ("result_id", "result:sha256:" + "0" * 64),
+            ("issue_number", 8), ("publisher", {"login": "other", "id": 10}),
+        ):
+            with self.subTest(field=field):
+                journal, holder, publisher, _ = self.published_fixture()
+                prior = holder["record"]
+                holder["record"] = replace(prior, publication_receipt={
+                    **prior.publication_receipt, field: replacement})
+                with self.assertRaises(PublicationError):
+                    read_verified_result("sample/repo", REQUEST_ID,
+                        journal=journal, publisher=publisher)
+
+    def test_cli_rejects_wrong_issue_and_incomplete_observations(self):
+        journal, _, publisher, comment = self.published_fixture()
+        publisher.exact = {**comment,
+            "issue_url": "https://api.github.com/repos/sample/repo/issues/8"}
+        with self.assertRaisesRegex(PublicationError, "IDENTITY_MISMATCH"):
+            read_verified_result("sample/repo", REQUEST_ID,
+                journal=journal, publisher=publisher)
+        for code in ("PUBLICATION_COMMENT_SCAN_INCOMPLETE", "PUBLICATION_API_FAILED"):
+            with self.subTest(code=code):
+                publisher.comments = mock.Mock(side_effect=PublicationError(code))
+                with self.assertRaisesRegex(PublicationError, code):
+                    read_verified_result("sample/repo", REQUEST_ID,
+                        journal=journal, publisher=publisher)
+
+    def test_pagination_cap_and_api_failure_are_fail_closed(self):
+        for status, output, expected in (
+            (0, json.dumps([{}] * 100), "COMMENT_SCAN_INCOMPLETE"),
+            (1, "", "API_FAILED"),
+        ):
+            with self.subTest(status=status):
+                runner = mock.Mock(return_value=subprocess.CompletedProcess(
+                    [], status, output, ""))
+                with self.assertRaisesRegex(PublicationError, expected):
+                    GitHubPublisher("sample/repo", runner=runner).comments(7)
+                self.assertEqual(runner.call_count, 100 if status == 0 else 1)
 
     def test_cli_preserves_historical_superseded_result(self):
         journal, holder, publisher, _ = self.published_fixture()

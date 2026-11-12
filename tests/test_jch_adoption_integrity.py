@@ -24,14 +24,38 @@ class AdoptionIntegrityTests(unittest.TestCase):
     def test_runtime_existing_schemas_profiles_and_workflows_are_unchanged(self):
         data=json.loads((ROOT/'docs/adoption/jch-baseline-preservation.json').read_text())
         self.assertEqual(data['base_sha'],'3057192a6ad4e80663b3b8168cbaa52657c3db27')
+        upstream=json.loads((ROOT/'docs/adoption/jch-upstream-preservation.json').read_text())
+        replacements=upstream['historical_protected_replacements']
+        self.assertEqual(set(replacements),set(data['unchanged_git_entries']) & set(upstream['entries']))
         for name,entry in data['unchanged_git_entries'].items():
             path=ROOT/name
             raw=path.readlink().as_posix().encode() if entry['mode']=='120000' else path.read_bytes()
-            with self.subTest(path=name):self.assertEqual(hashlib.sha256(raw).hexdigest(),entry['sha256'])
+            expected=entry['sha256']
+            if name in replacements:
+                self.assertEqual(replacements[name]['historical_sha256'],expected)
+                expected=upstream['entries'][name]['sha256']
+                self.assertEqual(replacements[name]['upstream_sha256'],expected)
+            with self.subTest(path=name):self.assertEqual(hashlib.sha256(raw).hexdigest(),expected)
         change=data['test_dependency_amendment'];text=(ROOT/change['path']).read_text()
         self.assertEqual(text.count(change['after']),1)
         restored=text.replace(change['after'],change['before']).encode()
         self.assertEqual(hashlib.sha256(restored).hexdigest(),change['baseline_sha256'])
+
+    def test_reconciled_dev_all_263_inherited_paths_are_exact(self):
+        data=json.loads((ROOT/'docs/adoption/jch-upstream-preservation.json').read_text())
+        self.assertEqual(data['upstream_commit'],'a47e42c9437357b18d79fb3e68776063f894b8ea')
+        self.assertEqual(data['integration_pr'],131)
+        self.assertEqual(data['supplemental_integration_pr'],133)
+        self.assertEqual(data['historical_base'],'3057192a6ad4e80663b3b8168cbaa52657c3db27')
+        self.assertEqual(len(data['entries']),263)
+        for name,entry in data['entries'].items():
+            path=ROOT/name
+            with self.subTest(path=name):
+                if entry['mode'] is None:self.assertFalse(path.exists() or path.is_symlink())
+                else:
+                    raw=path.readlink().as_posix().encode() if entry['mode']=='120000' else path.read_bytes()
+                    self.assertEqual(hashlib.sha256(raw).hexdigest(),entry['sha256'])
+                    self.assertEqual(hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest(),entry['git_oid'])
 
     def test_legacy_normative_body_tails_are_unchanged_except_explicit_ed04_status(self):
         data=json.loads((ROOT/'docs/adoption/jch-baseline-preservation.json').read_text())

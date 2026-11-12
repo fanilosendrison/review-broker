@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "J-CH Normative Adoption Preparation Validation"
-version: "0.1.4"
+version: "0.1.6"
 adoption_status: "proposed"
 ---
 
@@ -30,8 +30,10 @@ provides depth-one-CI-preserved evidence. No accepted ADR existed or is rewritte
 [Sixteen qualified files](jch-qualified-inputs.json)—thirteen verification modules
 and three candidate schema references—are byte-identical to the qualified input.
 All780 prior tests remain selected. The journal/result normative resources have
-exactly equivalent constraints under explicit $id/$ref/root-annotation relocation;
-tests do not silently discard unknown schema keywords or widen the ABI.
+exactly equivalent constraints under explicit $id/$ref/root-annotation relocation,
+except the later owner-authorized Issue130 challenge-length delta documented in
+[the adoption packet](jch-normative-adoption.md#issue130--explicitly-authorized-challenge-domain-exception).
+Tests do not silently discard unknown schema keywords or widen the ABI.
 
 New proposed resources add exact closed execution envelope, protected policy,
 authority hash-preimage, broker-metadata, stream and quiescence shapes. Their
@@ -323,6 +325,134 @@ probe programs and original outputs are preserved separately from later outcomes
   adversarial probe now pass, including155466 leap/offset assertions. A new
   publication, full exact-SHA qualification and complete independent verdict
   remain required; no previous GO or PASS is transferred.
+
+## Issue130 — exact challenge and separate class-audit findings
+
+The owner explicitly authorized only the challenge lexical correction and its
+narrow fidelity exception. The historical NO_GO on
+7a740e5550e3739c98356200ff9f4a2e490ce9a2 remains unchanged. The original oracle
+SHA2560fef77d33b2d929520d156e1fe90c9b411fcc73df893254ceb9c1f696233a668
+reproduced two failed schema subcases before correction and passes unchanged
+after adding only journal challenge minLength64/maxLength64. Its canonical
+record still contains an embedded LF, and its binding digest is recomputed;
+no unrelated digest failure substitutes for the lexical rejection.
+
+Three new real-resource tests cover valid lowercase hex and63/65-character,
+LF/CRLF/internal-LF/TAB/Unicode/uppercase/nonhex/empty/nontext negatives across
+journal, ARM and HELLO, with complete objects and consistent binding digests.
+They distinguish JSON-string LF from final document framing and explicitly
+preserve the old model's historical acceptance. The full-resource equality test
+permits only the two exact length constraints at the authorized pointer; a new
+sensitivity test refuses missing/misplaced/changed lengths and unrelated changes
+in either relocated resource. The sixteen frozen inputs remain untouched.
+
+### Historical Issue130 class audit — non-challenge engine conformance failed
+
+At the Issue130 handoff, the retained machine-readable inventory bound all eight
+proposed schema resources by SHA256 and listed every164 pattern occurrence with
+JSON Pointer, constraints, positive sample and LF/CRLF/TAB/NUL outcomes. Its
+explicit outcome was `FAIL_NON_CHALLENGE_LEXICAL_DOMAINS`. That exact historical
+snapshot is preserved in the handoff patch, not rewritten as a PASS. The current
+[inventory](jch-lexical-audit.json), reproduced with
+`python tests/jch_lexical_audit.py`, additionally distinguishes historical and
+corrected-engine outcomes as described in Issue132 below. Emitting a report is
+not itself a conformance-success receipt.
+
+- **Already exact for the tested mechanism:**36 occurrences refuse every tested
+  terminal suffix. Fixed-width hex/digest fields with matching maximum lengths
+  (including the corrected challenge) have a direct complete-domain argument.
+  This bounded audit does not claim a universal proof for arbitrary patterns.
+- **Confirmed lexical gaps:**128 occurrences accept the valid sample plus LF.
+  Families include unguarded journal hashes/IDs, prefixed identities with overly
+  loose maximum lengths, numeric IDs, repository/name/event/workflow-path strings,
+  JWT shape and artifact-path/URI patterns. A maximum larger than the exact token
+  length does not repair the dollar-anchor behavior. These are observed
+  subschema failures, not hypothetical risk or operational bypass evidence.
+- **Complete interinterface witness:** a canonical journal carrying a launcher
+  program digest plus LF, with its binding digest consistently recomputed, is
+  accepted by journal, ARM and the frozen model but refused by HELLO. This
+  independently demonstrates another real interface mismatch outside challenge.
+- **Semantic barriers remain distinct:** an exploratory input-digest witness
+  also exposed schema acceptance but the unchanged semantic capacity validator
+  refused it. Its original source/output and the separately narrowed launcher
+  witness are preserved; no capacity/authentication bypass is inferred.
+- **Unclassified/theoretical occurrences:** none within this enumerated pattern
+  corpus; other lexical mechanisms and operational paths are not universally
+  qualified by this suffix audit.
+
+**Discovery disposition:** `no-normative-impact` for the observational records;
+affected layers proposed normative contract, verification-or-qualification-evidence,
+integration-or-conformance and repository-governance-or-documentation. The gaps
+predate this challenge correction. Their repair is not covered by the exact
+challenge-only exception; separate explicit amendment authority is required.
+[Issue132](https://github.com/fanilosendrison/review-broker/issues/132) retains the
+complete occurrence inventory and standalone launcher witness, also reproduced
+against the untouched published7a740e5 baseline. It is a verified native blocker
+of Issue130, not permission to extend that mandate.
+Neither all-green maintained tests nor frozen-source fidelity waived those
+failures. They blocked publication at that handoff pending separately governed
+Issue132 disposition, recorded below. No other schema was changed.
+
+## Issue132 — local ECMA-262 conformance
+
+The owner-authorized Issue132 remediation preserves all proposed regex strings
+and constraints, apart from the separately approved challenge-length exception.
+The former128 LF acceptances were conformance-engine discrepancies, not128
+independent normative decisions. The original failing audit and complete-object
+launcher witness remain preserved with their exact sources and outcomes.
+
+**Discovery/authority:** Draft2020-12 validation section6.3.3 specifies ECMA-262
+regular expressions; JSON Schema pattern is a search, not implicit anchoring.
+Here all164 occurrences explicitly start with^ and end with$, covering26 exact
+expressions in eight resources. Python's default search accepts a final LF before
+its dollar anchor, unlike the native no-flags ECMAScript end assertion. The
+atomic correction is `no-normative-impact`, affecting verification evidence,
+integration/conformance and documentation; it realizes the already declared
+schema dialect, not a narrower product domain or new execution mechanism.
+
+The local `tests/jch_patterns.py` adapter admits only the exact committed
+26-expression catalogue. It uses maintained Python fullmatch for these explicitly
+anchored expressions, with ASCII ranges/escapes, quantifiers, noncapturing groups,
+negative lookahead and negated classes preserved. The two expressions containing
+wildcard dots (artifact-path lookaheads and the comment URL) explicitly map that
+wildcard to the ECMAScript non-multiline class excluding LF, CR, LS and PS. The
+comment URL's unescaped dot is NOT silently changed into a literal dot. Native
+engine differential tests exposed that distinction before correction.
+
+The catalogue excludes shorthand classes, flags, backreferences, lookbehind,
+Unicode properties and other unqualified constructs. Any new expression fails
+admission and requires explicit catalogue review and new equivalence evidence.
+No general regex translator or universal regex conformance claim is made.
+Per-expression reasoning establishes the used operators' correspondence;
+maintained tests independently compare native Node RegExp over deterministic
+mutations, lengths, ASCII scalars, Unicode/astral/surrogate values, separators,
+controls, internal/prefix/suffix contamination and valid-domain controls. Missing
+Node is a qualification failure, not a skipped differential check. Node24 is
+already supplied by inherited CI, with no new runtime dependency.
+
+Draft2020-12's pattern callback is extended only in a local validator class.
+Because jsonschema normally reselects a global class when resolving a resource
+with an explicit dialect marker, private evaluation copies remove ONLY the
+root `$schema` after requiring its exact Draft2020-12 value. Referencing resources
+are explicitly bound to that same specification. IDs, refs, annotations and all
+constraints remain exact. Nested dialect changes and unknown patterns refuse
+before validation. No global registration, public resource, accepted historical
+validator or frozen model is modified. A real ARM-to-journal reference regression
+proves the local callback is not bypassed during evolution.
+
+Current audit reports **164 occurrences,26 distinct patterns, zero unresolved
+suffix gaps** using the qualified local validator; separate per-occurrence
+historical results retain the former128 LF acceptances. Positive samples are
+required to pass before suffix tests. The unchanged original challenge and
+launcher oracles now pass against complete canonically resealed objects, without
+using stale hashes to force rejection. The frozen model's old acceptance remains
+visible. Snapshot-freshness PASS is still not a substitute for conformance tests.
+
+The [base reconciliation](jch-base-reconciliation.md) and explicit
+[upstream preservation manifest](jch-upstream-preservation.json) separately govern
+the ascending merge of PR131's v3 PREPARED context. No old824-test result is reused
+as qualification of that integrated candidate. Historical reports, external-data
+RFC3339 capability limits and every operational gate remain unchanged.
 
 ## Remaining publication and review gates
 

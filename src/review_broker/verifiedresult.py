@@ -8,7 +8,7 @@ from .github_journal import GitHubRefJournal
 from .publication import (
     GitHubPublisher,
     PublicationError,
-    PUBLICATION_MARKER,
+    attributable_result_comment,
     render_result_comment,
     validate_publication_intent,
     validate_publication_receipt,
@@ -59,26 +59,22 @@ def read_verified_result(
         raise PublicationError("PUBLICATION_JOURNAL_IDENTITY_MISMATCH")
 
     expected_body = render_result_comment(result, publication_id=intent["publication_id"])
-    marker = f"{PUBLICATION_MARKER}{intent['publication_id']} -->"
     issue_number = intent["issue_number"]
-    matching_marker = [
+    matching_comments = [
         comment for comment in active_publisher.comments(issue_number)
-        if marker in str(comment.get("body", ""))
+        if attributable_result_comment(comment, expected_body, intent["publisher"])
     ]
-    if len(matching_marker) != 1:
+    if len(matching_comments) != 1:
         raise PublicationError("PUBLICATION_COMMENT_MISSING_OR_AMBIGUOUS")
-    listed = matching_marker[0]
+    listed = matching_comments[0]
     comment = active_publisher.comment(receipt["comment_id"])
     expected_issue_path = f"/repos/{repository}/issues/{issue_number}"
     for observed in (listed, comment):
-        actor = observed.get("user")
         fields = {
             "id": "comment_id", "node_id": "comment_node_id",
             "html_url": "comment_url", "created_at": "comment_created_at",
         }
-        if (observed.get("body") != expected_body or
-            not isinstance(actor, dict) or
-            {"login": actor.get("login"), "id": actor.get("id")} != intent["publisher"] or
+        if (not attributable_result_comment(observed, expected_body, intent["publisher"]) or
             any(observed.get(key) != receipt[field] for key, field in fields.items()) or
             urlsplit(str(observed.get("issue_url", ""))).path != expected_issue_path):
             raise PublicationError("PUBLICATION_COMMENT_IDENTITY_MISMATCH")

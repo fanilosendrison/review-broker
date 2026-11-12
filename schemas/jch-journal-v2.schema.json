@@ -439,7 +439,9 @@
         },
         "challenge": {
           "pattern": "^[0-9a-f]{64}$",
-          "type": "string"
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64
         },
         "codespace_id": {
           "pattern": "^[1-9][0-9]*$",

@@ -35,8 +35,30 @@ class NormativeSchemaTests(unittest.TestCase):
             value=relocate(json.loads((ROOT/'docs/architecture/qualification'/old).read_text()))
             value['title']=title
             if 'description' in value:value['description']='Proposed normative resource. Formal integration, implementation, J20 and operational admission remain separate.'
+            if new=='jch-journal-v2.schema.json':
+                challenge=value['$defs']['binding']['properties']['challenge']
+                self.assertEqual(challenge,{'pattern':'^[0-9a-f]{64}$','type':'string'})
+                # Owner-authorized Issue130 delta ONLY at this exact JSON Pointer.
+                challenge.update(minLength=64,maxLength=64)
             self.assertEqual(RESOURCES[new],value)
         self.assertEqual(len(RESOURCES['jch-journal-v2.schema.json']['required']),15)
+
+    def test_relocation_oracle_refuses_missing_misplaced_and_unrelated_deltas(self):
+        journal=RESOURCES['jch-journal-v2.schema.json']
+        for mutation in ('missing-min','missing-max','wrong-length','wrong-location','unrelated'):
+            altered=deepcopy(journal);challenge=altered['$defs']['binding']['properties']['challenge']
+            if mutation=='missing-min':challenge.pop('minLength')
+            elif mutation=='missing-max':challenge.pop('maxLength')
+            elif mutation=='wrong-length':challenge['maxLength']=65
+            elif mutation=='wrong-location':
+                altered['$defs']['binding']['properties']['request_id']['minLength']=challenge.pop('minLength')
+            else:altered['additionalProperties']=True
+            with self.subTest(mutation=mutation),patch.dict(RESOURCES,{'jch-journal-v2.schema.json':altered}):
+                with self.assertRaises(AssertionError):
+                    self.test_promoted_journal_and_reference_have_exact_qualified_constraints()
+        altered=deepcopy(RESOURCES['jch-result-reference-v2.schema.json']);altered['additionalProperties']=True
+        with patch.dict(RESOURCES,{'jch-result-reference-v2.schema.json':altered}):
+            with self.assertRaises(AssertionError):self.test_promoted_journal_and_reference_have_exact_qualified_constraints()
 
     def test_public_resources_execute_valid_and_invalid_qualified_vectors(self):
         records,_=publication_chain()

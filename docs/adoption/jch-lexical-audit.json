@@ -1,0 +1,3883 @@
+{
+  "scope": "all pattern occurrences in eight proposed J-CH schema resources",
+  "boundary": "26 qualified ECMA-262 expressions only; not semantic/authentication bypass evidence.",
+  "dialect": "ECMA-262, no flags; local closed-catalogue adapter qualified against native Node RegExp",
+  "distinct_patterns": 26,
+  "overall": "NO_TESTED_SUFFIX_GAP",
+  "schema_sha256": {
+    "jch-arm-envelope-v1.schema.json": "2d92b54e5b4ed663e85a6356fa9be11b1a6178f43766de61777ef0c8047826e9",
+    "jch-broker-metadata-v1.schema.json": "fad888eb388e3a7c4c40a6b82eeabd6a4dfb95a7455c0f7e4ee3e213938dd46c",
+    "jch-deployment-policy-v1.schema.json": "e549e0b7748fecd32b9dfae60702535b805b48de570ec5c09fb83837b5f00ae7",
+    "jch-journal-v2.schema.json": "eacf32f0f6a4f531ba5b8c04715db68ce94e17b40de888d2b4469418197eedde",
+    "jch-launcher-message-v1.schema.json": "c4a3d113a00272fe6997e64a30ac2e7c457aff2988f3e71fc91a9098844cc5ef",
+    "jch-quiescence-v1.schema.json": "55f9978eeee0e365a6c067c35c205bd81907378de0af1d9cebb0b705480eb153",
+    "jch-result-reference-v2.schema.json": "c9edd0da52e4868a57610ce218645b2126f08dda90f7b0b5a8a357d06d32d3c9",
+    "jch-storage-authority-basis-v1.schema.json": "e7c7be17392d17417b8153a5b901f53b2747fa21b9d59030354c7dd349804430"
+  },
+  "occurrences": 164,
+  "confirmed_gaps": 0,
+  "entries": [
+    {
+      "schema": "jch-arm-envelope-v1.schema.json",
+      "pointer": "/properties/authorization_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-arm-envelope-v1.schema.json",
+      "pointer": "/properties/broker_repository",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+      },
+      "positive": "sample/broker",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-arm-envelope-v1.schema.json",
+      "pointer": "/properties/broker_repository_owner_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-arm-envelope-v1.schema.json",
+      "pointer": "/properties/arm_commit_sha",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-arm-envelope-v1.schema.json",
+      "pointer": "/properties/broker_metadata_sha256",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-broker-metadata-v1.schema.json",
+      "pointer": "/properties/broker_repository",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+      },
+      "positive": "sample/broker",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-broker-metadata-v1.schema.json",
+      "pointer": "/properties/attempt_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "attempt:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-broker-metadata-v1.schema.json",
+      "pointer": "/properties/request_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^request:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-broker-metadata-v1.schema.json",
+      "pointer": "/properties/executing_broker_sha",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-broker-metadata-v1.schema.json",
+      "pointer": "/properties/subject_repository",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+      },
+      "positive": "sample/broker",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-deployment-policy-v1.schema.json",
+      "pointer": "/properties/broker_repository",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+      },
+      "positive": "sample/broker",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-deployment-policy-v1.schema.json",
+      "pointer": "/properties/broker_repository_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-deployment-policy-v1.schema.json",
+      "pointer": "/properties/broker_repository_owner_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-deployment-policy-v1.schema.json",
+      "pointer": "/properties/executing_broker_sha",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-deployment-policy-v1.schema.json",
+      "pointer": "/properties/workflow_sha",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-deployment-policy-v1.schema.json",
+      "pointer": "/properties/launcher_program_sha256",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-deployment-policy-v1.schema.json",
+      "pointer": "/properties/reviewer_native_sha256",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-deployment-policy-v1.schema.json",
+      "pointer": "/properties/permission_profile_sha256",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-deployment-policy-v1.schema.json",
+      "pointer": "/properties/codespace_name",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200,
+        "pattern": "^[A-Za-z0-9-]{1,200}$"
+      },
+      "positive": "sample",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-deployment-policy-v1.schema.json",
+      "pointer": "/properties/codespace_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/properties/attempt_id",
+      "constraints": {
+        "pattern": "^attempt:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "attempt:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/properties/evidence_ids/items",
+      "constraints": {
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/properties/history/items/oneOf/0/properties/evidence_ids/items",
+      "constraints": {
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/properties/history/items/oneOf/1/properties/evidence_ids/items",
+      "constraints": {
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/properties/history/items/oneOf/2/properties/binding_sha256",
+      "constraints": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/properties/history/items/oneOf/2/properties/evidence_ids/items",
+      "constraints": {
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/properties/input_capacity/properties/attempt_id",
+      "constraints": {
+        "pattern": "^attempt:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "attempt:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/properties/input_capacity/properties/executing_broker_sha",
+      "constraints": {
+        "pattern": "^[0-9a-f]{40}$",
+        "type": "string"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/properties/input_capacity/properties/input_sha256",
+      "constraints": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/properties/input_capacity/properties/packet_id",
+      "constraints": {
+        "pattern": "^packet:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "packet:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/properties/input_capacity/properties/request_id",
+      "constraints": {
+        "pattern": "^request:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/properties/request_id",
+      "constraints": {
+        "pattern": "^request:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/attempt_id",
+      "constraints": {
+        "pattern": "^attempt:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "attempt:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/broker_repository_id",
+      "constraints": {
+        "pattern": "^[1-9][0-9]*$",
+        "type": "string"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/capacity_receipt_id",
+      "constraints": {
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/challenge",
+      "constraints": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string",
+        "minLength": 64,
+        "maxLength": 64
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/codespace_id",
+      "constraints": {
+        "pattern": "^[1-9][0-9]*$",
+        "type": "string"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/codespace_name",
+      "constraints": {
+        "pattern": "^[a-zA-Z0-9-]{1,200}$",
+        "type": "string"
+      },
+      "positive": "sample",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/controller_run_attempt",
+      "constraints": {
+        "pattern": "^[1-9][0-9]*$",
+        "type": "string"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/controller_run_id",
+      "constraints": {
+        "pattern": "^[1-9][0-9]*$",
+        "type": "string"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/input_sha256",
+      "constraints": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/launcher_program_sha256",
+      "constraints": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/packet_id",
+      "constraints": {
+        "pattern": "^packet:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "packet:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/prepared_parent_sha",
+      "constraints": {
+        "pattern": "^[0-9a-f]{40}$",
+        "type": "string"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/recipient_preflight_sha256",
+      "constraints": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/request_id",
+      "constraints": {
+        "pattern": "^request:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/reviewer_executable_sha256",
+      "constraints": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/reviewer_policy_sha256",
+      "constraints": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/subject_id",
+      "constraints": {
+        "pattern": "^subject:sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "positive": "subject:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/binding/properties/workflow_sha",
+      "constraints": {
+        "pattern": "^[0-9a-f]{40}$",
+        "type": "string"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/request/oneOf/0/properties/subject/properties/repository",
+      "constraints": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+      },
+      "positive": "sample/broker",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/request/oneOf/0/properties/mission/properties/id",
+      "constraints": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+      },
+      "positive": "sample",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/request/oneOf/1/properties/subject/properties/repository",
+      "constraints": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+      },
+      "positive": "sample/broker",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/request/oneOf/1/properties/subject/properties/expected_head_commit",
+      "constraints": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/request/oneOf/1/properties/mission/properties/id",
+      "constraints": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+      },
+      "positive": "sample",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/request/oneOf/1/properties/review_operation/oneOf/1/properties/previous_request_id",
+      "constraints": {
+        "type": "string",
+        "pattern": "^request:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/request/oneOf/1/properties/review_operation/oneOf/2/properties/previous_request_id",
+      "constraints": {
+        "type": "string",
+        "pattern": "^request:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/request/oneOf/1/properties/review_operation/oneOf/2/properties/authorization_nonce",
+      "constraints": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/request_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^request:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/subject/properties/repository",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+      },
+      "positive": "sample/broker",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/subject/properties/head_commit",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/subject/properties/base_commit",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/subject/properties/merge_base",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/subject_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^subject:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "subject:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/mission_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^mission:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "mission:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/policy_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^policy:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "policy:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission/properties/review_intent_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^review-intent:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "review-intent:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission_authority/properties/authorization_evidence_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission_authority/properties/broker_repository_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/admission_authority/properties/executing_broker_sha",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/plan/properties/broker_repository",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+      },
+      "positive": "sample/broker",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/plan/properties/request_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^request:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/plan/properties/attempt_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "attempt:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/plan/properties/subject_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^subject:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "subject:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/plan/properties/packet_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^packet:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "packet:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/plan/properties/workflow_run_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/plan/properties/workflow_run_attempt",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/plan/properties/artifact_name",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[A-Za-z0-9_.-]{1,255}$"
+      },
+      "positive": "sample",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/plan/properties/artifacts/propertyNames",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024,
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)[^\\u0000-\\u001f]+$"
+      },
+      "positive": "sample.json",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/plan/properties/artifacts/additionalProperties/properties/artifact_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/locator/properties/broker_repository",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+      },
+      "positive": "sample/broker",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/locator/properties/request_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^request:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/locator/properties/attempt_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "attempt:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/locator/properties/subject_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^subject:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "subject:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/locator/properties/packet_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^packet:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "packet:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/locator/properties/workflow_run_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/locator/properties/workflow_run_attempt",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/locator/properties/artifact_name",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[A-Za-z0-9_.-]{1,255}$"
+      },
+      "positive": "sample",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/locator/properties/artifacts/propertyNames",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024,
+        "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)[^\\u0000-\\u001f]+$"
+      },
+      "positive": "sample.json",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/locator/properties/artifacts/additionalProperties/properties/artifact_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/locator/properties/artifact_digest",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 71,
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      },
+      "positive": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/intent/properties/request_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^request:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/intent/properties/attempt_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "attempt:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/intent/properties/result_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^result:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "result:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/intent/properties/nonce",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/intent/properties/publication_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^publication:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "publication:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/intent/properties/comment_body_sha256",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/receipt/properties/publication_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^publication:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "publication:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/receipt/properties/result_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^result:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "result:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-journal-v2.schema.json",
+      "pointer": "/$defs/receipt/properties/comment_url",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024,
+        "pattern": "^https://github.com/[^/]+/[^/]+/issues/[1-9][0-9]*#issuecomment-[1-9][0-9]*$"
+      },
+      "positive": "https://github.com/sample/broker/issues/1#issuecomment-1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/0/properties/challenge",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/0/properties/request_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^request:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/0/properties/attempt_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "attempt:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/0/properties/packet_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^packet:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "packet:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/0/properties/broker_repository_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/0/properties/codespace_name",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200,
+        "pattern": "^[A-Za-z0-9-]{1,200}$"
+      },
+      "positive": "sample",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/0/properties/codespace_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/0/properties/executing_broker_sha",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/0/properties/launcher_program_sha256",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/0/properties/input_sha256",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/0/properties/capacity_receipt_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/0/properties/reviewer_runtime_identity/properties/native_executable_sha256",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/0/properties/reviewer_runtime_identity/properties/permission_profile_sha256",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/1/properties/jwt",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 32768,
+        "pattern": "^[A-Za-z0-9_-]+[.][A-Za-z0-9_-]+[.][A-Za-z0-9_-]+$"
+      },
+      "positive": "a.b.c",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-launcher-message-v1.schema.json",
+      "pointer": "/oneOf/2/properties/evidence_ids/items",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-quiescence-v1.schema.json",
+      "pointer": "/properties/request_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^request:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-quiescence-v1.schema.json",
+      "pointer": "/properties/attempt_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "attempt:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-quiescence-v1.schema.json",
+      "pointer": "/properties/arm_commit_sha/oneOf/1",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-quiescence-v1.schema.json",
+      "pointer": "/properties/arm_binding_sha256/oneOf/1",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-quiescence-v1.schema.json",
+      "pointer": "/properties/codespace_name",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200,
+        "pattern": "^[A-Za-z0-9-]{1,200}$"
+      },
+      "positive": "sample",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-quiescence-v1.schema.json",
+      "pointer": "/properties/codespace_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-quiescence-v1.schema.json",
+      "pointer": "/properties/lifecycle_context/properties/workflow_sha",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-quiescence-v1.schema.json",
+      "pointer": "/properties/lifecycle_context/properties/run_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-quiescence-v1.schema.json",
+      "pointer": "/properties/lifecycle_context/properties/run_attempt",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-quiescence-v1.schema.json",
+      "pointer": "/properties/custody_evidence_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-quiescence-v1.schema.json",
+      "pointer": "/properties/observation_evidence_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-quiescence-v1.schema.json",
+      "pointer": "/allOf/1/then/properties/arm_commit_sha",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-quiescence-v1.schema.json",
+      "pointer": "/allOf/1/then/properties/arm_binding_sha256",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/properties/artifact_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/execution/properties/request_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^request:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/execution/properties/attempt_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "attempt:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/execution/properties/subject_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^subject:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "subject:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/execution/properties/policy_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^policy:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "policy:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/execution/properties/packet_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^packet:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "packet:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/execution/properties/broker_repository_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/execution/properties/controller_workflow_sha",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/execution/properties/controller_run_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/execution/properties/controller_run_attempt",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/execution/properties/arm_commit_sha",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/execution/properties/arm_binding_sha256",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/execution/properties/terminal_capture_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/execution/properties/terminal_locator_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/execution/properties/validation_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/storage/properties/workflow_sha",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/storage/properties/run_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/storage/properties/run_attempt",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/storage/properties/authorization_receipt_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/location/properties/broker_repository",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+      },
+      "positive": "sample/broker",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/location/properties/workflow_run_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/location/properties/workflow_run_attempt",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/location/properties/artifact_name",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[A-Za-z0-9_.-]{1,255}$"
+      },
+      "positive": "sample",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/location/properties/archive_digest",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 71,
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      },
+      "positive": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/authorization/properties/authority_policy_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-result-reference-v2.schema.json",
+      "pointer": "/$defs/authorization/properties/statement_sha256",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-storage-authority-basis-v1.schema.json",
+      "pointer": "/properties/repository",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+      },
+      "positive": "sample/broker",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-storage-authority-basis-v1.schema.json",
+      "pointer": "/properties/repository_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-storage-authority-basis-v1.schema.json",
+      "pointer": "/properties/owner_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20,
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "positive": "1",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-storage-authority-basis-v1.schema.json",
+      "pointer": "/properties/recovery_scope/properties/request_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^request:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "request:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-storage-authority-basis-v1.schema.json",
+      "pointer": "/properties/recovery_scope/properties/attempt_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "attempt:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-storage-authority-basis-v1.schema.json",
+      "pointer": "/properties/recovery_scope/properties/arm_commit_sha",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-storage-authority-basis-v1.schema.json",
+      "pointer": "/properties/recovery_scope/properties/terminal_locator_id",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+      },
+      "positive": "artifact:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-storage-authority-basis-v1.schema.json",
+      "pointer": "/$defs/role/properties/workflow_sha",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "positive": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-storage-authority-basis-v1.schema.json",
+      "pointer": "/$defs/role/properties/path",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[.]github/workflows/[A-Za-z0-9-]+[.]yml$"
+      },
+      "positive": ".github/workflows/sample.yml",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    },
+    {
+      "schema": "jch-storage-authority-basis-v1.schema.json",
+      "pointer": "/$defs/role/properties/events/items",
+      "constraints": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "positive": "sample",
+      "suffix_accepted": {
+        "LF": false,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "historical_suffix_accepted": {
+        "LF": true,
+        "CRLF": false,
+        "TAB": false,
+        "NUL": false
+      },
+      "classification": "exact-against-tested-terminal-suffixes"
+    }
+  ]
+}

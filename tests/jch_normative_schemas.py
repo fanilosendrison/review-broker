@@ -14,12 +14,14 @@ from review_broker.oidc_subject import immutable_repository_subject
 from rb91_jch_contract_model import artifact, parse_strict
 from rb91_full_abi_model import validate as validate_qualified_record
 from jch_datetime import complete_date_time, qualify_complete_checker
+from jch_patterns import JCHValidator, qualified_resources
 
 ROOT=Path(__file__).resolve().parents[1]
 PREFIX='https://github.com/fanilosendrison/review-broker/schemas/'
 RESOURCES={p.name:json.loads(p.read_text()) for p in (ROOT/'schemas').glob('jch-*.schema.json')}
 REGISTRY=Registry().with_resources((v['$id'],Resource.from_contents(v)) for v in RESOURCES.values())
 for schema in RESOURCES.values():Draft202012Validator.check_schema(schema)
+EVALUATED_RESOURCES,EVALUATED_REGISTRY=qualified_resources(RESOURCES)
 
 
 def require(condition, code):
@@ -49,7 +51,8 @@ def qualified_format_checker():
 
 
 def check(name,value):
-    Draft202012Validator(RESOURCES[name],registry=REGISTRY,format_checker=qualified_format_checker()).validate(value)
+    JCHValidator(EVALUATED_RESOURCES[name],registry=EVALUATED_REGISTRY,
+                 format_checker=qualified_format_checker()).validate(value)
     return value
 
 

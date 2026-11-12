@@ -5,7 +5,7 @@ asset_type: "adoption-proposal"
 domain: "independent-review"
 severity: "draft"
 name: "J-CH Governed Normative Adoption Packet"
-version: "0.1.0"
+version: "0.1.2"
 adoption_status: "proposed"
 ---
 
@@ -87,12 +87,69 @@ Disposition records:
 The amendment is still proposed until the separate formal integration decision.
 No historical observation or accepted ADR body is rewritten.
 
+## Issue130 — explicitly authorized challenge-domain exception
+
+The owner's bounded Issue130 correction mandate authorizes exactly this proposed
+schema delta relative to the qualified candidate, beyond the existing fixed
+URI/root-annotation relocation:
+
+- Resource: `schemas/jch-journal-v2.schema.json`.
+- JSON Pointer: `/$defs/binding/properties/challenge`.
+- Original constraints remain `type: string` and `pattern: ^[0-9a-f]{64}$`.
+- Add exactly `minLength: 64` and `maxLength: 64` at that pointer.
+- No other constraint, field, location, value or resource is excepted.
+
+The resulting challenge domain is exactly64 ASCII lowercase hexadecimal
+characters, with no prefix/suffix or extra character. The ARM envelope inherits
+the binding through its unchanged reference to the journal resource. HELLO's
+existing64-character maximum and the same64-character pattern already define
+that domain; its minimum1 does not broaden it. No string or digest is normalized.
+The original CSPRNG challenge origin, lifetime, controller/launcher ownership and
+AtomicArm binding semantics are unchanged.
+
+The complete relocation equality oracle adds only these two explicit expected
+constraints at this exact pointer, then compares the entire resources. Negative
+sensitivity controls cover absent, misplaced and changed lengths and unrelated
+journal/result-resource changes. It is not a global waiver or a field-stripping
+comparison. All16 qualified historical inputs retain their exact original bytes
+and hashes, including the research model which accepts the old LF witness.
+That historical model is not retroactively qualified against this corrected
+proposed lexical contract. The new real-resource controls own this correction.
+
+The [bounded lexical audit](jch-lexical-audit.json) is observational evidence,
+not authority to redefine other fields. The later Issue132 mandate corrects the
+local evaluation engine for the26 existing ECMA-262 expressions, not128 schema
+occurrences. Current qualification and historical Python-engine results are
+separate columns. Unknown patterns/dialects refuse. No additional proposed-schema
+constraint is changed. Final integration remains owner-locked.
+
+## Issue132 — dialect fidelity and ascending base reconciliation
+
+JSON Schema Draft2020-12 pattern semantics select ECMA-262 and search matching,
+not Python regex quirks. Every inventoried J-CH expression is anchored at both
+ends. For this closed catalogue, the local conformance validator uses complete
+matching and preserves ECMAScript wildcard line-terminator behavior. It never
+normalizes a value or silently accepts a new expression. The unchanged historical
+research models retain their original engine and are not retroactively qualified.
+[Validation details](jch-validation.md#issue132--local-ecma-262-conformance) specify
+scope, positive-domain preservation, native-engine comparison and limitations.
+
+The owner's explicit reconciliation mandate also takes dev commit
+a47e42c9437357b18d79fb3e68776063f894b8ea as the second parent of an ascending
+merge into this proposal branch, preserving published7a740e5 ancestry and the
+mandate'sd8db161/PR131 input as an ancestor. The
+[compatibility assessment](jch-base-reconciliation.md) separates v3 PREPARED
+construction from future J-CH execution authority and records all263 inherited
+paths byte-exactly, including PR133's later three-file publication correction. The historical3057192 base and every original evidence/NO_GO
+identity remain historical, not rewritten. No merge of PR113 into dev follows.
+
 ## Validation and adoption boundary
 
 Qualified candidate schemas and all qualified verification modules are retained
 byte-identically as construction references. Proposed normative journal/result
 resources must have exactly equivalent constraints after an explicit fixed
-$id/$ref/annotation relocation; no F1 semantic rule is loosened. New workload/
+$id/$ref/annotation relocation, except ONLY the owner-authorized Issue130 delta
+specified below; no F1 semantic rule is loosened. New workload/
 message resources express the already selected bindings, with independent
 positive/negative conformance tests. Tests are offline and not runtime adapters.
 
