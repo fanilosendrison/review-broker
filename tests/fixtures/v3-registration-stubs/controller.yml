@@ -1,0 +1,21 @@
+name: v3 pre-model Controller
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_issue_number:
+        type: number
+        required: true
+      request_id:
+        type: string
+        required: true
+
+permissions: {}
+
+jobs:
+  controller:
+    name: controller
+    if: ${{ false }}
+    runs-on: ubuntu-24.04
+    steps:
+      - run: ":"
