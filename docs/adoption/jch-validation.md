@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "J-CH Normative Adoption Preparation Validation"
-version: "0.1.2"
+version: "0.1.3"
 adoption_status: "proposed"
 ---
 
@@ -206,6 +206,88 @@ oracle passed without changing the timestamp witness. Neither failure is erased.
   across five valid forms and35 invalid suffix variants, preserving input bytes.
   All12 unchanged independent probes pass locally. Complete-suite validation,
   new publication and exact-SHA CI/review remain required for this new candidate.
+
+## NR-05 — established RFC3339 leap-second conformance
+
+[The independent NO_GO on86a22b6254f55b3d3fd88bd644ac07368cd474e5](https://github.com/fanilosendrison/review-broker/pull/113#issuecomment-6819602223)
+remains unchanged. Its810-test PASS and15 adversarial PASS coexist with two
+positive RFC3339 example errors. The exact independent oracle SHA256 is
+3480059279127aeed8b031d7ca4d94f87a8db0142efbb293690b3bee15b0ea30.
+Replaying it before correction reproduced both errors without changing the file.
+
+### Discovery and bounded correction
+
+- **Statement/source:** `rfc3339-validator==0.1.4` excludes seconds60 syntactically,
+  rejecting the two established1990 leap-second examples in RFC3339 section5.8.
+- **Authority:** RFC3339 sections5.6–5.8 and the existing six `date-time` schema
+  sites; the resumption mandate requires established leap events, not arbitrary
+  acceptance of every syntactically shaped second60.
+- **Disposition:** `no-normative-impact`; verification-or-qualification-evidence,
+  integration-or-conformance and repository-governance-or-documentation.
+- **Relation:** completes NR-03 positive coverage while preserving NR-04's
+  complete-string refusal. Neither finding changes execution authority.
+- **Correction:** the offline `tests/jch_datetime.py` adapter preserves the
+  registered library validator for ordinary timestamps. Its separate full-match
+  seconds60 branch checks Gregorian calendar/minute fields with the standard
+  library, validates the numeric offset, and compares the end of the containing
+  UTC minute against established positive leap transitions. Fractions remain
+  exact digit sequences; no precision truncation or timestamp replacement occurs.
+  No input second is rewritten to59/00, and no normalized timestamp is returned.
+  Negative-zero offset retains the RFC3339 known-UTC/unknown-local-offset meaning.
+- **Qualification:** positive/negative functional checks apply to the actual
+  checker instance, including ordinary offsets/fractions/lowercase syntax and
+  established leap events. Missing, incomplete or permissive checkers fail;
+  missing or changed external data refuses qualification. Registration stays
+  instance-local. Non-string format checks defer type rejection to the schemas.
+- **Required authority/next action:** mechanical repair is authorized by the
+  NR-05 mandate; final normative integration still requires the separate owner
+  decision after new exact-SHA validation and independent complete-packet GO.
+
+### External leap facts, provenance and support boundary
+
+The public-domain [IANA-distributed IERS table](https://data.iana.org/time-zones/tzdb/leap-seconds.list)
+is retained byte-for-byte as `tests/fixtures/iana-leap-seconds.list`, SHA256
+`db5a895f16853b03bfc865e8d68f9fc8710ef1740e3400c701cd46a5bbbc3433`.
+It identifies IERS Bulletin C as the source of decisions. Its update marker is
+NTP3992312697; expiry is NTP4023129600, **2027-06-28T00:00:00Z**.
+The initial1972-01-01 offset is a baseline, NOT an insertion. The27 subsequent
+positive transitions cover every listed insertion through2016-12-31. No negative
+transition is present. Data bytes and their declared horizon are qualification
+inputs, not authenticated observation timestamps.
+
+An asserted second60 outside the pinned interval raises the explicit
+`LEAP_SECOND_OUTSIDE_PINNED_COVERAGE` capability error. It does not establish
+that the timestamp is normatively invalid. Within coverage, a nonexistent event
+or wrong UTC minute is rejected. Ordinary timestamps are not restricted to the
+leap table's interval. This is bounded conformance against the pinned evidence,
+NOT universal knowledge of future leap decisions or pre1972 time adjustments.
+RFC3339 itself says future insertions cannot be predicted and should not be
+emitted before announcement. The syntax checker does not establish chronology,
+clock accuracy, custody or authenticity of an observation.
+
+Updates require a separate explicit data-maintenance change: obtain the official
+IANA/IERS revision, inspect bulletin provenance, compare complete transition
+history and metadata, replace the raw fixture and pinned digest together, then
+rerun historical/offset/coverage tests and independent qualification. There is
+no automatic network refresh, wall-clock-dependent repair or ambient host table.
+A future negative leap requires separately qualified ordinary-second exclusion;
+merely changing the fixture/digest cannot activate that unsupported path because
+checker qualification refuses any negative transition. These are capability
+limits, not a narrower replacement for the normative RFC3339 contract.
+
+### Regression evidence
+
+Seven new maintained tests cover all27 established events, all2879 numeric minute
+offsets from-23:59 through+23:59 with contradictory-minute negatives, actual
+schema types/40-character limits at all six sites, Gregorian invalid dates,
+fractions, lowercase T/Z, forbidden separators/suffixes, local registration and
+missing/permissive/incomplete checkers/data. Space is not selected as a date/time
+separator: the existing JSON Schema RFC3339 grammar uses T/t; no new optional
+application syntax is introduced. The original two-case independent oracle is
+unchanged and passes after correction. Complete-suite, exact publication/CI and
+new independent verdict are separate evidence gates below, not inferred from
+these focused results. Runtime files, historical schemas, frozen qualified
+modules, dependencies and owner decisions remain unchanged.
 
 ## Remaining publication and review gates
 
