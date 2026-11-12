@@ -32,6 +32,16 @@ def qualified_format_checker():
     for invalid in ('2026-02-30T00:00:00Z','2025-02-29T00:00:00Z','2026-13-01T00:00:00Z',
                     '2026-11-09T00:00:00','not-a-timestamp'):
         require(not checker.conforms(invalid,'date-time'),'DATE_TIME_ASSERTION_PERMISSIVE')
+    original,raises=checker.checkers['date-time']
+
+    @checker.checks('date-time',raises=raises)
+    def complete_date_time(value):
+        # The maintained validator's `$` anchor permits a final LF. Reject it,
+        # without trimming input or replacing its calendar/offset implementation.
+        return (not isinstance(value,str) or '\n' not in value) and original(value)
+
+    require(not checker.conforms('2026-11-09T00:00:00Z\n','date-time'),
+            'DATE_TIME_ASSERTION_PERMISSIVE')
     return checker
 
 

@@ -111,6 +111,21 @@ class NormativeSchemaTests(unittest.TestCase):
             with self.subTest(timestamp=timestamp),self.assertRaises(ValidationError):
                 check('jch-quiescence-v1.schema.json',bad)
 
+    def test_date_time_requires_complete_string_without_normalization(self):
+        _,_,record,_,_=workload();receipt=quiescence(record)
+        positives=('2024-02-29T00:00:00Z','2026-11-09T23:59:59+05:30',
+                   '2026-11-09T00:00:00-07:00','2026-11-09t00:00:00z',
+                   '2026-11-09T00:00:00.123Z')
+        for timestamp in positives:
+            receipt['observed_at']=timestamp
+            with self.subTest(valid=timestamp):check('jch-quiescence-v1.schema.json',receipt)
+            for suffix in ('\n','\r\n','\r',' ','\t','\x00','junk'):
+                receipt['observed_at']=timestamp+suffix
+                wire=json.dumps(receipt);decoded=json.loads(wire)
+                with self.subTest(timestamp=decoded['observed_at']),self.assertRaises(ValidationError):
+                    check('jch-quiescence-v1.schema.json',decoded)
+                self.assertEqual(json.dumps(decoded),wire)
+
     def test_missing_or_permissive_format_checker_fails_closed(self):
         class Missing:
             checkers={}
