@@ -24,7 +24,6 @@ PUBLICATION_ID = re.compile(r"publication:sha256:[0-9a-f]{64}\Z")
 class PublicationError(RuntimeError):
     pass
 
-
 def result_is_current(result: dict[str, Any], current_head: str | None) -> bool:
     try:
         reviewed = result["resolved_request"]["subject"]["head_commit"]
@@ -250,8 +249,15 @@ def validate_publication_receipt(
     ).hexdigest()
 
 
-Runner = Callable[..., subprocess.CompletedProcess[str]]
+def attributable_result_comment(comment: Mapping[str, Any], body: str,
+                                publisher: Mapping[str, Any]) -> bool:
+    """Match canonical content and bound actor, never a public marker alone."""
+    actor = comment.get("user")
+    return (comment.get("body") == body and isinstance(actor, dict)
+            and {"login": actor.get("login"), "id": actor.get("id")} == publisher)
 
+
+Runner = Callable[..., subprocess.CompletedProcess[str]]
 
 class GitHubPublisher:
     def __init__(self, repository: str, runner: Runner = subprocess.run):
@@ -275,14 +281,8 @@ class GitHubPublisher:
         )
         matches: list[dict[str, Any]] = []
         for comment in self.comments(intent["issue_number"]):
-            if comment.get("body") != body:
-                continue
-            actor = comment.get("user")
-            if not isinstance(actor, dict) or {
-                "login": actor.get("login"), "id": actor.get("id")
-            } != intent["publisher"]:
-                continue
-            matches.append(comment)
+            if attributable_result_comment(comment, body, intent["publisher"]):
+                matches.append(comment)
         if len(matches) > 1:
             raise PublicationError("DUPLICATE_PUBLICATION_INCIDENT")
         if not matches:
