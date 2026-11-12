@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "J-CH Normative Adoption Preparation Validation"
-version: "0.1.3"
+version: "0.1.4"
 adoption_status: "proposed"
 ---
 
@@ -227,7 +227,8 @@ Replaying it before correction reproduced both errors without changing the file.
 - **Relation:** completes NR-03 positive coverage while preserving NR-04's
   complete-string refusal. Neither finding changes execution authority.
 - **Correction:** the offline `tests/jch_datetime.py` adapter preserves the
-  registered library validator for ordinary timestamps. Its separate full-match
+  registered library validator for ordinary timestamps, with the explicit
+  year0000 correction below. Its separate full-match
   seconds60 branch checks Gregorian calendar/minute fields with the standard
   library, validates the numeric offset, and compares the end of the containing
   UTC minute against established positive leap transitions. Fractions remain
@@ -277,7 +278,7 @@ limits, not a narrower replacement for the normative RFC3339 contract.
 
 ### Regression evidence
 
-Seven new maintained tests cover all27 established events, all2879 numeric minute
+Nine new maintained tests cover all27 established events, all2879 numeric minute
 offsets from-23:59 through+23:59 with contradictory-minute negatives, actual
 schema types/40-character limits at all six sites, Gregorian invalid dates,
 fractions, lowercase T/Z, forbidden separators/suffixes, local registration and
@@ -288,6 +289,40 @@ unchanged and passes after correction. Complete-suite, exact publication/CI and
 new independent verdict are separate evidence gates below, not inferred from
 these focused results. Runtime files, historical schemas, frozen qualified
 modules, dependencies and owner decisions remain unchanged.
+
+### Preserved first NR-05 remediation review and boundary corrections
+
+[The complete independent NO_GO on1bbfdfc6390c644de37b6b11cb67bea57b526a31](https://github.com/fanilosendrison/review-broker/pull/113#issuecomment-6820734402)
+remains unchanged. Its817-test PASS and successful unchanged NR-05 oracle did not
+erase fresh errors: two year0000 positives failed at all six schema sites, and
+complete-resource boundary probes exposed five error subcases. Both unchanged
+probe programs and original outputs are preserved separately from later outcomes.
+
+- **R1 statement/source/authority:** the ordinary dependency explicitly rejects
+  year0000, despite RFC3339 section1's0000AD–9999AD scope and four-digit grammar.
+  The correction reuses the dependency's full-match lexical grammar for that
+  previously excluded year and standard-library proleptic Gregorian month lengths.
+  It does not reinterpret a timestamp as another year, trim bytes, change schemas,
+  or substitute a new ordinary-date grammar. Actual positive/negative checker
+  qualification now includes year0000 and its leap-day/calendar boundaries.
+- **R2 statement/source/authority:** Python datetime arithmetic overflow at the
+  year boundaries became `False`, contradicting the documented distinction
+  between invalid calendars and unavailable leap-event coverage. Calendar and
+  offset fields are now validated first, then UTC-minute boundaries are computed
+  with integer Gregorian ordinals. No floating-point or datetime boundary
+  conversion truncates/normalizes the asserted event. Valid year0000 leap
+  assertions are necessarily outside the table and report that capability error;
+  malformed calendars still reject as invalid.
+- **Disposition/layers:** each record is `no-normative-impact`, affecting
+  verification-or-qualification-evidence, integration-or-conformance and
+  repository-governance-or-documentation. R1 is an inherited dependency limitation;
+  R2 was introduced by the first bounded adapter. Neither concerns live authority.
+- **Required authority/next action:** the NR-05 remediation mandate authorizes
+  both mechanical fixes. The two new maintained tests were RED before correction
+  and GREEN afterward. The unchanged four-method boundary probe and12-method
+  adversarial probe now pass, including155466 leap/offset assertions. A new
+  publication, full exact-SHA qualification and complete independent verdict
+  remain required; no previous GO or PASS is transferred.
 
 ## Remaining publication and review gates
 
