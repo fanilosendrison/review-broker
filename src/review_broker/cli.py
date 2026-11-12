@@ -23,6 +23,7 @@ from .execution_recovery import (
 )
 from .github_journal import GitHubRefJournal
 from .identity import canonical_bytes
+from .live_pre_model_cli import add_v3_commands, run_v3_command
 from .orchestration import prepare_issue, publish_validated_result
 from .publication_recovery_cli import add_publication_recovery_command, run_publication_recovery
 from .reconciliation import reconcile_repository
@@ -60,6 +61,7 @@ def _parser() -> argparse.ArgumentParser:
         default=os.environ.get("REVIEW_BROKER_REPOSITORY", DEFAULT_BROKER_REPOSITORY),
     )
     subcommands = parser.add_subparsers(dest="command", required=True)
+    add_v3_commands(subcommands)
 
     pilot = subcommands.add_parser("pilot-synthetic")
     pilot.add_argument("--run-dir", required=True, type=Path)
@@ -176,6 +178,8 @@ def main(argv: list[str] | None = None) -> int:
         else os.environ.pop("REVIEW_BROKER_SOURCE_TOKEN", None)
     )
     try:
+        if args.command.startswith("internal-v3-"):
+            return run_v3_command(args, source_token)
         if args.command == "pilot-synthetic":
             result = run_synthetic_pilot(
                 args.run_dir,
