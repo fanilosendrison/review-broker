@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "J-CH Normative Adoption Preparation Validation"
-version: "0.1.1"
+version: "0.1.2"
 adoption_status: "proposed"
 ---
 
@@ -163,6 +163,49 @@ date-time now refuses. Prose transfer, not schema tightening, resolves the first
 two mismatches. These are new outcomes, not retroactive changes to the initial
 review. No equivalent new memory entry is needed: the shared registry already
 documents optional-format fail-open behavior and positive/negative qualification.
+
+## Resumption review and NR-04 complete-string correction
+
+Canonical publication of the preserved eight-file correction produced
+08c67a2f9a5d1f57743a04e99d211a4a97c5575c, tree
+acc4ff7469829d562dcc8d5d703f424a81f1f05f. Publisher run
+01M77D697CFG0GCCHS1B9WZ4CH used qualified installed release0.11.1.
+The complete suite passed809 tests locally and in CI43181486933; official runner
+logs establish checkout of that literal SHA, not a synthetic merge.
+
+[The fresh complete-packet independent NO_GO](https://github.com/fanilosendrison/review-broker/pull/113#issuecomment-6818861832)
+remains historical on that SHA. Its809-test PASS coexists with12 independent
+probes containing one failure and an unchanged targeted failure. A separate
+symlink-dereferencing preservation oracle failed; a separately named symlink-aware
+oracle passed without changing the timestamp witness. Neither failure is erased.
+
+### NR-04-VERIFICATION — trailing LF accepted by the format dependency
+
+- **Statement/source/evidence:** schema validation accepted
+  `2026-11-09T00:00:00Z\n`; JSON round-trip preserves that embedded LF. The pinned
+  dependency uses Python regex `$`, which permits matching before a final LF.
+  The independent probe source SHA256 is
+  6287ff72c85eb9d9408b3c23898d85073acf7fa5af3404fd03c9be20bba01564.
+- **Existing authority:** the schema's RFC3339 `date-time` assertion and the
+  mandated effective-format qualification already require complete-string
+  rejection. No chronology or execution-authority rule is added.
+- **Semantic disposition:** `no-normative-impact`.
+- **Affected layers:** verification-or-qualification-evidence,
+  integration-or-conformance and repository-governance-or-documentation.
+- **Related consequence:** NR-03's earlier calendar/availability correction is
+  preserved but its lexical qualification was incomplete.
+- **Required authority:** the resumption mandate authorizes in-scope NO_GO
+  remediation; final normative integration remains a separate owner decision.
+- **Correction/impacts:** only the offline checker instance rejects LF before
+  delegating unchanged input to the registered maintained validator. No trimming,
+  independent calendar parser, global registration mutation, runtime change or
+  frozen-qualified-file amendment is introduced. Missing/permissive-checker
+  qualification remains active, with a final LF-refusal self-check.
+- **Verification/next action:** the new real-schema regression was RED on five
+  valid timestamp forms with appended LF. The identical regression is now GREEN
+  across five valid forms and35 invalid suffix variants, preserving input bytes.
+  All12 unchanged independent probes pass locally. Complete-suite validation,
+  new publication and exact-SHA CI/review remain required for this new candidate.
 
 ## Remaining publication and review gates
 
