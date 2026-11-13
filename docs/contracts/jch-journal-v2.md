@@ -6,12 +6,12 @@ domain: "independent-review"
 severity: "strict"
 name: "J-CH Journal v2"
 version: "0.1.0"
-adoption_status: "proposed"
+adoption_status: "accepted"
 ---
 
 # J-CH Journal v2
 
-**Proposed normative contract; separate owner acceptance/integration required.**
+**Owner-accepted normative contract; effective only upon integration into dev.**
 This contract governs future claims explicitly selected as journal2/j-ch-v1.
 It does not change legacy journal1, admit a request, implement a writer, qualify
 J20, or activate execution. [Adoption boundary](../adoption/jch-normative-adoption.md).

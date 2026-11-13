@@ -6,18 +6,18 @@ domain: "independent-review"
 severity: "strict"
 name: "OIDC-bound Arm Authority v1"
 version: "0.2.0"
-adoption_status: "proposed-coexistence-amendment"
+adoption_status: "accepted"
 ---
 
 # OIDC-bound Arm Authority v1
 
-## Protocol coexistence — proposed amendment
+## Protocol coexistence
 
 All legacy-v1 requirements below remain unchanged, including its exact envelope,
 audience, protected trust/local consumed store and original two-write journal
 ordering. Historical records and tokens do not acquire J-CH eligibility.
 
-The separately proposed [J-CH workload contract](jch-workload-authority.md) and
+The separately accepted [J-CH workload contract](jch-workload-authority.md) and
 [execution contract](jch-execution-authority.md) define a distinct j-ch-v1
 protocol, not an extension accepted by the v1 parser. Its one AtomicArm and
 original live challenge/continuation replace local durable history ONLY for
@@ -26,7 +26,8 @@ J20 and operational qualification. No legacy guard is removed here.
 
 A storage-purpose workload proof authenticates retention facts only, never ARM
 or invocation. Its audience/statement/receipt are disjoint. No JWT is retained
-as evidence. This Draft authorizes no bootstrap, mint or activation.
+as evidence. This amendment takes normative effect upon integration into dev and authorizes
+no bootstrap, mint or activation.
 
 ## Accepted decision and scope
 

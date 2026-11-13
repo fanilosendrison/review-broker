@@ -7,7 +7,7 @@ domain: independent-review
 severity: strict
 name: J-CH durable consumption authority
 id: ADR-002
-status: proposed
+status: accepted
 date: '2026-11-09'
 decision_body_sha256: 9a096763465325de69bb5ed8e781b43cae336ccb5885f530ff93574f7ad02920
 relation_completeness: complete

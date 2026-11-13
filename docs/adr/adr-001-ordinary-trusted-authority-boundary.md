@@ -7,7 +7,7 @@ domain: independent-review
 severity: strict
 name: Ordinary trusted authority boundary
 id: ADR-001
-status: proposed
+status: accepted
 date: '2026-11-09'
 decision_body_sha256: f7ebfe521c2fe4d2b2623939402de3818da989f2b49b39e55291e5c967007869
 relation_completeness: complete

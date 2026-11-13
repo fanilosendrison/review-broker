@@ -7,7 +7,7 @@ domain: independent-review
 severity: strict
 name: V2 quiescence before terminal recovery
 id: ADR-004
-status: proposed
+status: accepted
 date: '2026-11-09'
 decision_body_sha256: ad6213f461029bf14ecbf220490a797dc3f20fabbdfc734a30d84a5690289374
 relation_completeness: complete

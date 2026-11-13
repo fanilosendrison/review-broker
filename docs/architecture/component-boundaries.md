@@ -6,14 +6,15 @@ domain: "independent-review"
 severity: "strict"
 name: "Review Broker Component Boundaries"
 version: "0.2.0"
-adoption_status: "proposed-jch-amendment"
+adoption_status: "accepted"
 ---
 
 # Review Broker Component Boundaries
 
-## Proposed J-CH responsibility supplement
+## J-CH responsibility supplement
 
-This scoped proposal does not change current executable boundaries. Future
+This supplement takes normative effect upon integration into dev and does not
+change current executable boundaries. Future
 journal2 uses separate contract owners for [history/AtomicArm](../contracts/jch-journal-v2.md),
 [original execution](../contracts/jch-execution-authority.md),
 [workload/stream identity](../contracts/jch-workload-authority.md),

@@ -1,20 +1,45 @@
 ---
 okf_version: "1.0"
 kind: "KnowledgeAsset"
-asset_type: "adoption-proposal"
+asset_type: "adoption-record"
 domain: "independent-review"
 severity: "draft"
 name: "J-CH Governed Normative Adoption Packet"
 version: "0.1.2"
-adoption_status: "proposed"
+adoption_status: "accepted"
 ---
 
 # J-CH — Governed normative adoption packet
 
-**PROPOSED AMENDMENTS ONLY. No final adoption, merge, construction or activation.**
-This packet prepares the exact versioned authority changes selected by the owner.
-A separate explicit owner integration mandate is required. Nothing in a Draft,
-a schema validation result, ADR severity or independent GO activates execution.
+**Owner-accepted normative integration proposal; effective only after merge into dev.**
+The RB91 owner mandate accepts the five ADR decisions, their repository profile,
+the five J-CH contracts, eight versioned public schema resources and scoped
+amendments on the qualified source
+`f5838b6acb7d061ff6a0514b4d955d7c71d9cea1` (tree
+`71d1e3dbe5bc7028b80a659340399a9464ca9697`). This includes NR-01 through NR-05,
+Issue130 and Issue132 within their declared limits. B/E remain nonpreferred
+reconsideration options if required J-CH qualifications fail.
+
+Accepted lifecycle metadata on the PR branch is an integration proposal, not
+effective authority before merge into `dev`. The changed exact SHA requires its
+own CI and independent adoption GO. Merge additionally requires a verified dev
+ruleset or a distinct owner decision explicitly accepting integration without
+native protection; no such exception is inferred from an unprotected branch.
+No construction, J20 qualification, claim2, proof mint or activation is authorized.
+
+The five ADR transitions change only `status: proposed` to `status: accepted`.
+Their decision bodies, dates, identities, relationships, governing scopes and
+hashes are preserved. No acceptance-date field or precedence rule is introduced.
+The profile lifecycle and pinned schemas remain unchanged; its status and
+activation condition record this governed transition. Contract/schema changes
+are applicability prose and annotations only, not field-domain or protocol edits.
+The generated index and maintained governance assertions follow that transition.
+
+The sections below retain preparation provenance and its historical source
+qualification boundaries. Mentions of prior proposals, mandates still pending
+at those earlier stages, and historical verdicts do not override this current
+adoption boundary. Historical reports, frozen resources and manifests remain
+unchanged.
 
 ## Provenance and fixed decisions
 
@@ -33,9 +58,9 @@ PR94 and PR112 remain unchanged and preserved. Historical NoGo/Go/RED records
 retain their original exact-source scope. The F1 investigation is complete;
 this packet reuses its qualified artifacts rather than restarting it.
 
-## Proposed authority owners
+## Accepted authority owners
 
-- [ADR profile and proposed records](../adr/README.md): distinct decision scopes,
+- [ADR profile and accepted records](../adr/README.md): distinct decision scopes,
   provenance, lifecycle and immutable accepted-record policy.
 - [Journal v2](../contracts/jch-journal-v2.md): closed record/identity/history and
   AtomicArm consumption semantics.
@@ -47,14 +72,16 @@ this packet reuses its qualified artifacts rather than restarting it.
   independently authenticated storage, faithful exact result and one publication.
 - [S2 recovery](../contracts/jch-recovery-s2.md): custody/quiescence priority and
   evidence-only recovery with no post-consumption grant.
-- Versioned resources in `schemas/`: proposed machine contracts, never runtime
+- Versioned resources in `schemas/`: accepted machine contracts effective upon
+  integration into dev, never runtime
   admission switches. Current v1 public schemas and production source stay exact.
 
 Specification, existing execution/evidence/result/recovery/security/component
 owners receive scoped amendments pointing to these protocol-specific contracts.
 Legacy v1 remains under its own authority. Severity is not precedence; the
 repository's existing specification→public schemas→accepted documents→code order
-is retained. Proposed records do not become accepted merely by appearing here.
+is retained. The owner mandate, not file presence or severity, authorizes the
+accepted lifecycle transitions; normative effect awaits merge into dev.
 
 ## ED04 — governed status reconciliation
 
@@ -84,8 +111,8 @@ Disposition records:
   `no-normative-impact`, repository documentation/conformance. The accepted
   request contract owns semantics; operational status stays separate.
 
-The amendment is still proposed until the separate formal integration decision.
-No historical observation or accepted ADR body is rewritten.
+The owner mandate accepts this status correction, effective upon merge into dev.
+No historical observation or ADR decision body is rewritten.
 
 ## Issue130 — explicitly authorized challenge-domain exception
 
@@ -145,6 +172,10 @@ identity remain historical, not rewritten. No merge of PR113 into dev follows.
 
 ## Validation and adoption boundary
 
+The following preparation requirements remain qualification and preservation
+obligations under the owner adoption mandate; they do not claim the new SHA has
+already passed or that any integration or operational gate has completed.
+
 Qualified candidate schemas and all qualified verification modules are retained
 byte-identically as construction references. Proposed normative journal/result
 resources must have exactly equivalent constraints after an explicit fixed
@@ -153,10 +184,10 @@ specified below; no F1 semantic rule is loosened. New workload/
 message resources express the already selected bindings, with independent
 positive/negative conformance tests. Tests are offline and not runtime adapters.
 
-A new exact-packet independent review and CI are required. The old source GO is
-provenance only, not a GO for these amendments. Final owner integration must
-explicitly accept the proposed ADR/profile/contract versions and reconcile any
-required lifecycle metadata; publication alone performs none of that.
+A new exact-packet independent adoption review and CI are required. The source
+GO on f5838b6 is provenance only, not a GO for these changed bytes. The owner
+mandate authorizes the ADR/profile/contract lifecycle transitions; branch
+publication alone does not make them effective before integration into dev.
 
 After formal adoption, separate mandates are still required for construction,
 actual workflow/job/issuer/credential capabilities, launcher isolation and bypass

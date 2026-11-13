@@ -6,12 +6,12 @@ domain: "independent-review"
 severity: "strict"
 name: "J-CH Result Retention and Publication"
 version: "0.1.1"
-adoption_status: "proposed"
+adoption_status: "accepted"
 ---
 
 # J-CH Result Retention and Publication
 
-**Proposed normative contract. Separate owner acceptance/integration is required.**
+**Owner-accepted normative contract; effective only upon integration into dev.**
 The requirements below preserve the qualified F1 semantics at
 b7316e5e8cadc718872ea56dfecfb61709c636ce. They govern future journal2/j-ch-v1,
 not historical v1 records. No implementation, workflow permission, live proof,
@@ -273,6 +273,6 @@ Raw JWTs never enter evidence. No prior consumed attempt or publication intent
 is reset. The scope/status of the qualified model is construction evidence only.
 
 Legacy v1 result/publication bytes, exact historical receipt lookup and no-retry
-semantics remain under the accepted v1 contracts. This proposed contract does
+semantics remain under the accepted v1 contracts. This contract does
 not migrate or invalidate those histories, or grant a model permission from a
 storage receipt. [Adoption boundary](../adoption/jch-normative-adoption.md).

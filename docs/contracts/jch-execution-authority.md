@@ -6,14 +6,14 @@ domain: "independent-review"
 severity: "strict"
 name: "J-CH Execution Authority"
 version: "0.1.0"
-adoption_status: "proposed"
+adoption_status: "accepted"
 ---
 
 # J-CH Execution Authority
 
-**Proposed normative contract. No operational implementation or admission.**
-This is a separate protocol from accepted OIDC ARM v1/local consumption. It
-becomes authority only through the separate owner normative-integration mandate.
+**Owner-accepted normative contract; effective only upon integration into dev.**
+This is a separate protocol from accepted OIDC ARM v1/local consumption.
+Acceptance does not establish operational implementation or admission.
 Its runtime still requires construction, qualification, J20 and exact admission.
 
 ## Goal and trusted actors

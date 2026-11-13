@@ -6,12 +6,12 @@ domain: "independent-review"
 severity: "strict"
 name: "Review Broker Recovery Runbook"
 version: "0.3.0"
-adoption_status: "proposed-jch-amendment"
+adoption_status: "accepted"
 ---
 
 # Review Broker Recovery Runbook
 
-## Dispatch and J-CH supplement — proposed amendment
+## Dispatch and J-CH supplement
 
 Select request, journal and workload protocol versions independently BEFORE any
 recovery effect. The existing rules below retain legacy journal1 behavior,
@@ -31,7 +31,8 @@ preserving original execution/terminal/validation and content. Actual metadata,
 archives and authority must be verified; no declarative recovery mode suffices.
 Reserved publication is immutable and observation-only to a later noncreator;
 no fresh receipt/location reconstructs POST permission. STOPPED still requires
-actual observed Shutdown. No adoption, J20 or operational activation occurs here.
+actual observed Shutdown. Normative effect begins upon integration into dev;
+no J20 qualification or operational activation occurs here.
 
 ## Evidence first
 

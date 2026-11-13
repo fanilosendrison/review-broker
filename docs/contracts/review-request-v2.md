@@ -6,7 +6,7 @@ domain: "independent-review"
 severity: "strict"
 name: "ReviewRequest v2 Contract"
 version: "0.1.2"
-adoption_status: "proposed-status-correction"
+adoption_status: "accepted"
 ---
 
 # ReviewRequest v2 Contract
@@ -19,11 +19,12 @@ execution, recovery, publication, and retrieval integration described here.
 Operational v2 admission remains explicitly default-disabled and requires
 separate authorization. ReviewRequest v1 remains supported unchanged.
 
-The proposed [ED04 status reconciliation](../adoption/jch-normative-adoption.md#ed04--governed-status-reconciliation)
+The [ED04 status reconciliation](../adoption/jch-normative-adoption.md#ed04--governed-status-reconciliation)
 corrects stale implementation-status prose in the primary specification and
 execution contract without changing these request semantics or wire bytes.
-Request2 is independent of proposed journal2/J-CH; neither implementation status
-nor document publication activates that new authority.
+Request2 is independent of journal2/J-CH, whose normative effect begins upon
+integration into dev; neither implementation status nor document publication
+activates its execution.
 
 ## Stable Review Intent
 

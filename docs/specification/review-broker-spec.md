@@ -6,7 +6,7 @@ domain: "independent-review"
 severity: "strict"
 name: "Review Broker v1 Specification"
 version: "0.8.0"
-adoption_status: "proposed-amendment"
+adoption_status: "accepted"
 ---
 
 # Review Broker v1 Specification
@@ -68,7 +68,7 @@ construction were integrated in version0.4.17 (PR41, merge50b89e4ed46963e11846e0
 This implementation-status statement grants no operational qualification or
 activation. Request2 operational admission remains default-disabled and requires
 separate exact authorization. Historical v1 requests are never reinterpreted as
-v2. The proposed journal2/J-CH authority is a separate version domain and has no
+v2. The separate journal2/J-CH authority is a separate version domain and has no
 operational implementation or admission conferred by this publication.
 
 The implemented subject kind is an explicitly authorized GitHub pull request.
@@ -234,10 +234,10 @@ separate qualification and owner approval. This subsection accepts only the
 source-credential boundary for the separately qualified successor path; it does
 not normatively accept ReviewRequest v3 or Reviewer Packet v2 as a whole.
 
-## Proposed J-CH authority profile
+## J-CH authority profile
 
-This scoped amendment is part of a Draft adoption packet, not final normative
-integration or runtime activation. The owner-selected conditional ordinary
+This owner-accepted scoped amendment takes normative effect only upon integration
+into dev, not upon branch publication or runtime activation. The owner-selected ordinary
 profile uses GitHub as durable consumption authority, one challenge-bound
 AtomicArm, the original protected launcher continuation and disjoint workload
 proof. B/E remain nonpreferred alternatives if an in-scope guarantee cannot be
@@ -245,7 +245,7 @@ qualified. Ordinary errors, leaks, fork/reentry/relaunch/bypass and ineffective
 Shutdown remain defects; arbitrary fully privileged history/memory compromise
 is outside that profile, not allegedly solved by hashes or an extra CAS.
 
-The proposed contracts separately own [journal2](../contracts/jch-journal-v2.md),
+The accepted contracts separately own [journal2](../contracts/jch-journal-v2.md),
 [execution](../contracts/jch-execution-authority.md),
 [workload identity](../contracts/jch-workload-authority.md),
 [F1 retention/publication](../contracts/jch-result-retention.md) and
@@ -255,10 +255,11 @@ Consumption/validation/result/storage/publication are distinct authorities.
 Later authorized recovery storage never changes original execution or faithful
 result identity, grants another model call or reconstitutes a POST capability.
 
-[The proposed ADR/profile/adoption packet](../adoption/jch-normative-adoption.md)
-records the versioned authority transition. Its publication and independent GO
-are evidence for the separate owner integration decision, not acceptance or
-permission to construct, bootstrap, dispatch, mint, cut over or invoke. All
+[The ADR/profile/adoption packet](../adoption/jch-normative-adoption.md)
+records the owner-authorized versioned authority transition. Accepted metadata
+on the PR branch remains an integration proposal until merge into dev. Neither
+adoption nor independent GO grants permission to construct, bootstrap, dispatch,
+mint, cut over or invoke. All
 historical consumed attempts and legacy v1 contracts remain applicable unchanged.
 
 ## Required separations

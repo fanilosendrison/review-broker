@@ -6,12 +6,12 @@ domain: "independent-review"
 severity: "strict"
 name: "ReviewResult v1 Contract"
 version: "0.2.0"
-adoption_status: "proposed-jch-amendment"
+adoption_status: "accepted"
 ---
 
 # ReviewResult v1 Contract
 
-## Journal2 retention supplement — proposed amendment
+## Journal2 retention supplement
 
 The public ReviewResult v1 schema, identity and legacy publication rules below
 remain unchanged. Future journal2/j-ch-v1 uses the separately closed
@@ -30,8 +30,8 @@ One immutable intent reservation has one live acknowledged creator continuation.
 Explicit Issue/API/HTML attribution must match the reserved repository/Issue and
 actual comment. Historical retrieval matches the precise receipt comment/node/
 URL/actor/body/time, never a replacement. Missing/ambiguous/contradictory proof
-cannot manufacture REPORTED, a second POST or renewed execution. Formal adoption
-and operational qualification remain separate.
+cannot manufacture REPORTED, a second POST or renewed execution. Normative effect begins upon integration into dev;
+operational qualification remains separate.
 
 ReviewResult v1 is defined by `schemas/review-result-v1.schema.json`. It binds the
 logical request, exact subject, policy, packet, attempt, requested reviewer,

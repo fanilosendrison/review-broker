@@ -7,7 +7,7 @@ domain: independent-review
 severity: strict
 name: Claim-time protocol isolation and cutover
 id: ADR-003
-status: proposed
+status: accepted
 date: '2026-11-09'
 decision_body_sha256: 2edf07dddd80fa5098b21df5927b1abe681762a7f45ad92f139670d81eb0ca1b
 relation_completeness: complete

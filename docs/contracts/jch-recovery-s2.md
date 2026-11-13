@@ -6,12 +6,13 @@ domain: "independent-review"
 severity: "strict"
 name: "J-CH S2 Recovery"
 version: "0.1.0"
-adoption_status: "proposed"
+adoption_status: "accepted"
 ---
 
 # J-CH S2 Recovery
 
-**Proposed normative contract for journal2 only; no lifecycle operation authorized.**
+**Owner-accepted journal2 contract; effective only upon integration into dev.**
+No lifecycle operation is authorized.
 Legacy recovery retains its accepted mark-indeterminate-then-stop order. Version
 and protocol dispatch precede recovery action. An unsupported record refuses;
 it is never absent, migrated or offered a new grant.

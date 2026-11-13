@@ -1,6 +1,6 @@
 profile_version: "0.1.0"
-status: proposed
-activation: separate-owner-normative-integration-mandate
+status: accepted
+activation: owner-authorized-merge-into-dev
 shared_profile:
   version: "0.1.0"
   repository: "https://github.com/fanilosendrison/dotagents"

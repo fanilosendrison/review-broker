@@ -6,12 +6,12 @@ domain: "independent-review"
 severity: "strict"
 name: "Review Broker Threat Model"
 version: "0.4.0"
-adoption_status: "proposed-jch-amendment"
+adoption_status: "accepted"
 ---
 
 # Review Broker Threat Model
 
-## Proposed ordinary J-CH assurance supplement
+## Ordinary J-CH assurance supplement
 
 The owner-selected ordinary J-CH profile trusts GitHub/issuer, approved qualified
 writers/workflows and protected host within their responsibilities. Arbitrary
@@ -33,7 +33,7 @@ reaches reviewer, packet, argv/environment, result or retained evidence. Only
 verified non-secret authorization receipts enter immutable journal custody.
 Actual source/job/policy/bootstrap/credential and all-mutator isolation must be
 qualified separately. Decision27's bounded risk policy is retained; no blanket
-maximal Codex-internals prerequisite is reopened. This Draft grants no runtime
+maximal Codex-internals prerequisite is reopened. This supplement takes normative effect upon integration into dev, grants no runtime
 admission and does not rewrite historical exposures or qualifications below.
 
 ## Protected assets

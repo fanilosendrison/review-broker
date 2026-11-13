@@ -6,12 +6,13 @@ domain: "independent-review"
 severity: "strict"
 name: "J-CH Workload and Stream Authority"
 version: "0.1.1"
-adoption_status: "proposed"
+adoption_status: "accepted"
 ---
 
 # J-CH Workload and Stream Authority
 
-**Proposed normative contract. No proof mint, bootstrap or invocation authorized.**
+**Owner-accepted normative contract; effective only upon integration into dev.**
+No proof mint, bootstrap or invocation is authorized.
 This defines the disjoint future j-ch-v1 domain. Accepted legacy ARM v1 envelope,
 audience, protected local-consumption configuration and historical bytes remain
 unchanged and cannot be upgraded by interpreting a new field or boolean.
@@ -152,7 +153,8 @@ not terminal evidence; accepted capture/validation and S2 gates remain separate.
 
 ## Qualification boundary
 
-The new resources are proposed public contracts, not runtime loaders. Known
+The new resources are accepted public contracts effective upon integration into
+dev, not runtime loaders. Known
 closed fields/types/canonicalization and cross-bindings must be independently
 tested offline. Actual GitHub issuer/job/SSH/FD/bootstrap/credential capabilities,
 source pins, original-session ownership, reentry/bypass/fork and failure cuts

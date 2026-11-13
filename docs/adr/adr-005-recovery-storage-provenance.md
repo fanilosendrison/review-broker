@@ -7,7 +7,7 @@ domain: independent-review
 severity: strict
 name: Separate execution and result-storage provenance
 id: ADR-005
-status: proposed
+status: accepted
 date: '2026-11-09'
 decision_body_sha256: 8a6d3a0910f79c3786e47f60ab6601017f1dcfb2c8ac28731bd14ed224786293
 relation_completeness: complete

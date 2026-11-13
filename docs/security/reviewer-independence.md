@@ -6,12 +6,12 @@ domain: "independent-review"
 severity: "strict"
 name: "Reviewer Independence Contract"
 version: "0.4.0"
-adoption_status: "proposed-jch-amendment"
+adoption_status: "accepted"
 ---
 
 # Reviewer Independence Contract
 
-## Proposed J-CH custody supplement
+## J-CH custody supplement
 
 Future journal2/j-ch-v1 retains every legacy reviewer-independence and credential
 boundary below. The original protected launcher/control descriptors, challenge,
@@ -26,8 +26,9 @@ execution/evidence or faithful public result. No raw JWT enters packet/evidence/
 result/argv/environment/logs. Actual FD/proc/child/source-job credential custody
 must be independently qualified; flags or a schema are not effective isolation.
 
-The [adoption proposal](../adoption/jch-normative-adoption.md) preserves the
-proportionate assurance policy and historical findings. Formal integration,
+The [adoption packet](../adoption/jch-normative-adoption.md) preserves the
+proportionate assurance policy and historical findings. Normative effect begins
+upon integration into dev. Integration,
 construction, J20 and exact operational admission remain separate; no execution
 or comprehensive security qualification follows from publication or design GO.
 
