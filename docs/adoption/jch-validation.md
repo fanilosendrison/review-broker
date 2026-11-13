@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "J-CH Normative Adoption Preparation Validation"
-version: "0.1.6"
+version: "0.1.7"
 adoption_status: "proposed"
 ---
 
@@ -419,6 +419,13 @@ wildcard to the ECMAScript non-multiline class excluding LF, CR, LS and PS. The
 comment URL's unescaped dot is NOT silently changed into a literal dot. Native
 engine differential tests exposed that distinction before correction.
 
+Matching uses a private UTF16-code-unit view, as required by no-flags ECMAScript.
+This is an evaluation representation only: received strings, Unicode character
+counts for minLength/maxLength, canonical identities and all returned values
+remain unchanged. In particular one wildcard cannot consume a complete astral
+code point (two units), while unbounded negated classes and wildcard repetitions
+retain the wider values actually expressed by the schema.
+
 The catalogue excludes shorthand classes, flags, backreferences, lookbehind,
 Unicode properties and other unqualified constructs. Any new expression fails
 admission and requires explicit catalogue review and new equivalence evidence.
@@ -453,6 +460,43 @@ The [base reconciliation](jch-base-reconciliation.md) and explicit
 the ascending merge of PR131's v3 PREPARED context. No old824-test result is reused
 as qualification of that integrated candidate. Historical reports, external-data
 RFC3339 capability limits and every operational gate remain unchanged.
+
+### IR132-01 — preserved independent wildcard NO_GO and correction
+
+Canonical ascending publication6219e1afe9ac6083b32a3b4ef23decd10ad70df5,
+with tree0508cebc26b243c2eddbc6285a49af79d70226f9 and ordered parents7a740e5/a47e42c,
+passed literal-checkout Linux CI43300783603:1568 tests, no skips. The new complete
+independent review nevertheless returned
+[NO_GO IR132-01](https://github.com/fanilosendrison/review-broker/pull/113#issuecomment-6837338301).
+Its result is historical on those bytes, not erased by later fixes.
+
+- **Statement/evidence:** the local engine consumed an astral code point at the
+  comment URL's single wildcard, while native ECMAScript requires one UTF16
+  unit. The actual schema and a coherently resealed complete journal accepted
+  the invalid value. The fresh lexical probe had three failures; a separate
+  resealed-receipt probe failed once. Exhaustive independent probing found
+  1048576 supplementary-plane mismatches at that operator position.
+- **Authority/disposition:** already declared no-flags ECMA-262 and the Issue132
+  engine-correction mandate; `no-normative-impact`, verification evidence,
+  integration/conformance and documentation layers. No new schema tightening,
+  product decision or authenticated-publication bypass follows.
+- **Correction:** use a private UTF16-code-unit representation for regex
+  evaluation, preserving the existing catalogue, dot LineTerminator rules,
+  lookaheads and fullmatch. No string is normalized/replaced in a resource,
+  canonicalization or hash. JSON Schema lengths still use the original value.
+- **Verification:** new maintained scalar-at-single-wildcard controls and expanded
+  operator-position mutations were RED before repair and GREEN afterward.
+  All three independent probes remain byte-identical and now pass: four lexical
+  tests, one complete resealed receipt test and5570560 exhaustive Unicode
+  comparisons across five actual operator positions. BMP wildcard substitutions,
+  astral repository/path values and other wider declared domains remain valid.
+- **Provenance:** independent sources SHA256
+  4c3baf10ee36c3d8141f9476dbc3fab861047c58073b10843a57500495de75c7,
+  77db227b81aab20d00f842542532b412b66e15f416663b18e2331f7c458e8a6b,
+  e4f68c7b243292539b7ab6525850ab41b735848c7d0c11d7563237dec7ba6e7c.
+- **Next action:** complete new-source validation, canonical publication,
+  literal-SHA Linux CI and NEW independent whole-packet GO. No old source GO or
+  CI result qualifies this changed adapter.
 
 ## Remaining publication and review gates
 
