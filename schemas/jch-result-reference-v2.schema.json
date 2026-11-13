@@ -1,0 +1,358 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+    },
+    "byte_length": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "media_type": {
+      "type": "string",
+      "const": "application/json"
+    },
+    "contract": {
+      "type": "string",
+      "const": "review-result-v1"
+    },
+    "execution": {
+      "$ref": "#/$defs/execution"
+    },
+    "storage": {
+      "$ref": "#/$defs/storage"
+    },
+    "location": {
+      "$ref": "#/$defs/location"
+    }
+  },
+  "required": [
+    "artifact_id",
+    "byte_length",
+    "media_type",
+    "contract",
+    "execution",
+    "storage",
+    "location"
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fanilosendrison/review-broker/schemas/jch-result-reference-v2.schema.json",
+  "$defs": {
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^request:sha256:[0-9a-f]{64}$"
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^subject:sha256:[0-9a-f]{64}$"
+        },
+        "policy_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^policy:sha256:[0-9a-f]{64}$"
+        },
+        "packet_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^packet:sha256:[0-9a-f]{64}$"
+        },
+        "broker_repository_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "controller_workflow_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "controller_workflow_sha": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "controller_run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "controller_run_attempt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "arm_commit_sha": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "arm_binding_sha256": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "terminal_capture_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+        },
+        "terminal_locator_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+        },
+        "validation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "request_id",
+        "attempt_id",
+        "subject_id",
+        "policy_id",
+        "packet_id",
+        "broker_repository_id",
+        "controller_workflow_ref",
+        "controller_workflow_sha",
+        "controller_run_id",
+        "controller_run_attempt",
+        "arm_commit_sha",
+        "arm_binding_sha256",
+        "terminal_capture_id",
+        "terminal_locator_id",
+        "validation_id"
+      ]
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "original",
+            "recovery"
+          ]
+        },
+        "workflow_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "workflow_sha": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "run_attempt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "job_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "job_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "actor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "login": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "login",
+            "id"
+          ]
+        },
+        "triggering_actor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "login": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "id": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "login",
+            "id"
+          ]
+        },
+        "authorization_receipt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+        },
+        "authorization": {
+          "$ref": "#/$defs/authorization"
+        }
+      },
+      "required": [
+        "mode",
+        "workflow_ref",
+        "workflow_sha",
+        "run_id",
+        "run_attempt",
+        "job_id",
+        "job_name",
+        "actor",
+        "triggering_actor",
+        "authorization_receipt_id",
+        "authorization"
+      ]
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "broker_repository": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "workflow_run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "workflow_run_attempt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "actions_artifact_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "artifact_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9_.-]{1,255}$"
+        },
+        "archive_digest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "path": {
+          "type": "string",
+          "const": "review-result.json"
+        }
+      },
+      "required": [
+        "broker_repository",
+        "workflow_run_id",
+        "workflow_run_attempt",
+        "actions_artifact_id",
+        "artifact_name",
+        "archive_digest",
+        "path"
+      ]
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "type": "integer",
+          "const": 1
+        },
+        "evidence_type": {
+          "type": "string",
+          "const": "result-storage-authorization-v1"
+        },
+        "issuer": {
+          "type": "string",
+          "const": "https://token.actions.githubusercontent.com"
+        },
+        "authority_policy_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+        },
+        "statement_sha256": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "schema_version",
+        "evidence_type",
+        "issuer",
+        "authority_policy_id",
+        "statement_sha256"
+      ]
+    }
+  },
+  "title": "J-CH Result Reference v2"
+}

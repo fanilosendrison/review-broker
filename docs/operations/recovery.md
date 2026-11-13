@@ -5,10 +5,34 @@ asset_type: "operations"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Recovery Runbook"
-version: "0.2.0"
+version: "0.3.0"
+adoption_status: "accepted"
 ---
 
 # Review Broker Recovery Runbook
+
+## Dispatch and J-CH supplement
+
+Select request, journal and workload protocol versions independently BEFORE any
+recovery effect. The existing rules below retain legacy journal1 behavior,
+including mark-indeterminate-then-stop, protected local consumption and historical
+non-replay. Request2 construction does not select journal2 or new ARM authority.
+Unsupported versions/unknown observations refuse without migration or mutation.
+
+For future journal2/j-ch-v1, [S2 recovery](../contracts/jch-recovery-s2.md) requires
+actual quiescence and held lifecycle custody BEFORE an incompatible post-ARM
+terminal/indeterminate expected-old CAS. Cancellation transit, controller/SSH loss,
+timeout or recent head read is not a fence. Unknown quiescence leaves consumption
+spent and an unresolved incident, never another launcher/proof/model invocation.
+
+[Authorized downstream storage](../contracts/jch-result-retention.md) may retain
+faithful validated result bytes under its own authenticated job identity while
+preserving original execution/terminal/validation and content. Actual metadata,
+archives and authority must be verified; no declarative recovery mode suffices.
+Reserved publication is immutable and observation-only to a later noncreator;
+no fresh receipt/location reconstructs POST permission. STOPPED still requires
+actual observed Shutdown. Normative effect begins upon integration into dev;
+no J20 qualification or operational activation occurs here.
 
 ## Evidence first
 

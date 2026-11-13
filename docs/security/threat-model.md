@@ -5,10 +5,36 @@ asset_type: "security-model"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Threat Model"
-version: "0.3.1"
+version: "0.4.0"
+adoption_status: "accepted"
 ---
 
 # Review Broker Threat Model
+
+## Ordinary J-CH assurance supplement
+
+The owner-selected ordinary J-CH profile trusts GitHub/issuer, approved qualified
+writers/workflows and protected host within their responsibilities. Arbitrary
+fully privileged history falsification or memory cloning is outside that
+adversarial claim, not defeated by hashes/nonce/PID/CAS. Ordinary bugs, replay,
+wrong transitions, unknown observations, credential leakage, excessive capability,
+fork/reentry/relaunch/bypass and ineffective Shutdown remain defects and gates.
+B/E remain nonpreferred reconsideration options if an in-scope invariant fails.
+
+The [versioned J-CH contracts](../adoption/jch-normative-adoption.md) require
+irreversible AtomicArm in GitHub, original live controller/launcher, strict
+version coexistence/J20 and S2 quiescence/custody. F1 separates execution,
+authenticated actual storage and exact faithful result content. A workload
+signature does not establish original result truth, upload-job custody, process
+identity, provider exactly-once inference or permission to post again.
+
+Storage-purpose OIDC is disjoint and transient; no raw proof/control credential
+reaches reviewer, packet, argv/environment, result or retained evidence. Only
+verified non-secret authorization receipts enter immutable journal custody.
+Actual source/job/policy/bootstrap/credential and all-mutator isolation must be
+qualified separately. Decision27's bounded risk policy is retained; no blanket
+maximal Codex-internals prerequisite is reopened. This supplement takes normative effect upon integration into dev, grants no runtime
+admission and does not rewrite historical exposures or qualifications below.
 
 ## Protected assets
 

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:review-broker:adr-profile:0.1.0",
+  "allOf": [{"$ref": "urn:fanilosendrison:okf:architecture-decision-record:0.1.0"}],
+  "properties": {
+    "domain": {"const": "independent-review"},
+    "id": {"type": "string", "pattern": "^ADR-[0-9]{3}$"},
+    "date": {"type": "string", "format": "date"},
+    "relation_completeness": {"const": "complete"},
+    "extensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document_version", "adoption_packet", "qualified_source"],
+      "properties": {
+        "document_version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)$", "description": "Repository ADR document revisions use release-form SemVer 2.0.0."},
+        "adoption_packet": {"const": "RB91_JCH_GOVERNED_NORMATIVE_ADOPTION"},
+        "qualified_source": {"const": "b7316e5e8cadc718872ea56dfecfb61709c636ce"}
+      }
+    }
+  }
+}

@@ -5,10 +5,32 @@ asset_type: "contract"
 domain: "independent-review"
 severity: "strict"
 name: "Review Evidence v1 Contract"
-version: "0.2.0"
+version: "0.3.0"
+adoption_status: "accepted"
 ---
 
 # Review Evidence v1 Contract
+
+## J-CH supplement
+
+All legacy packet/attempt/validation requirements below remain unchanged.
+For future journal2/j-ch-v1, [result retention](jch-result-retention.md) additionally
+separates immutable original execution/terminal/validation provenance from the
+actual authenticated original-or-recovery storage job and exact result bytes.
+A later storage location cannot relabel execution or change its faithful result.
+
+Original and result artifact metadata/source/branch/URI, chronology, safe archive
+inventory and exact bytes must agree on every relevant fresh read. Corrupt,
+missing, expired or contradictory proof blocks use, not consumed history.
+Schema validity, matching hashes, a workload signature or embedded validation
+alone does not establish faithful public-result projection or publication.
+
+Raw workload JWTs/control-stream bytes never enter packet, attempt artifacts,
+result, logs or uploaded evidence; only the verified non-secret receipt is
+journaled after all gates. [S2 quiescence](jch-recovery-s2.md) and actual Shutdown
+are separately evidenced, never inferred from a terminal JSON event or desired
+state. This amendment takes normative effect upon integration into dev, not as a
+qualification or invocation mandate.
 
 ## Source packet
 

@@ -5,7 +5,8 @@ asset_type: "specification"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker v1 Specification"
-version: "0.7.1"
+version: "0.8.0"
+adoption_status: "accepted"
 ---
 
 # Review Broker v1 Specification
@@ -44,8 +45,10 @@ not authorization for any downstream action.
 
 ## Versioned request boundary
 
-ReviewRequest v1 remains the only implemented request contract. Its logical
-request stays stable while resolution records the exact head, base, merge base,
+ReviewRequest v1 remains supported unchanged. ReviewRequest v2 construction is
+implemented under its accepted versioned request contract; operational admission
+is separate and default-disabled. These request versions do not select journal2
+or J-CH implicitly. A v1 logical request stays stable while resolution records the exact head, base, merge base,
 source manifest, policy, and mission identities. Its canonical bytes,
 identities, claims, attempts, artifacts, journals, publication receipts, and
 result retrieval remain unchanged.
@@ -60,10 +63,13 @@ bytes remain one deterministic claim. Changed-head and same-head repeat reviews
 require distinct authorized requests; neither is automatic. See
 `docs/contracts/review-request-v2.md`.
 
-This publication selects normative semantics only. No v2 parser, executable
-schema, admission path, claim, execution, recovery, or publication path is
-active until separately implemented and qualified. Historical v1 requests are
-never reinterpreted as v2.
+ReviewRequest v2 schema/parsing/identity/admission/predecessor and downstream
+construction were integrated in version0.4.17 (PR41, merge50b89e4ed46963e11846e0159975bdebc0a30f40).
+This implementation-status statement grants no operational qualification or
+activation. Request2 operational admission remains default-disabled and requires
+separate exact authorization. Historical v1 requests are never reinterpreted as
+v2. The separate journal2/J-CH authority is a separate version domain and has no
+operational implementation or admission conferred by this publication.
 
 The implemented subject kind is an explicitly authorized GitHub pull request.
 Other subject kinds are extensibility points only and are not claimed as
@@ -227,6 +233,34 @@ repository mismatches fail closed. Production v3 activation and live use require
 separate qualification and owner approval. This subsection accepts only the
 source-credential boundary for the separately qualified successor path; it does
 not normatively accept ReviewRequest v3 or Reviewer Packet v2 as a whole.
+
+## J-CH authority profile
+
+This owner-accepted scoped amendment takes normative effect only upon integration
+into dev, not upon branch publication or runtime activation. The owner-selected ordinary
+profile uses GitHub as durable consumption authority, one challenge-bound
+AtomicArm, the original protected launcher continuation and disjoint workload
+proof. B/E remain nonpreferred alternatives if an in-scope guarantee cannot be
+qualified. Ordinary errors, leaks, fork/reentry/relaunch/bypass and ineffective
+Shutdown remain defects; arbitrary fully privileged history/memory compromise
+is outside that profile, not allegedly solved by hashes or an extra CAS.
+
+The accepted contracts separately own [journal2](../contracts/jch-journal-v2.md),
+[execution](../contracts/jch-execution-authority.md),
+[workload identity](../contracts/jch-workload-authority.md),
+[F1 retention/publication](../contracts/jch-result-retention.md) and
+[S2 recovery](../contracts/jch-recovery-s2.md). New claims select journal2/j-ch-v1
+from creation only after future J20 and operational admission; no v1 migration.
+Consumption/validation/result/storage/publication are distinct authorities.
+Later authorized recovery storage never changes original execution or faithful
+result identity, grants another model call or reconstitutes a POST capability.
+
+[The ADR/profile/adoption packet](../adoption/jch-normative-adoption.md)
+records the owner-authorized versioned authority transition. Accepted metadata
+on the PR branch remains an integration proposal until merge into dev. Neither
+adoption nor independent GO grants permission to construct, bootstrap, dispatch,
+mint, cut over or invoke. All
+historical consumed attempts and legacy v1 contracts remain applicable unchanged.
 
 ## Required separations
 

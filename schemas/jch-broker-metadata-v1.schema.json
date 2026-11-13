@@ -1,0 +1,315 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fanilosendrison/review-broker/schemas/jch-broker-metadata-v1.schema.json",
+  "title": "Complete broker metadata hash-preimage v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "broker_repository": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "issue_number": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^request:sha256:[0-9a-f]{64}$"
+    },
+    "admission_mode": {
+      "enum": [
+        "comprehensive-security",
+        "low-sensitivity-v1",
+        "bounded-private-v1"
+      ]
+    },
+    "executing_broker_sha": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40,
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "requester": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "subject_repository": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "admission_checks": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requester_authorized": {
+              "const": true,
+              "type": "boolean"
+            },
+            "repository_authorized": {
+              "const": true,
+              "type": "boolean"
+            },
+            "executing_sha_admitted": {
+              "const": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "requester_authorized",
+            "repository_authorized",
+            "executing_sha_admitted"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requester_authorized": {
+              "const": true,
+              "type": "boolean"
+            },
+            "repository_authorized": {
+              "const": true,
+              "type": "boolean"
+            },
+            "executing_sha_admitted": {
+              "const": true,
+              "type": "boolean"
+            },
+            "low_sensitivity_repository_admitted": {
+              "const": true,
+              "type": "boolean"
+            },
+            "public_repository_verified": {
+              "const": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "requester_authorized",
+            "repository_authorized",
+            "executing_sha_admitted",
+            "low_sensitivity_repository_admitted",
+            "public_repository_verified"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requester_authorized": {
+              "const": true,
+              "type": "boolean"
+            },
+            "repository_authorized": {
+              "const": true,
+              "type": "boolean"
+            },
+            "executing_sha_admitted": {
+              "const": true,
+              "type": "boolean"
+            },
+            "bounded_private_request_admitted": {
+              "const": true,
+              "type": "boolean"
+            },
+            "private_repository_verified": {
+              "const": true,
+              "type": "boolean"
+            },
+            "private_source_credential_scope_verified": {
+              "const": true,
+              "type": "boolean"
+            },
+            "public_repository_verified": {
+              "const": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "requester_authorized",
+            "repository_authorized",
+            "executing_sha_admitted",
+            "bounded_private_request_admitted",
+            "private_repository_verified",
+            "private_source_credential_scope_verified",
+            "public_repository_verified"
+          ]
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "broker_repository",
+    "issue_number",
+    "attempt_id",
+    "request_id",
+    "admission_mode",
+    "executing_broker_sha",
+    "requester",
+    "subject_repository",
+    "admission_checks"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "admission_mode": {
+            "const": "comprehensive-security"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "admission_checks": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "requester_authorized": {
+                "const": true,
+                "type": "boolean"
+              },
+              "repository_authorized": {
+                "const": true,
+                "type": "boolean"
+              },
+              "executing_sha_admitted": {
+                "const": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "requester_authorized",
+              "repository_authorized",
+              "executing_sha_admitted"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "admission_mode": {
+            "const": "low-sensitivity-v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "admission_checks": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "requester_authorized": {
+                "const": true,
+                "type": "boolean"
+              },
+              "repository_authorized": {
+                "const": true,
+                "type": "boolean"
+              },
+              "executing_sha_admitted": {
+                "const": true,
+                "type": "boolean"
+              },
+              "low_sensitivity_repository_admitted": {
+                "const": true,
+                "type": "boolean"
+              },
+              "public_repository_verified": {
+                "const": true,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "requester_authorized",
+              "repository_authorized",
+              "executing_sha_admitted",
+              "low_sensitivity_repository_admitted",
+              "public_repository_verified"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "admission_mode": {
+            "const": "bounded-private-v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "admission_checks": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "requester_authorized": {
+                "const": true,
+                "type": "boolean"
+              },
+              "repository_authorized": {
+                "const": true,
+                "type": "boolean"
+              },
+              "executing_sha_admitted": {
+                "const": true,
+                "type": "boolean"
+              },
+              "bounded_private_request_admitted": {
+                "const": true,
+                "type": "boolean"
+              },
+              "private_repository_verified": {
+                "const": true,
+                "type": "boolean"
+              },
+              "private_source_credential_scope_verified": {
+                "const": true,
+                "type": "boolean"
+              },
+              "public_repository_verified": {
+                "const": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "requester_authorized",
+              "repository_authorized",
+              "executing_sha_admitted",
+              "bounded_private_request_admitted",
+              "private_repository_verified",
+              "private_source_credential_scope_verified",
+              "public_repository_verified"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fanilosendrison:okf:architecture-decision-record:0.1.0",
+  "title": "OKF Architecture Decision Record Profile 0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "okf_version",
+    "adr_profile_version",
+    "kind",
+    "asset_type",
+    "domain",
+    "severity",
+    "name",
+    "id",
+    "status",
+    "date",
+    "decision_body_sha256",
+    "relation_completeness",
+    "relations",
+    "governs"
+  ],
+  "properties": {
+    "okf_version": {
+      "const": "1.0"
+    },
+    "adr_profile_version": {
+      "const": "0.1.0"
+    },
+    "kind": {
+      "const": "KnowledgeAsset"
+    },
+    "asset_type": {
+      "const": "architecture-decision-record"
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 1
+    },
+    "severity": {
+      "const": "strict"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^ADR-[0-9]{3,}$"
+    },
+    "status": {
+      "enum": [
+        "proposed",
+        "accepted",
+        "rejected",
+        "deprecated",
+        "superseded"
+      ]
+    },
+    "date": {
+      "oneOf": [
+        {
+          "type": "string",
+          "format": "date",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "decision_body_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "relation_completeness": {
+      "enum": [
+        "complete",
+        "legacy-partial"
+      ]
+    },
+    "relations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clarifies",
+        "amends",
+        "supersedes",
+        "confirms"
+      ],
+      "properties": {
+        "clarifies": {
+          "$ref": "#/$defs/adrIdArray"
+        },
+        "amends": {
+          "$ref": "#/$defs/adrIdArray"
+        },
+        "supersedes": {
+          "$ref": "#/$defs/adrIdArray"
+        },
+        "confirms": {
+          "$ref": "#/$defs/adrIdArray"
+        }
+      }
+    },
+    "governs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "participants": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decision_makers": {
+          "$ref": "#/$defs/nonEmptyStringArray"
+        },
+        "consulted": {
+          "$ref": "#/$defs/nonEmptyStringArray"
+        },
+        "informed": {
+          "$ref": "#/$defs/nonEmptyStringArray"
+        }
+      }
+    },
+    "extensions": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "adrIdArray": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^ADR-[0-9]{3,}$"
+      },
+      "uniqueItems": true
+    },
+    "nonEmptyStringArray": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    }
+  }
+}

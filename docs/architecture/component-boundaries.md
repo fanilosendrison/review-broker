@@ -5,10 +5,35 @@ asset_type: "architecture"
 domain: "independent-review"
 severity: "strict"
 name: "Review Broker Component Boundaries"
-version: "0.1.0"
+version: "0.2.0"
+adoption_status: "accepted"
 ---
 
 # Review Broker Component Boundaries
+
+## J-CH responsibility supplement
+
+This supplement takes normative effect upon integration into dev and does not
+change current executable boundaries. Future
+journal2 uses separate contract owners for [history/AtomicArm](../contracts/jch-journal-v2.md),
+[original execution](../contracts/jch-execution-authority.md),
+[workload/stream identity](../contracts/jch-workload-authority.md),
+[result retention/publication](../contracts/jch-result-retention.md) and
+[S2 recovery](../contracts/jch-recovery-s2.md). The [adoption packet](../adoption/jch-normative-adoption.md)
+keeps formal integration, construction, qualification and admission separate.
+
+The journal owner alone validates versions/monotone parent-child operations and
+expected-old authority; workload identity never proves that operation by itself.
+The controller retains original live session/ACK ownership; the protected
+launcher owns one in-process start continuation; lifecycle custody/quiescence
+is a distinct recovery responsibility. Artifact storage cannot grant invocation.
+
+The retention authority verifies exact original evidence/validation and faithful
+result projection, independently authenticated actual storage job/source/actor
+and every relevant artifact observation. The publisher owns actual actor/Issue
+scope, one reservation creator, exact comment/receipt observation and no repost.
+Source applicability uses its separate admitted source-read authority. None of
+these new contracts is a runtime implementation or qualification claim.
 
 ## Domain contracts
 

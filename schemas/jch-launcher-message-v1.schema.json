@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/fanilosendrison/review-broker/schemas/jch-launcher-message-v1.schema.json",
+  "title": "Bounded J-CH stream messages",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol_id": {
+          "type": "string",
+          "const": "j-ch-v1"
+        },
+        "handshake_version": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "major": {
+              "type": "integer",
+              "const": 1
+            },
+            "minor": {
+              "type": "integer",
+              "const": 0
+            }
+          },
+          "required": [
+            "major",
+            "minor"
+          ]
+        },
+        "message_type": {
+          "type": "string",
+          "const": "HELLO"
+        },
+        "challenge": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^request:sha256:[0-9a-f]{64}$"
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^attempt:sha256:[0-9a-f]{64}$"
+        },
+        "packet_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^packet:sha256:[0-9a-f]{64}$"
+        },
+        "broker_repository_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "codespace_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[A-Za-z0-9-]{1,200}$"
+        },
+        "codespace_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "executing_broker_sha": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "launcher_program_sha256": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "input_sha256": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "capacity_receipt_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+        },
+        "reviewer_runtime_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "distribution": {
+              "type": "string",
+              "const": "@openai/codex"
+            },
+            "distribution_version": {
+              "type": "string",
+              "const": "0.164.0"
+            },
+            "native_executable_sha256": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "permission_profile_sha256": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "distribution",
+            "distribution_version",
+            "native_executable_sha256",
+            "permission_profile_sha256"
+          ]
+        }
+      },
+      "required": [
+        "protocol_id",
+        "handshake_version",
+        "message_type",
+        "challenge",
+        "request_id",
+        "attempt_id",
+        "packet_id",
+        "broker_repository_id",
+        "codespace_name",
+        "codespace_id",
+        "executing_broker_sha",
+        "launcher_program_sha256",
+        "input_sha256",
+        "capacity_receipt_id",
+        "reviewer_runtime_identity"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol_id": {
+          "type": "string",
+          "const": "j-ch-v1"
+        },
+        "handshake_version": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "major": {
+              "type": "integer",
+              "const": 1
+            },
+            "minor": {
+              "type": "integer",
+              "const": 0
+            }
+          },
+          "required": [
+            "major",
+            "minor"
+          ]
+        },
+        "message_type": {
+          "type": "string",
+          "const": "PROOF"
+        },
+        "envelope": {
+          "$ref": "https://github.com/fanilosendrison/review-broker/schemas/jch-arm-envelope-v1.schema.json"
+        },
+        "jwt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32768,
+          "pattern": "^[A-Za-z0-9_-]+[.][A-Za-z0-9_-]+[.][A-Za-z0-9_-]+$"
+        }
+      },
+      "required": [
+        "protocol_id",
+        "handshake_version",
+        "message_type",
+        "envelope",
+        "jwt"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protocol_id": {
+          "type": "string",
+          "const": "j-ch-v1"
+        },
+        "handshake_version": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "major": {
+              "type": "integer",
+              "const": 1
+            },
+            "minor": {
+              "type": "integer",
+              "const": 0
+            }
+          },
+          "required": [
+            "major",
+            "minor"
+          ]
+        },
+        "message_type": {
+          "type": "string",
+          "const": "DONE"
+        },
+        "outcome": {
+          "enum": [
+            "CHILD_EXITED",
+            "ABANDONED",
+            "INDETERMINATE"
+          ]
+        },
+        "invocation_status": {
+          "enum": [
+            "NOT_STARTED",
+            "STARTED",
+            "UNKNOWN"
+          ]
+        },
+        "evidence_ids": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^artifact:sha256:[0-9a-f]{64}$"
+          }
+        }
+      },
+      "required": [
+        "protocol_id",
+        "handshake_version",
+        "message_type",
+        "outcome",
+        "invocation_status",
+        "evidence_ids"
+      ]
+    }
+  ]
+}
