@@ -41,6 +41,12 @@ at those earlier stages, and historical verdicts do not override this current
 adoption boundary. Historical reports, frozen resources and manifests remain
 unchanged.
 
+The [adoption lexical receipt](jch-adoption-lexical-audit.json) records the new
+schema-file hashes separately from the unchanged historical audit. All 164
+observations, 26 expressions, constraints and outcomes match that historical
+report; its inherited scope label describes the original proposed-resource
+catalogue, not current normative effect or operational admission.
+
 ## Provenance and fixed decisions
 
 - Fresh base dev:3057192a6ad4e80663b3b8168cbaa52657c3db27.
