@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/fanilosendrison/review-broker/schemas/jch-storage-authority-basis-v1.schema.json",
-  "title": "Proposed storage authority hash-preimage v1",
+  "title": "Storage authority hash-preimage v1",
   "type": "object",
   "additionalProperties": false,
   "properties": {

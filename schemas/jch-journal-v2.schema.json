@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/fanilosendrison/review-broker/schemas/jch-journal-v2.schema.json",
-  "title": "Proposed J-CH Journal v2",
-  "description": "Proposed normative resource. Formal integration, implementation, J20 and operational admission remain separate.",
+  "title": "J-CH Journal v2",
+  "description": "Owner-accepted normative resource effective only upon integration into dev. Implementation, J20 and operational admission remain separate.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

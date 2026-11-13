@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/fanilosendrison/review-broker/schemas/jch-launcher-message-v1.schema.json",
-  "title": "Proposed bounded J-CH stream messages",
+  "title": "Bounded J-CH stream messages",
   "oneOf": [
     {
       "type": "object",
