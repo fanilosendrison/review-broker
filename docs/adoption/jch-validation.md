@@ -5,7 +5,7 @@ asset_type: "qualification-report"
 domain: "independent-review"
 severity: "draft"
 name: "J-CH Normative Adoption Preparation Validation"
-version: "0.1.7"
+version: "0.1.8"
 adoption_status: "proposed"
 ---
 
@@ -429,7 +429,12 @@ retain the wider values actually expressed by the schema.
 The catalogue excludes shorthand classes, flags, backreferences, lookbehind,
 Unicode properties and other unqualified constructs. Any new expression fails
 admission and requires explicit catalogue review and new equivalence evidence.
-No general regex translator or universal regex conformance claim is made.
+The unqualified regex-bearing `patternProperties` keyword is refused at resource
+admission (root and nested), even for an already catalogued expression, and its
+local validator callback also refuses direct evaluation. No current J-CH resource
+uses this keyword. It is not silently delegated to Python or counted as a new
+qualified regex surface. No general regex translator or universal regex
+conformance claim is made.
 Per-expression reasoning establishes the used operators' correspondence;
 maintained tests independently compare native Node RegExp over deterministic
 mutations, lengths, ASCII scalars, Unicode/astral/surrogate values, separators,
@@ -497,6 +502,39 @@ Its result is historical on those bytes, not erased by later fixes.
 - **Next action:** complete new-source validation, canonical publication,
   literal-SHA Linux CI and NEW independent whole-packet GO. No old source GO or
   CI result qualifies this changed adapter.
+
+### IR132-02 — preserved unsupported-surface NO_GO and correction
+
+The next exact candidate8d2b7ed491c9b28d63db9aada1e17e63f5a4a197 passed all six
+supplied independent oracles and literal Linux CI43334095894:1569 tests, zero
+skips. The fresh global review nevertheless returned
+[NO_GO IR132-02](https://github.com/fanilosendrison/review-broker/pull/113#issuecomment-6841353235).
+Its full report and failures remain unchanged on that source.
+
+- **Statement/source:** `patternProperties` regex keys bypassed the catalogue
+  visitor, while the extended class retained Python selection/classification
+  for that keyword. Independent methods05–07 established root unknown regex,
+  known-regex surface bypass and nested actual-resource mutation acceptance.
+  No existing public J-CH resource used the keyword.
+- **Authority/disposition:** the bounded Issue132 mandate requires refusal of
+  new/unqualified expressions; `no-normative-impact`, qualification/implementation,
+  integration/conformance and documentation layers. No product obligation,
+  schema tightening or live bypass is inferred.
+- **Correction:** refuse that unqualified surface before resource evaluation,
+  at both root and nested locations, and refuse its direct local keyword
+  callback as defense in depth. Known expressions do not automatically qualify
+  a different regex-bearing keyword. No global validator, public resource or
+  historical model changes, and no new regex-property implementation is added.
+- **Verification:** the three unchanged failed reviewer methods were RED before
+  repair and GREEN afterward. A new maintained test covers known/unknown regex
+  keys at root/nested locations, direct local use and an empty surface. All
+  current valid resources and their26 patterns remain supported. The original
+  ten-method reviewer program also had two independent reviewer exception-type
+  oracle errors; those original outputs remain NOT_PASS, separate from the
+  three genuine failures and their targeted unchanged replay.
+- **Next gate:** complete new-source validation/publication and a fresh exact
+  whole-packet independent verdict. Neither earlier1569-test result nor lexical
+  corpus success is transferred as qualification of this changed admission guard.
 
 ## Remaining publication and review gates
 

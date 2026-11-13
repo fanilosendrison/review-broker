@@ -88,6 +88,21 @@ class PatternDialectTests(unittest.TestCase):
             with self.subTest(mutation=mutation),self.assertRaises(ValueError):qualified_resources(resources)
         with self.assertRaises(ValueError):JCHValidator({'pattern':'^new$'}).validate('new')
 
+    def test_regex_property_surface_is_explicitly_unqualified(self):
+        for pattern in ('^unqualified$','^[0-9a-f]{64}$'):
+            for nested in (False,True):
+                resources=deepcopy(RESOURCES)
+                schema=resources['jch-journal-v2.schema.json']
+                target=schema['$defs']['plan']['properties']['artifacts'] if nested else schema
+                target['patternProperties']={pattern:{'const':1}}
+                with self.subTest(pattern=pattern,nested=nested),self.assertRaisesRegex(ValueError,'QUALIFIED'):
+                    qualified_resources(resources)
+            with self.subTest(direct=pattern),self.assertRaisesRegex(ValueError,'QUALIFIED'):
+                JCHValidator({'patternProperties':{pattern:{'const':1}}}).validate({'a'*64+'\n':1})
+        # Even an empty surface is not implicitly a qualified keyword expansion.
+        resource=deepcopy(RESOURCES);resource['jch-journal-v2.schema.json']['patternProperties']={}
+        with self.assertRaisesRegex(ValueError,'QUALIFIED'):qualified_resources(resource)
+
     def test_global_validator_and_public_resources_remain_exact(self):
         original=deepcopy(RESOURCES);before=Draft202012Validator.VALIDATORS['pattern']
         evaluated,registry=qualified_resources(RESOURCES)

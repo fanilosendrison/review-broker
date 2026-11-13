@@ -46,7 +46,14 @@ def pattern_keyword(validator,pattern,instance,schema):
         yield ValidationError(f'{instance!r} does not match qualified pattern {pattern!r}')
 
 
-JCHValidator=validators.extend(Draft202012Validator,{'pattern':pattern_keyword})
+def unqualified_pattern_properties(validator,patterns,instance,schema):
+    # Regex property selection and additionalProperties classification need
+    # their own dialect qualification. No current J-CH resource uses them.
+    raise ValueError('JCH_PATTERN_PROPERTIES_NOT_QUALIFIED')
+
+
+JCHValidator=validators.extend(Draft202012Validator,
+    {'pattern':pattern_keyword,'patternProperties':unqualified_pattern_properties})
 
 
 def qualified_resources(resources):
@@ -60,6 +67,8 @@ No global validator registration or historical resource mutation takes place.
 """
     def inspect(value):
         if isinstance(value,dict):
+            if 'patternProperties' in value:
+                raise ValueError('JCH_PATTERN_PROPERTIES_NOT_QUALIFIED')
             if 'pattern' in value and value['pattern'] not in COMPILED:
                 raise ValueError('JCH_PATTERN_NOT_QUALIFIED')
             if '$schema' in value:
