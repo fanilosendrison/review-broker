@@ -10,6 +10,7 @@ from copy import deepcopy
 import json
 from pathlib import Path
 import re
+import struct
 
 from jsonschema import Draft202012Validator, ValidationError, validators
 from referencing import Registry, Resource
@@ -29,7 +30,14 @@ COMPILED={pattern:re.compile(
 
 def matches(pattern,value):
     if pattern not in COMPILED:raise ValueError('JCH_PATTERN_NOT_QUALIFIED')
-    return COMPILED[pattern].fullmatch(value) is not None
+    # No-flags ECMAScript regexes consume UTF-16 code units, not Unicode code
+    # points. This private matching view changes neither the received value nor
+    # JSON Schema's separate character-count constraints/canonical bytes.
+    units=value
+    if not value.isascii() and any(ord(char)>0xffff for char in value):
+        raw=value.encode('utf-16-le','surrogatepass')
+        units=''.join(map(chr,struct.unpack('<'+'H'*(len(raw)//2),raw)))
+    return COMPILED[pattern].fullmatch(units) is not None
 
 
 def pattern_keyword(validator,pattern,instance,schema):
