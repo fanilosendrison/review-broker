@@ -30,11 +30,11 @@ def relocate(value):
 
 class NormativeSchemaTests(unittest.TestCase):
     def test_promoted_journal_and_reference_have_exact_qualified_constraints(self):
-        for old,new,title in [('rb91-journal-v2-candidate.schema.json','jch-journal-v2.schema.json','Proposed J-CH Journal v2'),
-                              ('rb91-result-reference-v2.schema.json','jch-result-reference-v2.schema.json','Proposed J-CH Result Reference v2')]:
+        for old,new,title in [('rb91-journal-v2-candidate.schema.json','jch-journal-v2.schema.json','J-CH Journal v2'),
+                              ('rb91-result-reference-v2.schema.json','jch-result-reference-v2.schema.json','J-CH Result Reference v2')]:
             value=relocate(json.loads((ROOT/'docs/architecture/qualification'/old).read_text()))
             value['title']=title
-            if 'description' in value:value['description']='Proposed normative resource. Formal integration, implementation, J20 and operational admission remain separate.'
+            if 'description' in value:value['description']='Owner-accepted normative resource effective only upon integration into dev. Implementation, J20 and operational admission remain separate.'
             if new=='jch-journal-v2.schema.json':
                 challenge=value['$defs']['binding']['properties']['challenge']
                 self.assertEqual(challenge,{'pattern':'^[0-9a-f]{64}$','type':'string'})
