@@ -47,7 +47,7 @@ class PatternDialectTests(unittest.TestCase):
                                sample[:len(sample)//2]+separator+sample[len(sample)//2:]))
             for i in range(len(sample)):
                 values.add(sample[:i]+sample[i+1:])
-                for ch in ('A','g','é','\n','\u2028'):
+                for ch in ('A','g','é','😀','\U00010000','\U0010ffff','\ud800','\udfff','\n','\u2028'):
                     values.add(sample[:i]+ch+sample[i+1:])
             vectors.extend([pattern,value] for value in sorted(values))
         script='const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync(0,"utf8")); process.stdout.write(JSON.stringify(v.map(([p,s])=>new RegExp(p).test(s))));'
@@ -56,6 +56,15 @@ class PatternDialectTests(unittest.TestCase):
         expected=json.loads(result.stdout);self.assertEqual(len(expected),len(vectors))
         for (pattern,value),accepted in zip(vectors,expected):
             self.assertEqual(matches(pattern,value),accepted,(pattern,repr(value)))
+
+    def test_utf16_single_wildcard_and_unbounded_negated_classes(self):
+        pattern=next(p for p in CATALOGUE if p.startswith('^https'))
+        for scalar in (0x10000,0x1f600,0x10ffff):
+            ch=chr(scalar)
+            self.assertFalse(matches(pattern,'https://github'+ch+'com/o/r/issues/1#issuecomment-1'))
+            self.assertTrue(matches(pattern,'https://github.com/'+ch+'/r/issues/1#issuecomment-1'))
+        self.assertTrue(matches(pattern,'https://githubécom/o/r/issues/1#issuecomment-1'))
+        self.assertTrue(matches(pattern,'https://githubXcom/o/r/issues/1#issuecomment-1'))
 
     def test_all_ascii_scalars_against_native_engine(self):
         node=shutil.which('node');self.assertIsNotNone(node)
