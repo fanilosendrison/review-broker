@@ -1,4 +1,4 @@
-"""Render explicitly, or purely check, the proposed ADR index."""
+"""Render explicitly, or purely check, the ADR index."""
 import argparse
 from pathlib import Path
 from adr_profile_contract import render_index

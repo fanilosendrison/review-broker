@@ -1,4 +1,4 @@
-"""Read-only validation/rendering of the proposed repository ADR convention.
+"""Read-only validation/rendering of the repository ADR convention.
 
 This is documentation governance tooling, not broker execution or adoption.
 Heterogeneous YAML/JSON values are admitted only after closed-schema checks.
@@ -114,8 +114,8 @@ def render_index(root):
         'version: "0.1.0"','adoption_status: "'+profile['status']+'"','---','','# Review Broker ADRs','',
         'Generated from canonical outgoing metadata. Profile status: '+profile['status']+'.',
         'Validation/rendering performs no acceptance transition or runtime admission.',
-        'No prior repository ADR convention existed. The local naming/profile choice',
-        'is part of the Draft for separate owner integration, not silently active policy.','',
+        'Accepted metadata on the integration branch is a proposal until the',
+        'owner-authorized merge into dev. It grants no operational admission.','',
         'After acceptance, identity/date/relations/governs and Context-through-EOF bytes',
         'are immutable. Only declared lifecycle transitions may change status. Retain',
         'all allocated records; never reuse IDs. Reverse relations below are derived.','',
